@@ -6,6 +6,7 @@ shadow routes are compared against the plan the big path just produced; active r
 
 from __future__ import annotations
 
+import asyncio
 import re
 import time
 from collections.abc import Callable
@@ -18,6 +19,7 @@ import numpy as np
 
 from ragnarok.core.clock import get_clock
 from ragnarok.core.errors import ModelError
+from ragnarok.harness.actionparse import parse_action
 from ragnarok.harness.answer import (
     CAPABILITIES,
     CAPABILITY_ASK,
@@ -75,6 +77,9 @@ class TurnResult:
     answer: Answered | None = None
     task_id: str | None = None
     timings: dict[str, int] = field(default_factory=dict)  # milliseconds per stage: where a turn's time went
+
+
+LLM_PARSED = {"reminder.add", "calendar.add", "mail.send", "mail.draft", "mail.reply", "chat.reply", "drive.create"}
 
 
 class Agent:
@@ -153,9 +158,12 @@ class Agent:
         return any(re.search(p, request, re.I) for sk, p in self.ACTION_WORDS.items() if sk != "reminder.add") and not self._is_question(request)
 
     def _wants_action(self, skill: str, request: str) -> bool:
-        """A write-capable skill runs only if the words of the request actually ask for it: small talk and questions never trigger one."""
+        """A write-capable skill runs only if the request actually asks for it. A clear command wording, or the language model reading the message as an action, counts; small talk and plain questions never do.
+        A trailing question mark does not cancel a clear command ('send a message on discord saying are we on?')."""
         m = self._manifest(skill)
         if m is None or (m.tier < 1 and not m.external_write):
+            return True
+        if match_intent(request) == skill or getattr(self, "_said_action", False):
             return True
         pat = self.ACTION_WORDS.get(skill)
         return bool(pat and re.search(pat, request, re.I)) and not (self._is_question(request) and skill in ("chat.reply", "mail.send", "mail.reply", "calendar.add", "drive.create"))
@@ -167,6 +175,18 @@ class Agent:
         return datetime.fromtimestamp(get_clock().now_ms() / 1000).astimezone().strftime("%A %Y-%m-%d %H:%M %Z")
 
     async def _single_skill_plan(self, text: str, skill: str, snippets: list[str]) -> Plan | None:
+        """Parameters by code from well-formed wording; when the wording is loose (typos, another language, no keywords) the language model reads the sentence instead, and code validates what it found."""
+        plan = await self._single_skill_plan_rules(text, skill, snippets)
+        if plan is not None:
+            return plan
+        if skill in LLM_PARSED:
+            llm = await self._plan_from_model(text, skill)
+            if llm is not None:
+                self._clarify = None
+                return llm
+        return None
+
+    async def _single_skill_plan_rules(self, text: str, skill: str, snippets: list[str]) -> Plan | None:
         m = self._manifest(skill)
         if m is None:
             return None
@@ -245,6 +265,76 @@ class Agent:
             except jsonschema.ValidationError:
                 continue
             return Plan(nodes=[PlanNode(id="n1", goal=text[:200], skill=skill, params=res.parsed or {}, criteria=CRITERIA.get(skill) or [{"kind": "ok"}])])
+        return None
+
+    async def _plan_from_model(self, text: str, skill: str) -> Plan | None:
+        p = await parse_action(self.gw, text)
+        if p is None or p.skill != skill and not ({p.skill, skill} <= {"mail.send", "mail.draft"}):
+            return None
+        return await self._plan_from_parsed(text, p, skill)
+
+    @staticmethod
+    def _faithful(body: str, request: str) -> bool:
+        """The words to send or remember must come from what the user said: most of their significant words appear in the request (a model must not invent message text)."""
+        letters = [c for c in request if c.isalpha()]
+        if letters and sum(1 for c in letters if ord(c) > 0x24F) / len(letters) > 0.3:
+            return True  # another script (Devanagari, Arabic, CJK...): words cannot be compared with a Latin-script body, and the approval card shows the text before anything is sent
+        ws = [w for w in re.findall(r"[^\W\d_]{3,}|\d+", body.lower())]
+        if not ws:
+            return True
+        low = request.lower()
+        return sum(1 for w in ws if w in low) / len(ws) >= 0.6
+
+    async def _plan_from_parsed(self, text: str, p: Any, skill: str | None = None) -> Plan | None:
+        skill = skill or p.skill
+        if skill not in LLM_PARSED or self._manifest(skill) is None:
+            return None
+        f = p.fields
+        from datetime import datetime as _dt
+
+        from ragnarok.router.when import parse_when
+
+        def node(params: dict[str, str]) -> Plan:
+            return Plan(nodes=[PlanNode(id="n1", goal=text[:200], skill=skill, params=params, criteria=CRITERIA[skill])])
+
+        now = _dt.fromtimestamp(get_clock().now_ms() / 1000)
+        if skill in ("reminder.add", "calendar.add"):
+            what = f.get("body") or f.get("title") or ""
+            when = f.get("when", "")
+            if not what or not self._faithful(what, text):
+                return None
+            if when and parse_when(when, now) is None:
+                self._clarify = "I could not tell what time that is. Say it like 'tomorrow at 3pm'."
+                return None
+            if skill == "reminder.add":
+                nodes = [PlanNode(id="n1", goal=text[:200], skill=skill, params={"text": what, "when": when}, criteria=CRITERIA[skill])]
+                if when and self._mirror is not None and self._mirror() and self._manifest("calendar.add") is not None:
+                    nodes.append(PlanNode(id="n2", goal="put it on the calendar", skill="calendar.add", params={"title": what, "when": when}, criteria=CRITERIA["calendar.add"]))
+                return Plan(nodes=nodes)
+            return node({"title": f.get("title") or what, "when": when}) if when else None
+        if skill == "chat.reply":
+            platform, target, body = f.get("platform", "").lower(), f.get("target", ""), f.get("body", "")
+            if platform not in ("telegram", "discord", "slack") or not body or not self._faithful(body, text):
+                return None
+            if not target:
+                recent = self.reader.recent_items(limit=1, source=platform)
+                target = str(recent[0]["title"]) if recent and recent[0]["title"] else ""
+            return node({"platform": platform, "target": target, "text": body}) if target else None
+        if skill in ("mail.send", "mail.draft"):
+            to, body, subject = f.get("to", ""), f.get("body", ""), f.get("subject", "")
+            if not to or "@" not in to or to.lower() not in text.lower() or not (body or subject):
+                return None
+            if body and not self._faithful(body, text):
+                return None
+            if not body:
+                subject, body = await self._write_mail(to, subject)
+                if not body:
+                    return None
+            return node({"to": to, "subject": subject or "(no subject)", "body": body})
+        if skill == "mail.reply":
+            return node({"target": f["target"], "body": f["body"]}) if f.get("target") and f.get("body") and self._faithful(f["body"], text) else None
+        if skill == "drive.create":
+            return node({"title": f["title"], "text": f.get("body", "")}) if f.get("title") and f.get("body") and self._faithful(f["body"], text) else None
         return None
 
     async def _write_mail(self, to: str, topic: str) -> tuple[str, str]:
@@ -377,6 +467,7 @@ class Agent:
             if said:
                 dec = RouteDecision(tier="L1", intent_family="memory_cmd", skills=[], plan_needed=False, risk_floor=0, memory_types=["semantic", "episodic"], confidence=1.0, latency_ms=0.0, backend="rule")
                 return TurnResult("L1", dec, None, None, (time.perf_counter() - t0) * 1000, answer=Answered(said, grounded=True), timings=tm)
+        strong = match_intent(request)  # a clear command wording (a strong cue): none of the read-only keyword gates below may take it over
         decomposer_note = ""
         if trust in ("user_direct", "agent") and is_compound(request):  # FR3.1: several steps in one request become a small execution graph, by code
             d = decompose(request)
@@ -396,16 +487,29 @@ class Agent:
             txt = n.strftime("It is %H:%M on %A %d %B %Y") + f" ({n.tzname()})."
             dec = RouteDecision(tier="L1", intent_family="clock", skills=[], plan_needed=False, risk_floor=0, memory_types=[], confidence=1.0, latency_ms=0.0, backend="rule")
             return TurnResult("L1", dec, None, None, (time.perf_counter() - t0) * 1000, answer=Answered(txt), timings=tm)
-        if self.answerer is not None and CAPABILITY_ASK.search(request) and not self._is_action_request(request.replace("can you", "")):
+        if strong is None and self.answerer is not None and CAPABILITY_ASK.search(request) and not self._is_action_request(request.replace("can you", "")):
             dec = RouteDecision(tier="L1", intent_family="capabilities", skills=[], plan_needed=False, risk_floor=0, memory_types=[], confidence=1.0, latency_ms=0.0, backend="rule")
             return TurnResult("L1", dec, None, None, (time.perf_counter() - t0) * 1000, answer=Answered(CAPABILITIES))
-        u = await understand(self.gw, request, history) if (self.answerer is not None and trust in ("user_direct", "agent") and request.strip() and match_intent(request) is None) else None  # an unambiguous command (strong cue + target) goes straight to the router: faster, and it keeps route learning
-        mark("understand", t0 + sum(tm.values()) / 1000) if u else None
+        self._said_action = False
+        u = pa = None
+        if self.answerer is not None and trust in ("user_direct", "agent") and request.strip():
+            if strong is None:
+                u, pa = await asyncio.gather(understand(self.gw, request, history), parse_action(self.gw, request))  # one reading for what it is, one for what to do; both are small and run together
+            else:
+                pa = await parse_action(self.gw, request)  # a clear command wording: only the details are read by the model
+        # the two readings must agree it is a request to DO something: a message the understanding reads as a question, a summary, the calendar or the screen is never turned into an action
+        accept = pa is not None and (strong is not None or (u is None and not self._is_question(request)) or (u is not None and (u.intent == "action" or (u.intent in ("chat", "unclear") and not self._is_question(request)))))
+        if accept and (plan_llm := await self._plan_from_parsed(request, pa)) is not None:
+            dec = RouteDecision(tier="L2", intent_family="action", skills=[n.skill for n in plan_llm.nodes], plan_needed=len(plan_llm.nodes) > 1, risk_floor=0, memory_types=memory_types_hint(request), confidence=0.9, latency_ms=0.0,
+                                backend="language-model", trace=["The language model read who, what and when from your own words; code checked every field; anything that sends or changes something still needs your click"])
+            return await self._run_plan(request, dec, plan_llm, "L2", [], t0, tm)
+        self._clarify = None if pa is not None else getattr(self, "_clarify", None)
+        self._said_action = bool(u is not None and u.intent == "action")
         if u is not None and u.intent != "action":  # the model decided this is not a request to DO something: it can only be answered, never acted on
             res = await self._answer_intent(request, u, history, trust, t0, tm)
             if res is not None:
                 return res
-        if self.vision is not None and SCREEN_ASK.search(request) and not self._is_action_request(re.sub(r"\b(?:read|check)\b", "", request, flags=re.I)):
+        if strong is None and self.vision is not None and SCREEN_ASK.search(request) and not self._is_action_request(re.sub(r"\b(?:read|check)\b", "", request, flags=re.I)):
             dec = RouteDecision(tier="L1", intent_family="vision", skills=[], plan_needed=False, risk_floor=0, memory_types=[], confidence=1.0, latency_ms=0.0, backend="vision",
                                 trace=["You asked about your screen: one capture, sent only to the local vision model, never stored"])
             if trust != "user_direct":  # a schedule or another autonomous run may never look at the screen
@@ -415,20 +519,20 @@ class Agent:
             except Exception as exc:  # noqa: BLE001
                 text = str(exc) if getattr(exc, "code", "").startswith("E_") else "I could not look at the screen."
             return TurnResult("L1", dec, None, None, (time.perf_counter() - t0) * 1000, answer=Answered(text, grounded=False, notes=["vision"]), timings=tm)
-        if self.answerer is not None and is_catchup(request):  # a briefing is read-only and needs no routing
+        if strong is None and self.answerer is not None and is_catchup(request):  # a briefing is read-only and needs no routing
             ans = await self.answerer.catch_up(request)
             dec = RouteDecision(tier="L1", intent_family="catchup", skills=[], plan_needed=False, risk_floor=0, memory_types=[], confidence=1.0, latency_ms=0.0, backend="catchup")
             return TurnResult("L1", dec, None, None, (time.perf_counter() - t0) * 1000, answer=ans)
-        if self.answerer is not None and (srcs := source_recall(request)) is not None and not is_agenda(request) and not is_catchup(request):
+        if strong is None and self.answerer is not None and (srcs := source_recall(request)) is not None and not is_agenda(request) and not is_catchup(request):
             ans = await self.answerer.recent_from(srcs)
             dec = RouteDecision(tier="L1", intent_family="recall", skills=[], plan_needed=False, risk_floor=0, memory_types=["episodic"], confidence=1.0, latency_ms=0.0, backend="rule")
             return TurnResult("L1", dec, None, None, (time.perf_counter() - t0) * 1000, answer=ans)
-        if self.answerer is not None and COMPLAINT.search(request) and history:
+        if strong is None and self.answerer is not None and COMPLAINT.search(request) and history:
             dec = RouteDecision(tier="L1", intent_family="complaint", skills=[], plan_needed=False, risk_floor=0, memory_types=[], confidence=1.0, latency_ms=0.0, backend="rule")
             msg = ("Sorry about that. Tell me again as a clear command and I will do it; anything that changes something outside this computer waits for your click in the Approvals tab, "
                    "so if no card appears there, I did not understand it as an action.")
             return TurnResult("L1", dec, None, None, (time.perf_counter() - t0) * 1000, answer=Answered(msg))
-        if self.answerer is not None and (is_smalltalk(request) or is_agenda(request)):  # conversation and agendas need no routing and no tool
+        if strong is None and self.answerer is not None and (is_smalltalk(request) or is_agenda(request)):  # conversation and agendas need no routing and no tool
             ans = await (self.answerer._general(request, history) if is_smalltalk(request) else self.answerer.agenda(request))
             dec = RouteDecision(tier="L1", intent_family="general" if is_smalltalk(request) else "agenda", skills=[], plan_needed=False, risk_floor=0, memory_types=[], confidence=1.0, latency_ms=0.0, backend="rule")
             return TurnResult("L1", dec, None, None, (time.perf_counter() - t0) * 1000, answer=ans)

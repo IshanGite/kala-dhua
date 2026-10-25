@@ -183,7 +183,7 @@ class Proactive:
 
     # settings -------------------------------------------------------
     def settings(self) -> dict[str, Any]:
-        return {"briefing_at": self._s.get("briefing_at", "08:00") or None, "os_notify": self._s.get("os_notify", "1") == "1", "enabled": self._s.get("proactive", "1") == "1"}
+        return {"briefing_at": self._s.get("briefing_at", "08:00") or None, "os_notify": self._s.get("os_notify", "0") == "1", "enabled": self._s.get("proactive", "1") == "1"}
 
     def configure(self, *, briefing_at: str | None | bool = False, os_notify: bool | None = None, enabled: bool | None = None) -> None:
         if briefing_at is not False:

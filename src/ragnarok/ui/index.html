@@ -76,6 +76,7 @@ header{background:linear-gradient(180deg,var(--panel),var(--bg))}
 .pill{font-size:12px;border-radius:99px;padding:2px 10px;background:var(--chip);color:var(--mute);white-space:nowrap}
 .ib{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:10px;width:34px;height:34px;display:grid;place-items:center;cursor:pointer;flex:none}
 .ib:hover{border-color:var(--accent)}.ib svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.ib.rec{background:var(--bad);border-color:var(--bad);color:#fff;animation:pulse2 1.2s infinite}@keyframes pulse2{0%{box-shadow:0 0 0 0 #a42d2d66}70%{box-shadow:0 0 0 9px #a42d2d00}100%{box-shadow:0 0 0 0 #a42d2d00}}
 .ib.stop{background:var(--bad);border-color:var(--bad);color:#fff}
 .ib.go{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .row2{display:flex;gap:8px;align-items:flex-end}
@@ -119,7 +120,7 @@ textarea#q{flex:1;resize:none;max-height:140px;min-height:38px;line-height:1.4}
   <span class="logo">R</span>
   <h1>Ragnarok</h1><span id="demopill" class="pill" style="display:none;background:var(--warn2);color:var(--warn);font-weight:700" title="Synthetic data, every send is a local fake. Nothing touches your real accounts.">DEMO</span>
   <span class="grow small"><span id="dot" class="dot" title="status" style="display:inline-block;margin-right:6px"></span><span id="state">connecting</span><span id="live"></span></span>
-  <button id="themeb" class="ib" title="Switch light / dark" aria-label="Switch theme"><svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+  <button id="pinb" class="ib" title="Pin to a screen edge, split screen, desktops" aria-label="Window options"><svg viewBox="0 0 24 24"><path d="M12 17v5M9 3h6l-1 6 3 4H7l3-4z"/></svg></button><button id="themeb" class="ib" title="Switch light / dark" aria-label="Switch theme"><svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
   <button id="syncb" class="btn" title="Check every connected app right now">Sync now</button>
   <button id="sw" class="sw" role="switch" aria-checked="true" aria-label="Always-on ingestion"></button>
 </header>
@@ -150,7 +151,7 @@ textarea#q{flex:1;resize:none;max-height:140px;min-height:38px;line-height:1.4}
       <div class="small" style="margin-top:6px">Tip: type a question first (for example "what is the total?") and it answers that instead.</div>
     </div>
     <div class="qa" id="qa" style="display:none"></div>
-    <form id="f"><button type="button" class="ib" id="attb" title="Ask about a picture (or paste / drop one)" aria-label="Attach picture"><svg viewBox="0 0 24 24"><path d="M21 12l-8.5 8.5a5 5 0 0 1-7-7L14 5a3.5 3.5 0 0 1 5 5l-8.5 8.5a2 2 0 0 1-3-3L15 8"/></svg></button><button type="button" class="ib" id="shotb" title="Look at my screen: whole screen, a part, or a window" aria-label="Explain my screen"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg></button><input type="file" id="file" accept="image/png,image/jpeg,image/webp" style="display:none"><textarea id="q" rows="1" autocomplete="off" placeholder="Message Ragnarok   (Enter to send, Shift+Enter for a new line)" aria-label="Message" maxlength="4000"></textarea><button class="ib go" type="submit" id="sendb" title="Send" aria-label="Send"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></form>
+    <form id="f"><button type="button" class="ib" id="attb" title="Ask about a picture (or paste / drop one)" aria-label="Attach picture"><svg viewBox="0 0 24 24"><path d="M21 12l-8.5 8.5a5 5 0 0 1-7-7L14 5a3.5 3.5 0 0 1 5 5l-8.5 8.5a2 2 0 0 1-3-3L15 8"/></svg></button><button type="button" class="ib" id="shotb" title="Look at my screen: whole screen, a part, or a window" aria-label="Explain my screen"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg></button><button type="button" class="ib" id="micb" title="Speak: click to start, click again to stop (runs on this computer, any language)" aria-label="Voice input"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button><input type="file" id="file" accept="image/png,image/jpeg,image/webp" style="display:none"><textarea id="q" rows="1" autocomplete="off" placeholder="Message Ragnarok   (Enter to send, Shift+Enter for a new line)" aria-label="Message" maxlength="4000"></textarea><button class="ib go" type="submit" id="sendb" title="Send" aria-label="Send"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></form>
   </section>
   <section id="dig">
     <div class="bar">
@@ -171,6 +172,15 @@ textarea#q{flex:1;resize:none;max-height:140px;min-height:38px;line-height:1.4}
   <section id="act"><div class="pad" id="feed"></div></section>
   <section id="src"><div class="pad" id="srcbox"></div></section>
 </main>
+<div id="edgemenu" class="pop" style="display:none;position:fixed;left:50%;top:56px;bottom:auto;transform:translateX(-50%);width:min(340px,calc(100% - 24px))" role="dialog" aria-label="Window options">
+  <div class="pt" id="em_t">Window options</div><div class="small" id="em_s"></div>
+  <div class="pb" style="flex-direction:column;align-items:stretch">
+    <button class="btn pri" id="em_pin" type="button">Pin here</button>
+    <button class="btn" id="em_snap" type="button">Split screen: take this half</button>
+    <button class="btn" id="em_all" type="button">Show on every desktop: off</button>
+    <button class="btn" id="em_new" type="button">Move to the next desktop</button>
+    <button class="btn" id="em_no" type="button">Not now</button>
+  </div><div class="small" id="em_msg" style="margin-top:6px"></div></div>
 <div class="toasts" id="toasts"></div>
 <script>
 (function(){
@@ -275,6 +285,35 @@ textarea#q{flex:1;resize:none;max-height:140px;min-height:38px;line-height:1.4}
     Object.keys(inline).forEach(function(id){if(!ids[id]){var b=inline[id];delete inline[id];if(!b.querySelector(".done"))setTimeout(function(){b.remove()},300)}})}
   document.addEventListener("keydown",function(e){if(e.key==="Escape"&&busy){stop()}});
 
+  /* ---------------- voice (local speech to text, any language) ---------------- */
+  var LANG={en:"English",es:"Spanish",fr:"French",de:"German",it:"Italian",pt:"Portuguese",nl:"Dutch",ru:"Russian",zh:"Chinese",ja:"Japanese",ko:"Korean",hi:"Hindi",mr:"Marathi",bn:"Bengali",ta:"Tamil",te:"Telugu",gu:"Gujarati",pa:"Punjabi",ur:"Urdu",ar:"Arabic",tr:"Turkish",pl:"Polish",uk:"Ukrainian",id:"Indonesian",vi:"Vietnamese",th:"Thai"};
+  var recording=false,recTimer=null,recStart=0,autoSend=store("voice_auto")!=="0";
+  function micUi(on){recording=on;var b=$("micb");b.className="ib"+(on?" rec":"");b.title=on?"Click to stop":"Speak: click to start, click again to stop (runs on this computer, any language)";
+    q.placeholder=on?"Listening... click the microphone again when you are done":"Message Ragnarok   (Enter to send, Shift+Enter for a new line)";clearInterval(recTimer);if(on){recStart=Date.now();recTimer=setInterval(function(){q.placeholder="Listening... "+((Date.now()-recStart)/1000|0)+" s (click the microphone to stop)"},500)}}
+  function micHelp(r){var m=addBot((r.detail||"I could not use the microphone.")+"");var ob=el("button","btn","Allow microphone and speech");ob.style.marginTop="8px";ob.onclick=function(){ob.disabled=true;ob.textContent="Check the system prompt...";api("/voice/permissions",{}).then(function(x){ob.textContent=(x.granted&&x.granted.mic)?"Microphone allowed. Try again.":"Not allowed yet: open System Settings > Privacy & Security > Microphone"})};m._bub.appendChild(ob)}
+  $("micb").onclick=function(){if(busy)return;
+    if(!recording){api("/voice/start",{}).then(function(r){if(r.ok)micUi(true);else micHelp(r)}).catch(function(){})}
+    else{micUi(false);var tmp=waiting("Listening back (on this computer)");api("/voice/stop",{}).then(function(r){tmp.remove();if(!r.ok){micHelp(r);return}
+        if(!r.text){toast("I did not hear anything. Try again a little closer.");return}
+        var lang=(r.language||"").split("-")[0],nm=LANG[lang]||"";if(nm&&lang!=="en")toast("Heard "+nm);
+        q.value=r.text;grow();q.focus();if(autoSend)setTimeout(function(){if(q.value===r.text){var t=q.value;q.value="";grow();send(t)}},700)}).catch(function(){tmp.remove()})}};
+  /* ---------------- window shell: pin to an edge (the raven waits there), split screen, desktops ---------------- */
+  var emEdge="right",emAll=false;
+  function emClose(){$("edgemenu").style.display="none"}
+  window.showEdgeMenu=function(edge){emEdge=edge||"right";var side=emEdge==="left"?"left":"right";
+    $("em_t").textContent=edge?("You moved me to the "+emEdge+" edge"):"Window options";
+    $("em_s").textContent="Pin me here and Muninn the raven waits at the edge. Click the raven to bring me back.";
+    $("em_pin").textContent="Pin here: hide the window, raven waits on the "+emEdge+" edge";$("em_snap").textContent="Split screen: take the "+side+" half of this screen";
+    $("em_all").textContent="Show on every desktop: "+(emAll?"on":"off");$("em_msg").textContent="";$("edgemenu").style.display="block"};
+  function shellCall(path,msg){api(path,{}).then(function(r){if(r.error==="E_NO_WINDOW"){$("em_msg").textContent="This works in the Ragnarok app window, not in a browser tab.";return}
+      if(r.ok===false){$("em_msg").textContent=r.error==="E_ACCESSIBILITY"?"macOS needs permission to switch desktops: System Settings > Privacy & Security > Accessibility > turn on Terminal.":"That did not work here."}else if(msg){emClose();toast(msg)}}).catch(function(){})}
+  $("em_pin").onclick=function(){emClose();api("/shell/pin?edge="+emEdge,{})};
+  $("em_snap").onclick=function(){shellCall("/shell/snap?side="+(emEdge==="left"?"left":"right"),"Split screen: the other half of your screen is free for another app")};
+  $("em_all").onclick=function(){emAll=!emAll;$("em_all").textContent="Show on every desktop: "+(emAll?"on":"off");shellCall("/shell/desktops?on="+emAll,null)};
+  $("em_new").onclick=function(){shellCall("/shell/newdesktop","Moved to the next desktop")};
+  $("em_no").onclick=emClose;
+  $("pinb").onclick=function(){api("/shell/state").then(function(s){emAll=!!s.all_desktops;window.showEdgeMenu(s.near_edge||s.edge||"right")}).catch(function(){window.showEdgeMenu("right")})};
+
   /* ---------------- header, sources, live status ---------------- */
   var sw=$("sw");
   sw.onclick=function(){var on=sw.getAttribute("aria-checked")!=="true";api("/toggle",{enabled:on}).then(refresh)};
@@ -295,17 +334,26 @@ textarea#q{flex:1;resize:none;max-height:140px;min-height:38px;line-height:1.4}
       var ln=s.last_new?("last new "+ago(s.last_new)):"nothing new yet";
       g.appendChild(el("div","small "+(s.ok===false?"err":""),s.ok===null||s.ok===undefined?"waiting for the first check":s.ok?("checked "+ago(s.at)+" - "+ln+" - every "+(s.interval<1?"moment":s.interval+"s")):("problem: "+(s.code||"error")+" - retrying")));
       r.appendChild(g);box.appendChild(r)});
+    box.appendChild(el("h2","","Voice"));var vc=el("div","card");vc.id="voicecard";box.appendChild(vc);loadVoice();
     box.appendChild(el("h2","","Desktop notifications"));var nb=el("div","card");nb.id="notifcard";box.appendChild(nb);loadNotif();
     box.appendChild(el("h2","","Daily briefing"));
     var st=el("div","card");st.appendChild(el("div","small","Time of your daily briefing (empty = off)."));
     var bt=el("input");bt.type="time";bt.id="briefat";bt.style.cssText="margin-top:6px;max-width:150px";st.appendChild(bt);
     var sv=el("button","btn","Save");sv.style.marginLeft="8px";sv.onclick=function(){var v=bt.value;api("/proactive",v?{briefing_at:v}:{briefing_off:true}).then(function(){sv.textContent="Saved";setTimeout(function(){sv.textContent="Save"},1200)})};st.appendChild(sv);
-    api("/inbox").then(function(d){if(d.settings&&d.settings.briefing_at)bt.value=d.settings.briefing_at});box.appendChild(st);
+    api("/inbox").then(function(d){if(d.settings&&d.settings.briefing_at)bt.value=d.settings.briefing_at;if(d.settings)osn.setAttribute("aria-checked",!!d.settings.os_notify)});box.appendChild(st);
+    box.appendChild(el("h2","","System notifications"));var nc=el("div","card");nc.appendChild(el("div","","Pop-up banners from your computer"));nc.appendChild(el("div","small","Off by default. Everything (needs-you flags, heads-ups, reminders) is always in the Inbox and shown in the window. On macOS the banners appear under the name Script Editor."));
+    var osn=el("button","sw");osn.setAttribute("role","switch");osn.setAttribute("aria-label","System notifications");osn.setAttribute("aria-checked","false");osn.style.marginTop="8px";osn.onclick=function(){var on=osn.getAttribute("aria-checked")!=="true";osn.setAttribute("aria-checked",on);api("/proactive",{os_notify:on})};nc.appendChild(osn);box.appendChild(nc);
     box.appendChild(el("h2","","Skills"));
     var sk=el("div","card");var skl=el("div");skl.id="skl";sk.appendChild(skl);
     var rp=el("input");rp.type="text";rp.placeholder="Folder of a skill to register";rp.style.cssText="width:100%;margin-top:8px";sk.appendChild(rp);
     var rb=el("button","btn","Register");rb.style.marginTop="6px";var rmsg=el("div","small");rb.onclick=function(){if(!rp.value.trim())return;api("/skills/register",{path:rp.value.trim()}).then(function(r){rmsg.textContent=r.ok?("Registered "+r.name+(r.blocked?" - BLOCKED by the install scan":" - turn it on below")):("Not registered: "+(r.detail||r.error));loadSkills()})};sk.appendChild(rb);sk.appendChild(rmsg);
     box.appendChild(sk);loadSkills();box.scrollTop=keep}
+  function loadVoice(){api("/voice/status").then(function(d){var c=$("voicecard");if(!c)return;c.textContent="";
+      if(!d.available){c.appendChild(el("div","small","Voice input is not available on this system yet."));return}
+      c.appendChild(el("div","",d.multilingual?"Local Whisper: about 99 languages, detected automatically":"Apple on-device speech: English (more languages if installed in System Settings > Keyboard > Dictation)"));
+      var p=d.permissions||{};c.appendChild(el("div","small","Microphone: "+(p.mic||"unknown")+" - Speech recognition: "+(p.speech||"unknown")));
+      var row=el("div","row");row.style.borderBottom="0";var ab=el("button","btn","Allow microphone and speech");ab.onclick=function(){ab.disabled=true;api("/voice/permissions",{}).then(function(){ab.disabled=false;loadVoice()})};row.appendChild(ab);
+      var au=el("button","btn",autoSend?"Send after speaking: on":"Send after speaking: off");au.onclick=function(){autoSend=!autoSend;store("voice_auto",autoSend?"1":"0");au.textContent=autoSend?"Send after speaking: on":"Send after speaking: off"};row.appendChild(au);c.appendChild(row)}).catch(function(){})}
   function loadNotif(){api("/notifications").then(function(d){var c=$("notifcard");if(!c)return;c.textContent="";
       if(d.available){c.appendChild(el("div","ok","Allowed. Notifications from the apps you list are read and grouped in the Digest."))}
       else{var h=el("div","hint");h.appendChild(el("div","","I can not read notifications yet."));h.appendChild(el("div","small",(d.detail||"macOS has not allowed it")+". Allow Full Disk Access for the app that started Ragnarok (for example Terminal), then quit and start it again."));

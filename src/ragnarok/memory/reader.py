@@ -209,6 +209,12 @@ class MemoryReader:
             if words:
                 cond = " AND ".join("lower(title) LIKE ?" for _ in words)
                 row = self._r.execute(f"SELECT native_id, title FROM items WHERE source=? AND {cond} ORDER BY coalesce(occurred_at,0) DESC LIMIT 1", (source, *[f"%{w}%" for w in words])).fetchone()
+        if row is None:
+            words = [w for w in re.findall(r"[\w#@.-]+", name.lower()) if w not in self.CHAT_FILLER and len(w) > 2]
+            for w in words:  # 'priya on slack general': a conversation named after any one of the words, or one a person of that name wrote in
+                row = self._r.execute("SELECT native_id, title FROM items WHERE source=? AND (lower(title) LIKE ? OR lower(flags_json) LIKE ?) ORDER BY coalesce(occurred_at,0) DESC LIMIT 1", (source, f"%{w}%", f"%{w}%")).fetchone()
+                if row is not None:
+                    break
         return dict(row) if row else None
 
     def items_by_person(self, comp_id: str, person: str, *, limit: int = 8) -> list[dict[str, Any]]:

@@ -38,11 +38,18 @@ class Services:
     digest: Any = None  # the digest engine
     vision: Any = None  # explain the screen / ask about an image
     demo: Any = None  # demo mode state (synthetic data, fake sends), or None
+    voice: Any = None  # the microphone recorder
+    shell: Any = None  # the window shell: pin, snap, desktops, the raven (None when there is no native window)
 
 
 class ChatIn(BaseModel):
     text: str = Field(min_length=1, max_length=4000)
     quick_s: float | None = Field(default=None, ge=0, le=10)  # how long to wait for an immediate answer before returning a job to poll (the window uses a short wait so Stop is available at once)
+
+
+class MascotMove(BaseModel):
+    dx: int = Field(ge=-400, le=400)
+    dy: int = Field(ge=-400, le=400)
 
 
 class ToggleIn(BaseModel):
@@ -99,7 +106,7 @@ def create_app(guard: TokenGuard | None = None, port: int = DEFAULT_PORT, servic
     guard = guard or TokenGuard()
     svc = services or Services()
     app = FastAPI(title="Ragnarok", docs_url=None, redoc_url=None, openapi_url=None)
-    app.add_middleware(LocalOnlyMiddleware, port=port, guard=guard, public_paths=frozenset({"/healthz", "/"}))
+    app.add_middleware(LocalOnlyMiddleware, port=port, guard=guard, public_paths=frozenset({"/healthz", "/", "/mascot"}))
     app.state.guard, app.state.services = guard, svc
 
     ui_file = Path(__file__).resolve().parents[1] / "ui" / "index.html"
@@ -107,6 +114,12 @@ def create_app(guard: TokenGuard | None = None, port: int = DEFAULT_PORT, servic
     @app.get("/", response_class=HTMLResponse)
     async def ui() -> str:
         return ui_file.read_text(encoding="utf-8")  # no secrets in the page; the session token arrives in the URL fragment from the launcher
+
+    mascot_file = Path(__file__).resolve().parents[1] / "ui" / "mascot.html"
+
+    @app.get("/mascot", response_class=HTMLResponse)
+    async def mascot_page() -> str:
+        return mascot_file.read_text(encoding="utf-8")
 
     @app.get("/healthz")
     async def healthz() -> dict[str, Any]:
@@ -315,6 +328,49 @@ def create_app(guard: TokenGuard | None = None, port: int = DEFAULT_PORT, servic
         subprocess.run(["open", f"x-apple.systempreferences:com.apple.preference.security?{panes[pane]}"], check=False, timeout=10)  # noqa: S603, S607
         return {"ok": True}
 
+    @app.get("/shell/state")
+    async def shell_state() -> dict[str, Any]:
+        return svc.shell.state() if svc.shell else {"available": False}
+
+    @app.post("/shell/pin")
+    async def shell_pin(edge: str | None = None) -> dict[str, Any]:
+        return svc.shell.pin(edge) if svc.shell else {"ok": False, "error": "E_NO_WINDOW"}
+
+    @app.post("/shell/minimize")
+    async def shell_minimize() -> dict[str, Any]:
+        """Minimize the window; the raven waits where it was pinned until it is clicked."""
+        if not svc.shell:
+            return {"ok": False, "error": "E_NO_WINDOW"}
+        return svc.shell.minimize()
+
+    @app.post("/shell/restore")
+    async def shell_restore() -> dict[str, Any]:
+        return svc.shell.restore() if svc.shell else {"ok": False, "error": "E_NO_WINDOW"}
+
+    @app.post("/shell/snap")
+    async def shell_snap(side: str = "right") -> dict[str, Any]:
+        return svc.shell.snap("left" if side == "left" else "right") if svc.shell else {"ok": False, "error": "E_NO_WINDOW"}
+
+    @app.post("/shell/desktops")
+    async def shell_desktops(on: bool = True) -> dict[str, Any]:
+        return svc.shell.all_desktops(on) if svc.shell else {"ok": False, "error": "E_NO_WINDOW"}
+
+    @app.post("/shell/newdesktop")
+    async def shell_newdesktop() -> dict[str, Any]:
+        return svc.shell.new_desktop() if svc.shell else {"ok": False, "error": "E_NO_WINDOW"}
+
+    @app.post("/shell/mascot/move")
+    async def shell_mascot_move(body: MascotMove) -> dict[str, Any]:
+        if svc.shell:
+            svc.shell.move_mascot(body.dx, body.dy)
+        return {"ok": bool(svc.shell)}
+
+    @app.post("/shell/mascot/dropped")
+    async def shell_mascot_dropped() -> dict[str, Any]:
+        if svc.shell:
+            svc.shell.mascot_dropped()
+        return {"ok": bool(svc.shell)}
+
     @app.get("/demo/outbox")
     async def demo_outbox() -> dict[str, Any]:
         return {"demo": svc.demo is not None, "items": list(svc.demo.outbox) if svc.demo else [], "auto": bool(svc.demo and svc.demo.auto)}
@@ -331,6 +387,57 @@ def create_app(guard: TokenGuard | None = None, port: int = DEFAULT_PORT, servic
             return {"ok": False, "error": "E_NOT_DEMO"}
         svc.demo.auto = enabled
         return {"ok": True, "auto": enabled}
+
+    @app.get("/voice/status")
+    async def voice_status() -> dict[str, Any]:
+        import asyncio as _a
+
+        from ragnarok.platform import voice as v
+
+        if not v.available():
+            return {"available": False}
+        perms = await _a.to_thread(v.permissions)
+        return {"available": True, "engine": "whisper" if v.whisper_ready() else "apple", "multilingual": v.whisper_ready(), "permissions": perms, "recording": bool(svc.voice and svc.voice.active)}
+
+    @app.post("/voice/start")
+    async def voice_start() -> dict[str, Any]:
+        import asyncio as _a
+
+        from ragnarok.platform import voice as v
+
+        if svc.voice is None:
+            svc.voice = v.Recorder()
+        try:
+            await _a.to_thread(svc.voice.start, 60.0)
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "error": getattr(exc, "code", "E_VOICE"), "detail": str(exc)[:300]}
+        return {"ok": True}
+
+    @app.post("/voice/stop")
+    async def voice_stop() -> dict[str, Any]:
+        import asyncio as _a
+
+        if svc.voice is None or not svc.voice.active:
+            return {"ok": False, "error": "E_VOICE", "detail": "nothing is being recorded"}
+        try:
+            d = await _a.to_thread(svc.voice.stop, None)
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "error": getattr(exc, "code", "E_VOICE"), "detail": str(exc)[:300]}
+        return {"ok": True, **d}
+
+    @app.post("/voice/cancel")
+    async def voice_cancel() -> dict[str, Any]:
+        if svc.voice is not None:
+            svc.voice.cancel()
+        return {"ok": True}
+
+    @app.post("/voice/permissions")
+    async def voice_permissions() -> dict[str, Any]:
+        import asyncio as _a
+
+        from ragnarok.platform import voice as v
+
+        return {"ok": True, "granted": await _a.to_thread(v.request_permissions)}
 
     @app.get("/screens")
     async def screens(check: bool = False) -> dict[str, Any]:

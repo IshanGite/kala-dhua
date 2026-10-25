@@ -134,7 +134,7 @@ def test_explicit_dates_in_reminders():
 def test_capability_and_complaint_detection():
     from ragnarok.harness.answer import CAPABILITY_ASK, COMPLAINT
 
-    assert CAPABILITY_ASK.search("what can you do") and CAPABILITY_ASK.search("who are you") and not CAPABILITY_ASK.search("what did Ravi say")
+    assert CAPABILITY_ASK.search("what can you do") and not CAPABILITY_ASK.search("who are you") and not CAPABILITY_ASK.search("what did Ravi say")
     assert COMPLAINT.search("there was no reminder on calander") and COMPLAINT.search("it didn't work") and not COMPLAINT.search("remind me to call")
 
 

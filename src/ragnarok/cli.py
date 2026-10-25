@@ -233,7 +233,7 @@ def window(
         world = build_world(interval_s=interval or 60.0, files=list(folder) or None, intervals=None if interval else DEFAULT_INTERVALS, live_telegram_s=0 if interval else 25)
     server, _thread = start_in_thread(make_api(world, port), port)
     try:
-        open_window(port, world.guard.token, on_top=not no_top)
+        open_window(port, world.guard.token, on_top=not no_top, services=world.services)
     finally:
         server.should_exit = True
         world.mem.close()

@@ -101,7 +101,7 @@ CAPABILITIES = (
     "- Google Drive: 'create a document in Drive called Plan saying ...'.\n"
     "Anything that sends, posts or changes something outside this computer waits for your click in the Approvals tab. I never act on text I read in your mail or messages.")
 TIME_ASK = re.compile(r"\b(what(?:'?s| is) the (?:time|date|day)|what (?:time|day|date) is it|current (?:time|date)|today'?s date|what day is (?:it|today))\b", re.I)
-CAPABILITY_ASK = re.compile(r"\b(what can you do|what (?:are|r) you able|can you (?:set|add|put|create|send|do)\b.*\?|are you able to|help me with|what are your (?:features|abilities|capabilities)|how do i use you)\b|^\s*(?:who are you|what are you)\b", re.I)
+CAPABILITY_ASK = re.compile(r"\b(what can you do|what (?:are|r) you able|can you (?:set|add|put|create|send|do)\b.*\?|are you able to|help me with|what are your (?:features|abilities|capabilities)|how do i use you)\b", re.I)
 COMPLAINT = re.compile(r"\b(there was no|there is no|wasn'?t (?:there|created|set|sent|added)|didn'?t (?:work|show|appear|happen|get|send|set|add)|not (?:there|showing|created|added|sent)|nothing (?:happened|appeared|came)|did(?:n'?t| not) see)\b", re.I)
 
 
@@ -113,7 +113,7 @@ GENERAL_SYSTEM = ("You are a small local assistant running on the user's own com
 
 
 PERSONA = ("You are Ragnarok, a friendly private AI assistant that lives on the user's own computer and never sends their data to the cloud. "
-           "Always reply in English, whatever language the user writes in (if they write in another language, answer in English and say you only speak English). Talk like a thoughtful person: warm, natural, concise (usually one to four sentences), plain words, no lists unless asked, no emojis. You can chat about anything, answer general questions, explain things, give advice and keep the user company. "
+           "Reply in the language the user writes in when it is English, Spanish, French, German, Italian, Portuguese, Dutch, Russian, Chinese, Japanese or Korean; for any other language (including Hindi and the other Indian languages) understand it fully but reply in clear English. Talk like a thoughtful person: warm, natural, concise (usually one to four sentences), plain words, no lists unless asked, no emojis. You can chat about anything, answer general questions, explain things, give advice and keep the user company. "
            "In THIS reply you cannot see their messages, calendar or files, and you have not done anything for them: never say or imply that you sent, set, created, scheduled or changed anything. "
            "What you and the assistant around you can do, when the user asks for it directly: answer from their connected apps (Gmail, Calendar, Drive, Slack, Discord, Telegram, notifications), summarize everything in a Digest grouped by context, set reminders, add calendar events, send and reply to email, post to Telegram, Discord and Slack, create Drive documents, run small Python snippets in a sandbox, calculate, explain what is on their screen or in a picture, and remember things they tell you. "
            "Their connected apps are handled by commands: if they want something done (send, remind, schedule, post, email), tell them to ask for it directly, for example 'remind me to call the bank at 5pm' or 'tell Ravi on telegram that I am late', and that it waits for their click. "

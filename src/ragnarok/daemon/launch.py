@@ -42,7 +42,7 @@ def start_in_thread(api: FastAPI, port: int) -> tuple[uvicorn.Server, threading.
     raise RuntimeError("the local API did not start")
 
 
-def open_window(port: int, token: str, *, on_top: bool = True) -> None:
+def open_window(port: int, token: str, *, on_top: bool = True, services: object | None = None) -> None:
     url = f"http://{DEFAULT_HOST}:{port}/#token={token}"
     try:
         import webview
@@ -50,5 +50,18 @@ def open_window(port: int, token: str, *, on_top: bool = True) -> None:
         webbrowser.open_new_tab(url)  # no native window available: the same page in the default browser
         threading.Event().wait()
         return
-    webview.create_window("Ragnarok", url, width=390, height=660, min_size=(340, 460), on_top=on_top)
+    main = webview.create_window("Ragnarok", url, width=390, height=660, min_size=(340, 460), on_top=on_top)
+    mascot = webview.create_window("Muninn", f"http://{DEFAULT_HOST}:{port}/mascot#token={token}", width=110, height=112, frameless=True, transparent=True, on_top=True, easy_drag=False,
+                                   shadow=False, resizable=False, hidden=True, focus=False, background_color="#000000", text_select=False)
+    if services is not None and main is not None and mascot is not None:
+        from ragnarok.daemon.shell import Shell
+
+        store = getattr(getattr(services, "runtime", None), "state", None)
+        shell = Shell(main, mascot, store)
+        shell.load()
+        services.shell = shell  # type: ignore[attr-defined]
+        main.events.moved += shell.on_moved
+        main.events.minimized += shell.on_minimized
+        main.events.restored += shell.on_restored
+        main.events.closed += lambda: mascot.destroy()
     webview.start()
