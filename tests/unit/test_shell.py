@@ -33,7 +33,7 @@ class Win:
 
 
 def make(main_x=500, main_y=90):
-    main, mascot = Win(main_x, main_y), Win(0, 0, 110, 112)
+    main, mascot = Win(main_x, main_y), Win(0, 0, 56, 84)
     mascot.visible = False
     sh = Shell(main, mascot)
     sh._screens = lambda: [(Box(0, 0, 1440, 900), (0, 38, 0, 70))]  # type: ignore[method-assign]
@@ -53,7 +53,7 @@ def test_pin_hides_window_and_places_raven_at_the_edge():
     sh, main, mascot = make(main_x=1440 - 390 - 5)
     r = sh.pin()
     assert r["pinned"] == "right" and not main.visible and mascot.visible
-    assert mascot.x + 110 >= 1440 - 2  # sits on the right edge
+    assert mascot.x + 56 >= 1440 - 2  # sits on the right edge
 
 
 def test_clicking_the_raven_brings_the_window_back_where_it_was():
@@ -91,3 +91,13 @@ def test_prompt_is_offered_once_per_edge():
     main.move(1440 - 390 - 5, 90)
     sh._maybe_prompt()
     assert sh.take_prompt()["prompt"] == "right"
+
+
+def test_raven_window_grows_for_a_message_toward_the_screen_and_shrinks_back():
+    sh, main, mascot = make(main_x=1440 - 390 - 5)
+    sh.pin()
+    right_edge_before = mascot.x + mascot.width
+    sh.resize_mascot(260, 110)
+    assert mascot.width == 260 and mascot.x + mascot.width == right_edge_before and mascot.x < 1440 - 100  # grew leftward, into the screen
+    sh.resize_mascot(56, 84)
+    assert mascot.width == 56 and mascot.x + mascot.width == right_edge_before

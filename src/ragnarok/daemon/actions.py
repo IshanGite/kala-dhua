@@ -104,6 +104,22 @@ class Actions:
 
             log("write_through_failed", err=type(exc).__name__)
 
+    async def my_address(self) -> str:
+        """The signed-in Gmail address (for 'send it to myself' showcase actions). Demo and test senders use a placeholder; nothing real is contacted for them."""
+        if getattr(self, "_me", ""):
+            return self._me  # type: ignore[no-any-return]
+        if self._senders and "mail" in self._senders:
+            return "you@demo.example"
+        raw = self._vault.get(token_name("google", "read")) or self._vault.get(token_name("google", "write"))
+        if raw is None:
+            return ""
+        g = json.loads(raw)
+        try:
+            self._me = str((await GoogleAuth(g["client_id"], g["client_secret"], g["refresh_token"]).get(f"{Gmail.API}/profile")).json().get("emailAddress", ""))
+        except Exception:  # noqa: BLE001
+            self._me = ""
+        return self._me
+
     def _write_auth(self) -> GoogleAuth | None:
         raw = self._vault.get(token_name("google", "write"))
         if raw is None:

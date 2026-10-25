@@ -39,6 +39,7 @@ class Services:
     vision: Any = None  # explain the screen / ask about an image
     demo: Any = None  # demo mode state (synthetic data, fake sends), or None
     voice: Any = None  # the microphone recorder
+    showcase: Any = None  # one button per feature, for demos
     shell: Any = None  # the window shell: pin, snap, desktops, the raven (None when there is no native window)
 
 
@@ -54,6 +55,11 @@ class MascotMove(BaseModel):
 
 class SpeakIn(BaseModel):
     text: str = Field(min_length=1, max_length=4000)
+
+
+class MascotSize(BaseModel):
+    w: int = Field(ge=20, le=420)
+    h: int = Field(ge=20, le=300)
 
 
 class ToggleIn(BaseModel):
@@ -332,6 +338,17 @@ def create_app(guard: TokenGuard | None = None, port: int = DEFAULT_PORT, servic
         subprocess.run(["open", f"x-apple.systempreferences:com.apple.preference.security?{panes[pane]}"], check=False, timeout=10)  # noqa: S603, S607
         return {"ok": True}
 
+    @app.get("/showcase")
+    async def showcase_list() -> dict[str, Any]:
+        return {"items": svc.showcase.items() if svc.showcase else []}
+
+    @app.post("/showcase/{name}")
+    async def showcase_run(name: str) -> dict[str, Any]:
+        """Runs one feature directly (no sentence to misread) as a chat job, so its result and any approval cards show in the chat."""
+        if svc.chat is None or svc.showcase is None or name not in {i["id"] for i in svc.showcase.items()}:
+            return {"ok": False, "error": "E_NO_SUCH_ITEM"}
+        return await svc.chat.submit_showcase(name, svc.showcase)
+
     @app.get("/reminders")
     async def reminders_list() -> dict[str, Any]:
         return {"items": svc.runtime.commitments.list_open() if svc.runtime and svc.runtime.commitments else []}
@@ -428,6 +445,12 @@ def create_app(guard: TokenGuard | None = None, port: int = DEFAULT_PORT, servic
     async def shell_mascot_move(body: MascotMove) -> dict[str, Any]:
         if svc.shell:
             svc.shell.move_mascot(body.dx, body.dy)
+        return {"ok": bool(svc.shell)}
+
+    @app.post("/shell/mascot/size")
+    async def shell_mascot_size(body: MascotSize) -> dict[str, Any]:
+        if svc.shell:
+            svc.shell.resize_mascot(body.w, body.h)
         return {"ok": bool(svc.shell)}
 
     @app.post("/shell/mascot/dropped")

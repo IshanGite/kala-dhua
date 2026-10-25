@@ -206,6 +206,25 @@ class ChatService:
 
         return await self._start(job, run(), 0.4)
 
+    async def submit_showcase(self, name: str, showcase: Any) -> dict[str, Any]:
+        job = Job(new_id()[:10], f"Showcase: {name}")
+        self.jobs[job.id] = job
+
+        async def run() -> None:
+            PROGRESS.set(lambda tid: setattr(job, "task_id", tid))
+            try:
+                job.reply = summarize(await showcase.run(name))
+                self._log_reply(job.reply.get("text", ""))
+                job.state = "done"
+            except asyncio.CancelledError:
+                self._mark_cancelled(job)
+                job.reply, job.state = {"text": "Stopped. Nothing further was done.", "citations": [], "cancelled": True}, "cancelled"
+            except Exception as exc:  # noqa: BLE001
+                log("showcase_failed", err=type(exc).__name__)
+                job.reply, job.state = {"text": f"That did not work ({type(exc).__name__}).", "citations": []}, "error"
+
+        return await self._start(job, run(), 0.5)
+
     async def _start(self, job: Job, coro: Any, quick_s: float | None = None) -> dict[str, Any]:
         task = asyncio.get_running_loop().create_task(coro)
         job.task = task

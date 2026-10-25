@@ -14,7 +14,7 @@ from typing import Any
 
 from ragnarok.core.logging import log
 
-MASCOT_W, MASCOT_H = 110, 112
+MASCOT_W, MASCOT_H = 56, 84  # the idle size: a small bolt; the window grows only while it is speaking
 EDGE_NEAR = 28  # how close to an edge (points) a dragged window must come before the options appear
 EDGES = ("left", "right", "top", "bottom")
 
@@ -99,6 +99,7 @@ class Shell:
         self._all_desktops = False
         self._home: Box | None = None  # where the window was before it was pinned
         self._hidden_by_pin = False
+        self.mw, self.mh = MASCOT_W, MASCOT_H
         self._lock = threading.RLock()
 
     # ------------------------------------------------------------------ geometry
@@ -130,15 +131,16 @@ class Shell:
     def mascot_spot(self, edge: str, b: Box) -> tuple[int, int]:
         scr, (il, it, ir, ib) = self._screen_of(b.x + b.w // 2, b.y + b.h // 2)
         left, top, right, bottom = scr.x + il, scr.y + it, scr.x + scr.w - ir, scr.y + scr.h - ib
-        cy = min(max(b.y + b.h // 2 - MASCOT_H // 2, top), bottom - MASCOT_H)
-        cx = min(max(b.x + b.w // 2 - MASCOT_W // 2, left), right - MASCOT_W)
+        mw, mh = MASCOT_W, MASCOT_H
+        cy = min(max(b.y + b.h // 2 - mh // 2, top), bottom - mh)
+        cx = min(max(b.x + b.w // 2 - mw // 2, left), right - mw)
         if edge == "left":
-            return left - 8, cy
+            return left - 4, cy
         if edge == "right":
-            return right - MASCOT_W + 8, cy
+            return right - mw + 4, cy
         if edge == "top":
-            return cx, top - 6
-        return cx, bottom - MASCOT_H + 4  # bottom: the raven stands on the Dock line
+            return cx, top - 4
+        return cx, bottom - mh + 2  # bottom: it stands on the Dock line
 
     # ------------------------------------------------------------------ the moved-near-an-edge prompt
     def on_moved(self, _x: int, _y: int) -> None:
@@ -194,6 +196,7 @@ class Shell:
         return {"ok": True, **self.state()}
 
     def _show_mascot(self, x: int, y: int) -> None:
+        self.mascot.resize(MASCOT_W, MASCOT_H)
         self.mascot.move(int(x), int(y))
         self.mascot.show()
         if self._all_desktops:
@@ -238,6 +241,22 @@ class Shell:
             if not self._hidden_by_pin:
                 self.mascot.hide()
 
+    def resize_mascot(self, w: int, h: int) -> None:
+        """The raven's window grows to fit what it says and shrinks back afterwards; the bolt stays where it is, the bubble opens toward the middle of the screen."""
+        with self._lock:
+            ow, oh = int(self.mascot.width), int(self.mascot.height)
+            x, y = int(self.mascot.x), int(self.mascot.y)
+            w, h = max(MASCOT_W, min(int(w), 300)), max(MASCOT_H, min(int(h), 220))
+            scr, (il, it, ir, ib) = self._screen_of(x + ow // 2, y + oh // 2)
+            right = scr.x + scr.w - ir
+            if self.edge == "right" or x + w > right + 8:
+                nx = x + ow - w
+            else:
+                nx = x
+            ny = max(scr.y + it, min(y + (oh - h) // 2, scr.y + scr.h - ib - h))
+            self.mascot.resize(w, h)
+            self.mascot.move(nx, ny)
+
     def move_mascot(self, dx: int, dy: int) -> None:
         x, y = int(self.mascot.x) + dx, int(self.mascot.y) + dy
         self.mascot.move(x, y)
@@ -245,7 +264,7 @@ class Shell:
     def mascot_dropped(self) -> None:
         """After dragging the raven, it settles on the nearest edge of the screen it was dropped on and remembers that spot."""
         with self._lock:
-            b = Box(int(self.mascot.x), int(self.mascot.y), MASCOT_W, MASCOT_H)
+            b = Box(int(self.mascot.x), int(self.mascot.y), int(self.mascot.width), int(self.mascot.height))
             edge = self.near_edge_for(b)
             self.edge = edge
             self.pin_at = self.mascot_spot(edge, b)

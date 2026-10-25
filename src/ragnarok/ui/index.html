@@ -178,8 +178,11 @@ textarea#q{flex:1;resize:none;max-height:140px;min-height:38px;line-height:1.4}
     <button class="btn" id="mm_clear" type="button">Clear this conversation</button>
     <button class="btn" id="mm_copy" type="button">Copy the conversation</button>
     <button class="btn" id="mm_speak" type="button">Speak replies aloud: off</button>
+    <button class="btn" id="mm_show" type="button">Showcase: feature buttons</button>
     <button class="btn" id="mm_keys" type="button">Keyboard shortcuts</button>
   </div><div class="small" id="mm_msg" style="margin-top:6px"></div></div>
+<div id="showpop" class="pop" style="display:none;position:fixed;left:50%;top:52px;bottom:auto;transform:translateX(-50%);width:min(420px,calc(100% - 20px));max-height:calc(100% - 70px);overflow:auto" role="dialog" aria-label="Showcase">
+  <div class="pt">Showcase</div><div class="small">Each button runs a real feature on your real data, so it works even when a sentence is misunderstood. What it does appears in the chat. Anything that sends still waits for your click.</div><div id="showbox"></div><button class="btn" id="show_close" type="button" style="margin-top:8px">Close</button></div>
 <div id="edgemenu" class="pop" style="display:none;position:fixed;left:50%;top:56px;bottom:auto;transform:translateX(-50%);width:min(340px,calc(100% - 24px))" role="dialog" aria-label="Window options">
   <div class="pt" id="em_t">Window options</div><div class="small" id="em_s"></div>
   <div class="pb" style="flex-direction:column;align-items:stretch">
@@ -323,6 +326,13 @@ textarea#q{flex:1;resize:none;max-height:140px;min-height:38px;line-height:1.4}
       it.forEach(function(r){var row=el("div","row"),g=el("div","grow");g.appendChild(el("div","",r.what));g.appendChild(el("div","small",r.due_at?new Date(r.due_at).toLocaleString([], {weekday:"short",day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}):"no time"));row.appendChild(g);
         var dn=el("button","btn","Done");dn.onclick=function(){api("/reminders/"+r.id+"/done",{}).then(loadReminders)};var sn=el("button","btn","+10 min");sn.onclick=function(){api("/reminders/"+r.id+"/snooze?minutes=10",{}).then(loadReminders)};var tm=el("button","btn","Tomorrow");tm.onclick=function(){api("/reminders/"+r.id+"/snooze?minutes=1440",{}).then(loadReminders)};
         row.appendChild(dn);row.appendChild(sn);row.appendChild(tm);b.appendChild(row)})}).catch(function(){})}
+  /* ---------------- showcase: one button per feature ---------------- */
+  var showItems=null;
+  function runShowcase(it){$("showpop").style.display="none";go("/showcase/"+it.id,{},"Showcase: "+it.label,"Running: "+it.label)}
+  function buildShowcase(box){box.textContent="";(showItems||[]).reduce(function(acc,it){var g=acc.find(function(x){return x.name===it.group});if(!g){g={name:it.group,items:[]};acc.push(g)}g.items.push(it);return acc},[]).forEach(function(g){box.appendChild(el("h2","",g.name));var row=el("div","pb");row.style.marginTop="2px";g.items.forEach(function(it){var b=el("button","btn",it.label);b.title=it.help;b.onclick=function(){runShowcase(it)};row.appendChild(b)});box.appendChild(row)});
+    if(window.__demo){box.appendChild(el("h2","","Demo data"));var r2=el("div","pb");var b=el("button","btn","Send me a message now");b.onclick=function(){api("/demo/incoming",{}).then(function(r){if(r.ok){$("showpop").style.display="none";goto("chat");addBot("Demo message arrived on "+r.source+" from "+(r.from||r.title)+": "+r.text)}})};r2.appendChild(b);box.appendChild(r2)}}
+  function openShowcase(){$("moremenu").style.display="none";var go2=function(){buildShowcase($("showbox"));$("showpop").style.display="block"};if(showItems)go2();else api("/showcase").then(function(d){showItems=d.items||[];go2()})}
+  $("mm_show").onclick=openShowcase;$("show_close").onclick=function(){$("showpop").style.display="none"};
   /* ---------------- window shell: pin to an edge (the raven waits there), split screen, desktops ---------------- */
   var emEdge="right",emAll=false;
   function emClose(){$("edgemenu").style.display="none"}
@@ -350,9 +360,10 @@ textarea#q{flex:1;resize:none;max-height:140px;min-height:38px;line-height:1.4}
   function renderSources(rt){var box=$("srcbox");var keep=box.scrollTop;box.textContent="";
     if(window.__demo){box.appendChild(el("h2","","Demo mode"));var dc=el("div","card");dc.appendChild(el("div","","This is a demo copy with made-up data for every app. Every send is a local fake and nothing reaches a real account."));
       var dr=el("div","row");dr.style.borderBottom="0";var inb=el("button","btn pri","Send me a message now"),au=el("button","btn","Auto messages: on");
-      inb.onclick=function(){inb.disabled=true;api("/demo/incoming",{}).then(function(r){inb.disabled=false;if(r.ok)toast("New "+r.source+" message from "+(r.from||r.title),function(){goto("dig")})})};
+      inb.onclick=function(){inb.disabled=true;api("/demo/incoming",{}).then(function(r){inb.disabled=false;if(r.ok){goto("chat");addBot("Demo message arrived on "+r.source+" from "+(r.from||r.title)+": "+r.text)}})};
       au.onclick=function(){var on=au.textContent.indexOf("on")>0;api("/demo/auto?enabled="+(!on),{}).then(function(r){au.textContent="Auto messages: "+(r.auto?"on":"off")})};
       dr.appendChild(inb);dr.appendChild(au);dc.appendChild(dr);box.appendChild(dc)}
+    box.appendChild(el("h2","","Showcase"));var sc=el("div","card");sc.appendChild(el("div","small","One button per feature. If a command is ever misread, these still work. Results appear in the chat."));var sb=el("button","btn pri","Open the feature buttons");sb.style.marginTop="8px";sb.onclick=function(){goto("chat");openShowcase()};sc.appendChild(sb);box.appendChild(sc);
     box.appendChild(el("h2","","Connected apps (checked continuously)"));
     var names=Object.keys(rt.sources||{});
     if(!names.length&&!window.__demo)box.appendChild(el("p","small","No sources connected yet. Run: ragnarok connect <name>"));
@@ -476,7 +487,9 @@ textarea#q{flex:1;resize:none;max-height:140px;min-height:38px;line-height:1.4}
 
   /* ---------------- inbox ---------------- */
   var KIND={attention:"Needs you",heads_up:"Heads-up",briefing:"Briefing",alert:"Alert",reminder:"Reminder",scheduled:"Scheduled"};
-  function loadInbox(){api("/inbox").then(function(d){var it=d.items||[],b=$("ibox");$("ibadge").textContent=it.length?String(it.length):"";if(cur!=="inb")return;loadReminders();b.textContent="";
+  var inboxSeen=null;
+  function alertsToChat(it){var cur2={};it.forEach(function(m){cur2[m.id]=1});if(inboxSeen){it.forEach(function(m){if(!inboxSeen[m.id]&&/^(attention|alert|heads_up|reminder)$/.test(m.kind)){var n=el("div","m b");n.appendChild(el("div","av","!"));var bub=el("div","bub");bub.style.borderColor="var(--warn)";bub.appendChild(el("div","small",({attention:"Needs you",alert:"Alert",heads_up:"Heads-up",reminder:"Reminder"})[m.kind]));bub.appendChild(el("div","",m.title));if(m.body)bub.appendChild(el("div","small",String(m.body).slice(0,180)));n.appendChild(bub);intro();log.appendChild(n);down(false)}})}inboxSeen=cur2}
+  function loadInbox(){api("/inbox").then(function(d){var it=d.items||[],b=$("ibox");alertsToChat(it);$("ibadge").textContent=it.length?String(it.length):"";if(cur!=="inb")return;loadReminders();b.textContent="";
       if(!it.length)b.appendChild(el("p","small","Nothing new. Try: every day at 8am catch me up on my emails, or: when I get an email from Dev, tell me."));
       it.forEach(function(m){var c=el("div","card"+(m.kind==="attention"||m.kind==="alert"?" need":""));c.appendChild(el("div","small",(KIND[m.kind]||m.kind)+" - "+ago(m.ts)+(m.source?" - "+m.source:"")));c.appendChild(el("div","",m.title));var bd=el("div","small",m.body);bd.style.whiteSpace="pre-wrap";c.appendChild(bd);
         var row=el("div","row");row.style.borderBottom="0";if(m.link){var l=el("a","small","Open");l.href=m.link;l.target="_blank";l.rel="noopener noreferrer";row.appendChild(l)}var x=el("button","btn","Dismiss");x.onclick=function(){api("/inbox/dismiss?item_id="+encodeURIComponent(m.id),{}).then(loadInbox)};row.appendChild(x);c.appendChild(row);b.appendChild(c)})}).catch(function(){})}

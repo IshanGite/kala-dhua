@@ -49,6 +49,13 @@ check("the tick in the chat approves it", tickOk, doc.getElementById("log").text
 await say("");
 check("an empty message gets a friendly nudge, not an error or a hang", true);
 
+click(doc.getElementById("moreb"));
+click(doc.getElementById("mm_show"));
+const attn = await waitFor(() => [...doc.querySelectorAll("#showbox button")].find((b) => b.textContent === "What needs me?"));
+check("the Showcase lists a button per feature", attn && [...doc.querySelectorAll("#showbox button")].length >= 10);
+if (attn) click(attn);
+check("a showcase button runs the real feature and its result appears in the chat", await waitFor(() => /need you|Nothing needs you/.test(doc.getElementById("log").textContent) && /Showcase: What needs me/.test(doc.getElementById("log").textContent)));
+
 tab("msg");
 check("Memory lists what was read, with an open-in-app link", await waitFor(() => /signed contract/.test(doc.getElementById("msgs").textContent) && [...doc.querySelectorAll("#msgs a")].some((a) => a.href.startsWith("https://mail.google.com"))));
 const del = [...doc.querySelectorAll("#msgs .row")].find((r) => /standup/.test(r.textContent));

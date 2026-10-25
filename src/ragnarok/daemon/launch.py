@@ -51,7 +51,7 @@ def open_window(port: int, token: str, *, on_top: bool = True, services: object 
         threading.Event().wait()
         return
     main = webview.create_window("Ragnarok", url, width=390, height=660, min_size=(340, 460), on_top=on_top)
-    mascot = webview.create_window("Muninn", f"http://{DEFAULT_HOST}:{port}/mascot#token={token}", width=110, height=112, frameless=True, transparent=True, on_top=True, easy_drag=False,
+    mascot = webview.create_window("Muninn", f"http://{DEFAULT_HOST}:{port}/mascot#token={token}", width=56, height=84, frameless=True, transparent=True, on_top=True, easy_drag=False,
                                    shadow=False, resizable=False, hidden=True, focus=False, background_color="#000000", text_select=False)
     if services is not None and main is not None and mascot is not None:
         from ragnarok.daemon.shell import Shell

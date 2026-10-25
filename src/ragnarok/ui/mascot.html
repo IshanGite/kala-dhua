@@ -6,92 +6,76 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; img-src data:">
 <title>Muninn</title>
 <style>
-/* Muninn: one of Odin's two ravens, the one that stands for memory. A small raven that perches where Ragnarok is pinned. */
-html,body{margin:0;height:100%;background:transparent;overflow:hidden;user-select:none;-webkit-user-select:none;cursor:pointer}
-#stage{position:absolute;inset:0;display:flex;align-items:flex-end;justify-content:center}
-#bird{width:92px;height:92px;transform-origin:50% 92%;animation:bob 3.4s ease-in-out infinite}
-#bird.flip{transform:scaleX(-1)}
-@keyframes bob{0%,100%{translate:0 0}50%{translate:0 -1.5px}}
+/* A small bolt of lightning that waits where Ragnarok is pinned: calm and dim when nothing is happening, flaring with a message when something needs you. */
+html,body{margin:0;height:100%;background:transparent;overflow:hidden;user-select:none;-webkit-user-select:none;cursor:pointer;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+#row{position:absolute;inset:0;display:flex;align-items:center;gap:8px;padding:0 2px}
+#row.right{flex-direction:row-reverse}
+#bolt{width:52px;height:80px;flex:none;position:relative;filter:drop-shadow(0 0 5px #38d6b0aa) drop-shadow(0 0 12px #38d6b055);animation:breathe 3.2s ease-in-out infinite;transform-origin:50% 60%}
 svg{width:100%;height:100%;overflow:visible}
-.body{fill:#1c2430}.wing{fill:#27323f}.wing2{fill:#334355}.belly{fill:#2a3644}
-.beak{fill:#e0a02c}.leg{stroke:#e0a02c;stroke-width:2.4;stroke-linecap:round;fill:none}
-.eyew{fill:#f4efe2}.pupil{fill:#10151c}.glint{fill:#fff}
-#lid{fill:#1c2430;transform-origin:60px 40px;transform:scaleY(0);transition:transform .09s}
-#head{transform-origin:62px 46px;transition:transform .5s cubic-bezier(.3,1.4,.5,1)}
-#wingg{transform-origin:46px 62px;transition:transform .3s}
-.seed{fill:#c9a15a;opacity:0}
-.z{font:700 13px system-ui;fill:#7fbfa6;opacity:0}
-/* behaviours */
-.look-l #head{transform:rotate(-14deg)}.look-r #head{transform:rotate(12deg)}.tilt #head{transform:rotate(-22deg) translateY(1px)}
-.peck #head{animation:peck .5s ease-in-out 3}.peck .seed{opacity:1}
-@keyframes peck{0%,100%{transform:rotate(0)}50%{transform:rotate(38deg) translateY(4px)}}
-.preen #head{transform:rotate(58deg) translate(-8px,10px)}.preen #wingg{transform:rotate(-12deg) translateY(-2px)}
-.sleep #lid{transform:scaleY(1)}.sleep #head{transform:rotate(18deg) translateY(5px)}.sleep #bird{animation:breath 3.6s ease-in-out infinite}.sleep .z{animation:zz 3s ease-in-out infinite}
-@keyframes breath{0%,100%{scale:1 1}50%{scale:1.02 .985}}
-@keyframes zz{0%{opacity:0;translate:0 6px}30%{opacity:1}100%{opacity:0;translate:6px -16px}}
-.alert #bird{animation:hop .5s ease-out 4}.alert #wingg{animation:flap .22s linear 8}
-@keyframes hop{0%,100%{translate:0 0}40%{translate:0 -16px}}
-@keyframes flap{0%,100%{transform:rotate(0)}50%{transform:rotate(-34deg)}}
-#bubble{position:absolute;left:50%;bottom:98px;transform:translateX(-50%) scale(.85);background:#f4efe2;color:#1c2430;font:600 12px/1.25 system-ui,sans-serif;border-radius:10px;padding:6px 9px;max-width:150px;width:max-content;text-align:center;opacity:0;pointer-events:none;transition:all .2s;box-shadow:0 2px 10px #0006}
-#bubble.on{opacity:1;transform:translateX(-50%) scale(1)}
-#bubble::after{content:"";position:absolute;left:50%;bottom:-5px;width:10px;height:10px;background:#f4efe2;transform:translateX(-50%) rotate(45deg)}
-#dot{position:absolute;right:14px;top:6px;min-width:18px;height:18px;border-radius:9px;background:#5fbf9d;color:#0c1a14;font:700 11px/18px system-ui;text-align:center;display:none;padding:0 4px}
+.core{fill:url(#g)}
+.rim{fill:none;stroke:#e8fffb;stroke-width:1.1;stroke-linejoin:round;opacity:.9}
+.arc{fill:none;stroke:#bffcf0;stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round;opacity:0}
+@keyframes breathe{0%,100%{filter:drop-shadow(0 0 4px #38d6b099) drop-shadow(0 0 9px #38d6b044);scale:1}50%{filter:drop-shadow(0 0 7px #38d6b0cc) drop-shadow(0 0 16px #38d6b077);scale:1.025}}
+@keyframes flick{0%,100%{opacity:1}6%{opacity:.55}9%{opacity:1}52%{opacity:1}54%{opacity:.7}57%{opacity:1}}
+#bolt .core{animation:flick 6.5s steps(1) infinite}
+.zap .arc{animation:arc .42s steps(2) 1}
+@keyframes arc{0%{opacity:0}20%{opacity:1}55%{opacity:.25}75%{opacity:1}100%{opacity:0}}
+.sleep #bolt{animation:ember 4.5s ease-in-out infinite;filter:drop-shadow(0 0 3px #38d6b055)}
+@keyframes ember{0%,100%{opacity:.5}50%{opacity:.78}}
+.alert #bolt{animation:flare .9s ease-out 3;filter:drop-shadow(0 0 9px #8ffff0) drop-shadow(0 0 22px #38d6b0)}
+.alert .arc{animation:arc .3s steps(2) 6}
+@keyframes flare{0%{scale:1}15%{scale:1.22}30%{scale:.96}45%{scale:1.14}100%{scale:1}}
+#row:hover #bolt{filter:drop-shadow(0 0 8px #8ffff0) drop-shadow(0 0 18px #38d6b0)}
+#bubble{max-width:188px;background:#eefdf9;color:#10231f;font:600 12.5px/1.3 system-ui,sans-serif;border-radius:12px;padding:8px 11px;box-shadow:0 3px 14px #0008;opacity:0;transform:scale(.9);transform-origin:center;transition:opacity .2s,transform .2s;display:none;word-break:break-word;border:1px solid #38d6b0}
+#bubble.on{opacity:1;transform:scale(1)}
+#dot{position:absolute;right:-2px;top:-2px;min-width:17px;height:17px;border-radius:9px;background:#ff6b5e;color:#fff;font:700 10.5px/17px system-ui;text-align:center;display:none;padding:0 4px;box-shadow:0 1px 4px #0007}
 </style>
 </head>
 <body>
-<div id="stage" title="Click to bring Ragnarok back">
-  <div id="bubble"></div><div id="dot"></div>
-  <div id="bird">
-    <svg viewBox="0 0 120 120" aria-label="Muninn, a small raven">
-      <path class="leg" d="M52 100 L52 112 M44 112 L60 112"/><path class="leg" d="M68 100 L68 112 M60 112 L76 112"/>
-      <path class="body" d="M24 98 L8 112 L30 106 L18 118 L42 108 Z"/>
-      <ellipse class="body" cx="58" cy="76" rx="30" ry="28"/>
-      <ellipse class="belly" cx="64" cy="84" rx="19" ry="16"/>
-      <g id="wingg"><path class="wing" d="M26 66 C20 84 34 104 56 102 C48 88 46 76 52 62 Z"/><path class="wing2" d="M32 72 C30 84 38 94 50 96 C46 86 45 78 48 68 Z"/></g>
-      <g id="head">
-        <circle class="body" cx="64" cy="44" r="19"/>
-        <path class="beak" d="M80 40 L102 46 L80 54 Z"/>
-        <circle class="eyew" cx="70" cy="40" r="6.2"/><circle class="pupil" cx="71.5" cy="40.4" r="3.4"/><circle class="glint" cx="72.8" cy="38.8" r="1.2"/>
-        <ellipse id="lid" cx="70" cy="40" rx="7" ry="7"/>
-        <path d="M48 36 C52 28 60 25 68 26" stroke="#334355" stroke-width="2" fill="none" stroke-linecap="round"/>
-        <circle class="seed" cx="98" cy="64" r="2.6"/>
-      </g>
-      <text class="z" x="90" y="30">z</text><text class="z" x="100" y="20" style="animation-delay:1s">z</text>
+<div id="row" class="right" title="Click to bring Ragnarok back">
+  <div id="bolt">
+    <div id="dot"></div>
+    <svg viewBox="0 0 60 100" aria-label="A small bolt of lightning">
+      <defs><linearGradient id="g" x1="0" y1="0" x2="0.35" y2="1"><stop offset="0" stop-color="#f4fffd"/><stop offset=".45" stop-color="#7ff5df"/><stop offset="1" stop-color="#18a98d"/></linearGradient></defs>
+      <path class="arc" d="M6 30 L14 34 L9 42 L19 46"/><path class="arc" d="M54 62 L46 66 L51 74 L41 78"/><path class="arc" d="M10 78 L18 76 L15 86"/><path class="arc" d="M50 20 L43 25 L47 31"/>
+      <path class="core" d="M41 0 L5 55 L25 55 L9 100 L56 36 L34 36 L52 0 Z"/>
+      <path class="rim" d="M41 0 L5 55 L25 55 L9 100 L56 36 L34 36 L52 0 Z"/>
     </svg>
   </div>
+  <div id="bubble"></div>
 </div>
 <script>
 (function(){
   var tok=(location.hash.match(/token=([\w-]+)/)||[])[1]||"",H={"x-ragnarok-token":tok,"content-type":"application/json"};
   try{history.replaceState(null,"",location.pathname+location.search)}catch(e){}
-  var params=new URLSearchParams(location.search),stage=document.getElementById("stage"),bird=document.getElementById("bird"),bub=document.getElementById("bubble"),dot=document.getElementById("dot");
   function api(p,b){return fetch(p,b===undefined?{headers:H}:{method:"POST",headers:H,body:JSON.stringify(b)}).then(function(r){return r.json()})}
-  function setEdge(edge){bird.className=(edge==="right"?"flip":"")}   // face into the screen
-  setInterval(function(){api("/shell/poll").then(function(d){if(d.edge)setEdge(d.edge)}).catch(function(){})},1000);
-  
-  // idle life: look around, peck at a seed, preen, tilt the head, blink, and fall asleep when nothing has happened for a while
-  var state="",last=Date.now(),sleeping=false,lid=document.getElementById("lid");
-  function set(cls,ms){stage.className=cls;if(ms)setTimeout(function(){if(stage.className===cls)stage.className=sleeping?"sleep":""},ms)}
-  function idle(){if(sleeping||stage.className==="alert")return;var r=Math.random();
-    if(r<.22)set("look-l",1600);else if(r<.42)set("look-r",1600);else if(r<.62)set("peck",1700);else if(r<.78)set("preen",2400);else set("tilt",1800)}
-  setInterval(idle,4200);
-  setInterval(function(){if(sleeping)return;lid.style.transform="scaleY(1)";setTimeout(function(){lid.style.transform="scaleY(0)"},110)},3300);
-  setInterval(function(){if(!sleeping&&Date.now()-last>90000){sleeping=true;stage.className="sleep"}},5000);
-  function wake(){last=Date.now();if(sleeping){sleeping=false;stage.className=""}}
-  document.addEventListener("mousemove",function(e){wake();var x=e.clientX/innerWidth;if(!/peck|preen/.test(stage.className))stage.className=x<.4?"look-l":x>.6?"look-r":""});
-  document.addEventListener("mouseleave",function(){if(!sleeping)stage.className=""});
-  // news from the app: an approval waiting, a reminder, something that needs the user
-  var seen={},queue=[],talking=false;
-  function say(t,ms){queue.push([t,ms||5200]);next()}
-  function next(){if(talking||!queue.length)return;talking=true;var m=queue.shift();bub.textContent=m[0];bub.className="on";stage.className="alert";wake();
-    setTimeout(function(){bub.className="";if(stage.className==="alert")stage.className=sleeping?"sleep":"";setTimeout(function(){talking=false;next()},350)},m[1])}
+  var row=document.getElementById("row"),bub=document.getElementById("bubble"),dot=document.getElementById("dot");
+  var edge="right",sleeping=false,last=Date.now(),queue=[],talking=false,seen={};
+  function side(e){edge=e||"right";row.className=(edge==="left"?"left":"right")+(sleeping?" sleep":"")}
+  side("right");
+  // keep the bolt at the screen edge: the bubble opens toward the middle of the screen
+  setInterval(function(){api("/shell/poll").then(function(d){if(d&&d.edge&&d.edge!==edge)side(d.edge)}).catch(function(){})},1000);
+  // life: a crackle now and then; it dims after a while with nothing to say, and wakes when something happens or the mouse comes near
+  function zap(){if(sleeping)return;row.classList.add("zap");setTimeout(function(){row.classList.remove("zap")},500)}
+  setInterval(function(){if(Math.random()<.45)zap()},3800);
+  setInterval(function(){if(!sleeping&&!talking&&Date.now()-last>90000){sleeping=true;row.classList.add("sleep")}},5000);
+  function wake(){last=Date.now();if(sleeping){sleeping=false;row.classList.remove("sleep")}}
+  document.addEventListener("mouseover",function(){wake();zap()});
+  // news from the app: an approval waiting, a reminder, something that needs you. One at a time, never cut off: the window grows to fit the words.
+  function say(t,ms){queue.push([String(t).slice(0,110),ms||6000]);next()}
+  function next(){if(talking||!queue.length)return;talking=true;var m=queue.shift();wake();
+    bub.textContent=m[0];bub.style.display="block";bub.className="";
+    var w=Math.min(260,56+10+Math.min(188,Math.max(90,m[0].length*7+26))),h=Math.max(84,bub.offsetHeight+14);
+    api("/shell/mascot/size",{w:w,h:h}).catch(function(){});
+    setTimeout(function(){bub.className="on";row.classList.add("alert")},120);
+    setTimeout(function(){bub.className="";row.classList.remove("alert");setTimeout(function(){bub.style.display="none";api("/shell/mascot/size",{w:56,h:84}).catch(function(){});setTimeout(function(){talking=false;next()},300)},220)},m[1])}
   function poll(){api("/approvals").then(function(d){var n=(d.items||[]).length;dot.style.display=n?"block":"none";dot.textContent=n;
       (d.items||[]).forEach(function(c){if(!seen["a"+c.id]){seen["a"+c.id]=1;say("Waiting for your OK: "+(c.headline||c.skill),6500)}})}).catch(function(){});
-    api("/inbox").then(function(d){(d.items||[]).slice(0,4).forEach(function(m){if(!seen["i"+m.id]&&(m.kind==="reminder"||m.kind==="attention"||m.kind==="alert"||m.kind==="heads_up")){var first=Object.keys(seen).length===0;seen["i"+m.id]=1;if(!first)say(m.title,6000)}else seen["i"+m.id]=1})}).catch(function(){})}
+    api("/inbox").then(function(d){var first=Object.keys(seen).length===0;(d.items||[]).slice(0,4).forEach(function(m){if(!seen["i"+m.id]&&(m.kind==="reminder"||m.kind==="attention"||m.kind==="alert"||m.kind==="heads_up")){seen["i"+m.id]=1;if(!first)say(m.title,6500)}else seen["i"+m.id]=1})}).catch(function(){})}
   setInterval(poll,2500);poll();
-  // a click (not a drag) brings Ragnarok back; dragging moves the bird along the screen edge
+  // a click (not a drag) brings Ragnarok back; dragging moves the bolt along the screen edge
   var down=null,moved=false;
-  stage.addEventListener("mousedown",function(e){down={x:e.screenX,y:e.screenY};moved=false;wake()});
+  row.addEventListener("mousedown",function(e){down={x:e.screenX,y:e.screenY};moved=false;wake()});
   document.addEventListener("mousemove",function(e){if(!down)return;var dx=e.screenX-down.x,dy=e.screenY-down.y;if(Math.abs(dx)+Math.abs(dy)>4)moved=true;if(moved){api("/shell/mascot/move",{dx:dx,dy:dy});down={x:e.screenX,y:e.screenY}}});
   document.addEventListener("mouseup",function(){if(down&&!moved){api("/shell/restore",{})}else if(down&&moved){api("/shell/mascot/dropped",{})}down=null});
 })();

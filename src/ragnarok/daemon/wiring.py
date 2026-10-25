@@ -170,6 +170,9 @@ def build_world(*, use_laya: bool = True, sandbox: bool = True, embed_rungs: boo
 
     skills_admin = SkillsAdmin(registry, ledger, broker, hub, selector, gw, builtin_names)
     services = Services(runtime, answerer, notif, chat, reader, hub, proactive, mem, reindex, skills_admin, digest, vision)
+    from ragnarok.harness.showcase import Showcase
+
+    services.showcase = Showcase(agent, answerer, digest, proactive, actions, reader, vision, runtime.commitments)
     w = World(mem, reader, index, gw, runtime, services, guard, token_file, agent, ledger, broker, None, selector, l1)
     w.registry = registry  # type: ignore[attr-defined]
     return w
