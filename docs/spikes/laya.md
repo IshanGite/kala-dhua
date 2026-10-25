@@ -33,3 +33,14 @@ Fitted per decision on 199 seeded synthetic requests (temperature scaling, thres
 | risk_precheck | 0.9 | 0.549 | 100 % (2 accepted) | 6.7 % | 60.0 % |
 
 Reading: calibrated Laya answers a bit over half of family decisions at about 94 % precision and sends the rest up the cascade, which is the intended behaviour. Risk is left to policy rules. All samples are small (n = 30 real); do not quote as a benchmark. A local fine-tune on a larger set is the next lever.
+
+## Local fine-tune (`scripts/finetune_laya.py`, result `docs/evidence/laya_finetune.json`)
+Trained on this Mac (Apple GPU, encoder frozen, heads only, 8 epochs, 554 s) on 513 rows: seeded templates plus 64 author-written phrasings. Tested on the 30 author-written requests that are in no training row (small sample, one labeller: not a benchmark).
+
+| Question | Before | After |
+|---|---|---|
+| skill_family accuracy | 76.7 % | 76.7 % (unchanged) |
+| skill_family answers at confidence 0.8 or more | 0 of 30 | 19 of 30, 94.7 % correct |
+| injection accuracy | 83.3 % | 90.0 % (recall 100 %, 1 false positive) |
+
+Reading: fine-tuning did not raise raw accuracy on family, but the model is now sure about far more requests (19 of 30 against none) and right 94.7 % of the time when sure, so fewer requests fall through to the slower small model. It is overconfident on injection (29 of 30 answers at 0.8 or more, 89.7 % correct); Laya only adds caution, so that is the safe direction. A full encoder fine-tune was tried first and abandoned: one epoch took about 40 minutes on this machine. The fine-tuned weights stay out of the repository; use them with `RAGNAROK_LAYA_CKPT=models-local/laya-ft/ckpt`. Not on by default until the cascade thresholds are re-fitted on it.

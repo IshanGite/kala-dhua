@@ -81,9 +81,9 @@ for qi, (name, idx) in enumerate([("skill_family", 1), ("injection", 2)]):
 del agent_before
 print("before:", json.dumps(before), flush=True)
 t0 = time.time()
-summary = finetune(str(OUT / "train.jsonl"), str(BASE), str(OUT / "ckpt"), TrainConfig(epochs=EPOCHS, micro_batch=8, grad_accum=2, loss="soft-ce", seed=7), device=dev)
+summary = finetune(str(OUT / "train.jsonl"), str(BASE), str(OUT / "ckpt"), TrainConfig(epochs=EPOCHS, micro_batch=8, grad_accum=2, loss="soft-ce", seed=7, freeze_encoder=True), device=dev)
 secs = round(time.time() - t0)
 after = evaluate(OUT / "ckpt", dev)
 print("after:", json.dumps(after), "train_seconds", secs, flush=True)
 Path("docs/evidence").mkdir(parents=True, exist_ok=True)
-Path("docs/evidence/laya_finetune.json").write_text(json.dumps({"train_rows": len(train), "epochs": EPOCHS, "device": dev, "train_seconds": secs, "test": "30 author-written requests, none in training", "before": before, "after": after}, indent=1), encoding="utf-8")
+Path("docs/evidence/laya_finetune.json").write_text(json.dumps({"train_rows": len(train), "epochs": EPOCHS, "encoder_frozen": True, "device": dev, "train_seconds": secs, "test": "30 author-written requests, none in training", "before": before, "after": after}, indent=1), encoding="utf-8")

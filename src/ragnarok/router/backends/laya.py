@@ -92,6 +92,9 @@ class LayaBackend:
                         import laya
                     except ImportError as exc:
                         raise ModelError("laya is not installed (uv sync --extra laya)", code="E_LAYA_MISSING") from exc
+                    ckpt = os.environ.get("RAGNAROK_LAYA_CKPT")  # a local fine-tune (scripts/finetune_laya.py); opt-in, the shipped checkpoint is the default
+                    if ckpt:
+                        return laya.load(ckpt, device=self.device or best_device())
                     return laya.load(self.model_id, subfolder=self.subfolder, device=self.device or best_device())
 
                 self._agent = await asyncio.to_thread(load)

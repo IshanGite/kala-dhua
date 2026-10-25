@@ -1,0 +1,36 @@
+{
+ "train_rows": 513,
+ "epochs": 8,
+ "encoder_frozen": true,
+ "device": "mps",
+ "train_seconds": 554,
+ "test": "30 author-written requests, none in training",
+ "before": {
+  "n": 30,
+  "skill_family": {
+   "accuracy": 0.767,
+   "answers_ge_0.8_conf": 0,
+   "accuracy_when_ge_0.8": null
+  },
+  "injection": {
+   "accuracy": 0.833,
+   "answers_ge_0.8_conf": 7,
+   "accuracy_when_ge_0.8": 1.0
+  }
+ },
+ "after": {
+  "n": 30,
+  "skill_family": {
+   "accuracy": 0.767,
+   "answers_ge_0.8_conf": 19,
+   "accuracy_when_ge_0.8": 0.947
+  },
+  "injection": {
+   "accuracy": 0.9,
+   "answers_ge_0.8_conf": 29,
+   "accuracy_when_ge_0.8": 0.897
+  },
+  "injection_recall": 1.0,
+  "injection_false_positives": 1
+ }
+}
