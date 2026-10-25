@@ -6,10 +6,18 @@ All answers are in the user's time zone (default Asia/Kolkata) and returned as U
 from __future__ import annotations
 
 import re
-from datetime import datetime, timedelta
-from zoneinfo import ZoneInfo
+from datetime import UTC, datetime, timedelta, timezone, tzinfo
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 DEFAULT_TZ = "Asia/Kolkata"
+
+
+def zone(name: str) -> tzinfo:
+    """The IANA zone, or a safe fixed offset when the OS has no tz database (Windows without the tzdata package)."""
+    try:
+        return ZoneInfo(name)
+    except (ZoneInfoNotFoundError, ModuleNotFoundError, KeyError):
+        return timezone(timedelta(hours=5, minutes=30)) if name == "Asia/Kolkata" else UTC
 WEEKDAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
 MONTHS = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"]
 
@@ -24,8 +32,8 @@ def _day_start(dt: datetime) -> datetime:
 
 def parse_time_range(text: str, now_ms: int, tz: str = DEFAULT_TZ) -> tuple[int, int] | None:
     """Return (start_ms, end_ms) for the first time expression found, or None."""
-    zone = ZoneInfo(tz)
-    now = datetime.fromtimestamp(now_ms / 1000, zone)
+    tzi = zone(tz)
+    now = datetime.fromtimestamp(now_ms / 1000, tzi)
     today = _day_start(now)
     t = text.lower()
     day = timedelta(days=1)
@@ -69,9 +77,9 @@ def parse_time_range(text: str, now_ms: int, tz: str = DEFAULT_TZ) -> tuple[int,
     if m and not (m.group("m") == "may" and not m.group("pre") and not m.group("y")):  # a bare "may" is the verb
         month = MONTHS.index(m.group("m")) + 1
         year = int(m.group("y")) if m.group("y") else (now.year if month <= now.month else now.year - 1)
-        start = datetime(year, month, 1, tzinfo=zone)
-        end = datetime(year + (month == 12), (month % 12) + 1, 1, tzinfo=zone)
+        start = datetime(year, month, 1, tzinfo=tzi)
+        end = datetime(year + (month == 12), (month % 12) + 1, 1, tzinfo=tzi)
         return _ms(start), _ms(end)
     if re.search(r"\blast year\b", t):
-        return _ms(datetime(now.year - 1, 1, 1, tzinfo=zone)), _ms(datetime(now.year, 1, 1, tzinfo=zone))
+        return _ms(datetime(now.year - 1, 1, 1, tzinfo=tzi)), _ms(datetime(now.year, 1, 1, tzinfo=tzi))
     return None

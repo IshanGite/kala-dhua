@@ -26,22 +26,39 @@ class ContainerBackend:
         self.image = image
         self._engine: str | None = None
 
-    def _find_engine(self) -> str | None:
+    def _find_engine(self) -> tuple[str | None, str]:
+        """Find a running engine in LINUX-container mode with the skill image already pulled. Returns (path, why_not)."""
+        why = "no Docker or Podman installed"
         for exe in ("docker", "podman"):
             path = shutil.which(exe)
-            if path:
-                try:
-                    r = subprocess.run([path, "info"], capture_output=True, timeout=15, check=False)  # noqa: S603
-                except (OSError, subprocess.TimeoutExpired):
-                    continue
-                if r.returncode == 0:
-                    return path
-        return None
+            if not path:
+                continue
+            try:
+                info = subprocess.run([path, "info", "--format", "{{.OSType}}"], capture_output=True, timeout=15, check=False)  # noqa: S603
+            except (OSError, subprocess.TimeoutExpired):
+                why = f"{exe} did not answer"
+                continue
+            if info.returncode != 0:
+                why = f"{exe} is installed but not running"
+                continue
+            if info.stdout.decode("utf-8", errors="replace").strip().lower() != "linux":
+                why = f"{exe} is in Windows-containers mode; switch to Linux containers"
+                continue
+            try:
+                img = subprocess.run([path, "image", "inspect", self.image], capture_output=True, timeout=15, check=False)  # noqa: S603
+            except (OSError, subprocess.TimeoutExpired):
+                why = f"{exe} did not answer"
+                continue
+            if img.returncode != 0:
+                why = f"image {self.image} is not pulled yet (ragnarok setup pulls it)"
+                continue
+            return path, ""
+        return None, why
 
     def probe(self) -> ProbeResult:
-        self._engine = self._find_engine()
+        self._engine, why = self._find_engine()
         if not self._engine:
-            return ProbeResult(self.name, False, "no running Docker or Podman")
+            return ProbeResult(self.name, False, why)
         return ProbeResult(self.name, True, Path(self._engine).name)
 
     def wrap(self, argv: list[str], granted: Granted, limits: Limits) -> tuple[list[str], str]:
