@@ -113,6 +113,32 @@ def connect_outlook(client_id: str = typer.Option(..., "--client-id", help="Appl
 
 
 @app.command()
+def run(
+    port: int = typer.Option(8765, help="Local port (127.0.0.1 only)"),
+    interval: float = typer.Option(60.0, help="Seconds between sync cycles"),
+    folder: list[str] = typer.Option([], "--folder", help="A local folder to watch (repeatable)"),  # noqa: B008
+) -> None:
+    """Start the always-on agent: continuous ingestion plus the local API the window talks to."""
+    import contextlib
+
+    from ragnarok.daemon.api import create_app, serve
+    from ragnarok.daemon.wiring import build_world
+
+    world = build_world(interval_s=interval, files=list(folder) or None)
+
+    @contextlib.asynccontextmanager
+    async def lifespan(_app):  # noqa: ANN001
+        world.runtime.start()
+        yield
+        await world.runtime.stop()
+
+    api = create_app(world.guard, port, world.services)
+    api.router.lifespan_context = lifespan
+    typer.echo(f"ragnarok: running on 127.0.0.1:{port}; sources: {', '.join(world.runtime.runners) or 'none connected'}; session token file: {world.token_file}")
+    serve(api, port)
+
+
+@app.command()
 def check() -> None:
     """Lint and run the fast tests (the pre-push gate)."""
     import subprocess

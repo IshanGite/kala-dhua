@@ -1,29 +1,94 @@
-"""FastAPI app for the local UI and CLI. Binds 127.0.0.1 only."""
+"""FastAPI app for the local UI and CLI. Binds 127.0.0.1 only. Every route except /healthz needs the session token."""
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from typing import Any
+
 from fastapi import FastAPI
+from pydantic import BaseModel, Field
 
 from ragnarok import __version__
 from ragnarok.daemon.auth import LocalOnlyMiddleware, TokenGuard
+from ragnarok.daemon.runtime import Runtime
+from ragnarok.harness.answer import Answerer
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8765
 
 
-def create_app(guard: TokenGuard | None = None, port: int = DEFAULT_PORT) -> FastAPI:
+@dataclass
+class Services:
+    runtime: Runtime | None = None
+    answerer: Answerer | None = None
+
+
+class ChatIn(BaseModel):
+    text: str = Field(min_length=1, max_length=4000)
+
+
+class ToggleIn(BaseModel):
+    enabled: bool
+
+
+class PairIn(BaseModel):
+    platform: str = Field(max_length=40)
+    handle: str = Field(max_length=200)
+    action: str = Field(pattern="^(approve|block)$")
+
+
+def create_app(guard: TokenGuard | None = None, port: int = DEFAULT_PORT, services: Services | None = None) -> FastAPI:
     guard = guard or TokenGuard()
+    svc = services or Services()
     app = FastAPI(title="Ragnarok", docs_url=None, redoc_url=None, openapi_url=None)
     app.add_middleware(LocalOnlyMiddleware, port=port, guard=guard)
-    app.state.guard = guard
+    app.state.guard, app.state.services = guard, svc
 
     @app.get("/healthz")
-    async def healthz() -> dict:
+    async def healthz() -> dict[str, Any]:
         return {"ok": True, "version": __version__}
 
     @app.get("/status")
-    async def status() -> dict:
-        return {"ok": True, "version": __version__, "degraded": []}
+    async def status() -> dict[str, Any]:
+        out: dict[str, Any] = {"ok": True, "version": __version__, "degraded": []}
+        if svc.runtime:
+            out["runtime"] = svc.runtime.status()
+        return out
+
+    @app.get("/activity")
+    async def activity(limit: int = 50) -> dict[str, Any]:
+        return {"items": list(svc.runtime.activity)[: max(1, min(limit, 200))] if svc.runtime else []}
+
+    @app.post("/toggle")
+    async def toggle(body: ToggleIn) -> dict[str, Any]:
+        if svc.runtime is None:
+            return {"ok": False, "error": "E_NO_RUNTIME"}
+        svc.runtime.set_enabled(body.enabled)
+        return {"ok": True, "enabled": svc.runtime.enabled}
+
+    @app.post("/tick")
+    async def tick() -> dict[str, Any]:
+        """Run one sync cycle now (the window's Sync button)."""
+        if svc.runtime is None:
+            return {"ok": False, "error": "E_NO_RUNTIME"}
+        reps = await svc.runtime.tick()
+        return {"ok": True, "sources": {k: {"ingested": v.ingested, "held": v.held, "failed": v.failed} for k, v in reps.items()}}
+
+    @app.post("/pairing")
+    async def pairing(body: PairIn) -> dict[str, Any]:
+        if svc.runtime is None:
+            return {"ok": False, "error": "E_NO_RUNTIME"}
+        if body.action == "approve":
+            return {"ok": True, "released": svc.runtime.approve_sender(body.platform, body.handle)}
+        svc.runtime.block_sender(body.platform, body.handle)
+        return {"ok": True}
+
+    @app.post("/chat")
+    async def chat(body: ChatIn) -> dict[str, Any]:
+        if svc.answerer is None:
+            return {"ok": False, "error": "E_NO_AGENT"}
+        a = await svc.answerer.answer(body.text)
+        return {"ok": True, "answer": a.text, "citations": a.citations, "grounded": a.grounded, "notes": a.notes}
 
     return app
 
