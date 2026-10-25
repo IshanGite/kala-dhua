@@ -51,7 +51,7 @@ FREE = "{free}"  # a free-text parameter in a stored route: refilled from the ne
 CRITERIA: dict[str, list[dict]] = {
     "reminder.add": [{"kind": "field_present", "path": "reminder_id"}], "reminder.list": [{"kind": "ok"}],
     "mail.draft": [{"kind": "field_present", "path": "draft"}], "mail.send": [{"kind": "equals", "path": "sent", "value": True}],
-    "chat.reply": [{"kind": "equals", "path": "posted", "value": True}], "calendar.add": [{"kind": "equals", "path": "added", "value": True}], "mail.reply": [{"kind": "equals", "path": "sent", "value": True}], "drive.create": [{"kind": "equals", "path": "created", "value": True}], "memory.search": [{"kind": "field_present", "path": "hits"}],
+    "chat.reply": [{"kind": "equals", "path": "posted", "value": True}], "calendar.add": [{"kind": "equals", "path": "added", "value": True}], "mail.reply": [{"kind": "equals", "path": "sent", "value": True}], "drive.create": [{"kind": "equals", "path": "created", "value": True}], "memory.search": [{"kind": "ok"}],
 }
 
 
@@ -250,6 +250,31 @@ class Agent:
         d = res.parsed or {}
         return str(d.get("subject", ""))[:150], str(d.get("body", ""))[:1500]
 
+    USER_FIXABLE = {"E_APPROVAL_DENIED", "E_APPROVAL_INVALID", "E_NOT_CONNECTED", "E_UNKNOWN_TARGET", "E_BAD_RECIPIENT", "E_NO_TIME", "E_AUTH", "E_DENIED", "E_PANIC", "E_SANDBOX_UNAVAILABLE"}
+
+    async def _reflect(self, request: str, decision: RouteDecision, plan: Plan, outcome: TaskOutcome, snippets: list[str]) -> TaskOutcome:
+        """FR3.3: when a read-only or local step fails or does not meet its criteria, look at what went wrong and try ONE adjusted plan. Anything that
+        sends, posts or writes outside is never re-planned by the machine, and anything the user must fix (a denied card, a missing permission) is not retried."""
+        if outcome.state == "succeeded" or not outcome.errors:
+            return outcome
+        if any(code in self.USER_FIXABLE for code in outcome.errors.values()):
+            return outcome
+        by_id = {n.id: n for n in plan.nodes}
+        for nid in outcome.errors:
+            m = self._manifest(by_id[nid].skill) if nid in by_id else None
+            if m is None or m.external_write or m.side_effects == "irreversible":
+                return outcome
+        failed = "; ".join(f"step {nid} ({by_id[nid].skill}) failed with {code}" for nid, code in outcome.errors.items() if nid in by_id)
+        manifests = [m for n in decision.shortlist if (m := self._manifest(n)) is not None] or self._all_manifests()[:5]
+        pr = await self.planner.plan(f"{request}\n[Self-correction: the previous attempt did not work: {failed}. Choose a different approach or different parameters.]", manifests, snippets=snippets,
+                                     deadline=get_clock().monotonic() + 30)
+        if pr.plan is None or [(n.skill, n.params) for n in pr.plan.nodes] == [(n.skill, n.params) for n in plan.nodes]:
+            decision.trace.append(f"Self-correction: {failed}; I could not find a different approach")
+            return outcome
+        decision.trace.append(f"Self-correction: {failed}; trying again with {', '.join(n.skill for n in pr.plan.nodes)}")
+        tid = self.executor.start_task(request, pr.plan, self.ctx, plan_meta={"tier": decision.tier, "retry_of": outcome.task_id})
+        return await self.executor.run_task(tid, self.ctx)
+
     async def _route_plan(self, d: RouteDecision, request: str) -> Plan | None:
         nodes = d.route_nodes or []
         if any(FREE in str(n.get("params")) for n in nodes):
@@ -392,6 +417,7 @@ class Agent:
                 shown = ", ".join(f"{k}={str(v)[:50]}" for k, v in n.params.items())
                 decision.trace.append(f"Step {n.id}: {n.skill} (risk tier {int(m.tier)}{', needs your click' if m.external_write or int(m.tier) >= 2 else ''}) with {shown}")
         decision.trace.append("Result: " + ", ".join(f"{k}={v}" for k, v in outcome.node_states.items()))
+        outcome = await self._reflect(request, decision, plan, outcome, snippets)
         t_learn = time.perf_counter()
         learned = await self._learn(request, decision, plan, plan_source, outcome)
         mark("learn", t_learn)

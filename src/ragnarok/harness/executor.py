@@ -30,6 +30,9 @@ from ragnarok.security.guard import Guard, ToolCall
 from ragnarok.skills.registry import SkillNotRunnable, SkillRegistry
 from ragnarok.skills.runner import RunContext, run_skill
 
+RETRYABLE = {"E_NET", "E_UPSTREAM", "E_MODEL_TIMEOUT", "E_MODEL_DEADLINE", "E_SANDBOX_TIMEOUT", "E_NATIVE_TIMEOUTERROR"}
+MAX_RETRIES = 2
+BACKOFF_S = 0.4
 READ_SOURCES = {"mail.read": "received", "chat.read": "received", "drive.read": "received", "fs.read": "user_file"}
 MAX_CONCURRENCY = 2
 
@@ -207,6 +210,15 @@ class Executor:
             self._l.set_node_state(nid, "blocked", error_code="E_APPROVAL_INVALID")
             return
         outcome = await self._execute(manifest, skill, params, ctx)
+        tries = 0
+        # FR3.3: a transient failure of something that cannot have changed the outside world is retried with backoff. A send or post is never retried by the
+        # machine: a lost reply could mean the message was delivered, and the user decides about a second try.
+        while (not outcome["ok"] and tries < MAX_RETRIES and manifest.side_effects in ("none", "reversible") and not manifest.external_write
+               and (outcome.get("retryable") or outcome["code"] in RETRYABLE)):
+            tries += 1
+            log("node_retry", node=nid[:12], skill=skill, n=tries, err=outcome["code"])
+            await asyncio.sleep(BACKOFF_S * tries)
+            outcome = await self._execute(manifest, skill, params, ctx)
         if not outcome["ok"]:
             if effect_key:
                 self._l.set_effect(effect_key, "failed")
@@ -292,7 +304,7 @@ class Executor:
                 return {"ok": True, "result": await handler(params, ctx, dry_run=dry_run)}
             except Exception as exc:  # noqa: BLE001
                 code = getattr(exc, "code", None)  # our own errors carry a stable code and a safe, human-readable message
-                return {"ok": False, "code": code if isinstance(code, str) and code.startswith("E_") else f"E_NATIVE_{type(exc).__name__.upper()}"}
+                return {"ok": False, "code": code if isinstance(code, str) and code.startswith("E_") else f"E_NATIVE_{type(exc).__name__.upper()}", "retryable": bool(getattr(exc, "retryable", False))}
         rc = RunContext(workspace=ctx.workspace, data_dir=ctx.data_dir, today=ctx.today, dry_run=dry_run)
         try:
             res = await asyncio.to_thread(run_skill, self._backend, self._reg, skill, params, rc)
