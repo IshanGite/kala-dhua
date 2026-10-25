@@ -41,6 +41,7 @@ class Services:
 
 class ChatIn(BaseModel):
     text: str = Field(min_length=1, max_length=4000)
+    quick_s: float | None = Field(default=None, ge=0, le=10)  # how long to wait for an immediate answer before returning a job to poll (the window uses a short wait so Stop is available at once)
 
 
 class ToggleIn(BaseModel):
@@ -312,22 +313,22 @@ def create_app(guard: TokenGuard | None = None, port: int = DEFAULT_PORT, servic
 
     @app.post("/vision")
     async def vision(body: VisionIn) -> dict[str, Any]:
-        """Typed or clicked by the user only. The picture is used once and never stored; the answer is words, and nothing is executed from it."""
-        if svc.vision is None:
+        """Typed or clicked by the user only. The picture is used once and never stored; the answer is words, and nothing is executed from it. A job, so it can be stopped."""
+        if svc.chat is None:
             return {"ok": False, "error": "E_NO_AGENT"}
-        import asyncio as _a
         import base64 as _b
 
-        try:
-            if body.image_b64:
-                text = await svc.vision.ask(_b.b64decode(body.image_b64.split(",")[-1], validate=False), body.question)
-            else:
-                if body.delay_s:
-                    await _a.sleep(body.delay_s)  # time to switch to the window that should be explained
-                text = await svc.vision.explain_screen(body.question)
-        except Exception as exc:  # noqa: BLE001
-            return {"ok": False, "error": getattr(exc, "code", "E_VISION"), "detail": str(exc)[:300]}
-        return {"ok": True, "answer": text}
+        image = None
+        if body.image_b64:
+            try:
+                image = _b.b64decode(body.image_b64.split(",")[-1], validate=False)
+            except ValueError:
+                return {"ok": False, "error": "E_IMAGE_TYPE", "detail": "that is not a readable image"}
+        return await svc.chat.submit_vision(body.question, image, body.delay_s)
+
+    @app.post("/chat/{job_id}/cancel")
+    async def chat_cancel(job_id: str) -> dict[str, Any]:
+        return svc.chat.cancel(job_id) if svc.chat else {"ok": False, "error": "E_NO_AGENT"}
 
     @app.get("/approvals")
     async def approvals() -> dict[str, Any]:
@@ -349,7 +350,7 @@ def create_app(guard: TokenGuard | None = None, port: int = DEFAULT_PORT, servic
     @app.post("/chat")
     async def chat(body: ChatIn) -> dict[str, Any]:
         if svc.chat is not None:
-            return await svc.chat.submit(body.text)
+            return await svc.chat.submit(body.text, quick_s=body.quick_s)
         if svc.answerer is None:
             return {"ok": False, "error": "E_NO_AGENT"}
         a = await svc.answerer.answer(body.text)

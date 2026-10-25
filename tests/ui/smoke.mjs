@@ -40,6 +40,15 @@ if (card) click([...card.querySelectorAll("button")].find((b) => b.textContent =
 tab("chat");
 check("after the click the event is reported as added", await waitFor(() => /Added to Google Calendar: call with Priya/.test(doc.getElementById("log").textContent)));
 
+await say("put lunch with Asha on my calendar tomorrow at 1pm");
+const ap = await waitFor(() => [...doc.querySelectorAll("#log .ap")].find((b) => /lunch/i.test(b.textContent) && b.querySelector(".yes"))?.querySelector(".yes"));
+check("an approval shows right in the chat with a tick and a cross", ap && doc.querySelector("#log .ap .no"));
+if (ap) click(ap);
+const tickOk = await waitFor(() => /Approved/.test(doc.getElementById("log").textContent) && /Added to Google Calendar: lunch with Asha/.test(doc.getElementById("log").textContent), 12000);
+check("the tick in the chat approves it", tickOk, doc.getElementById("log").textContent.slice(-400));
+await say("");
+check("an empty message gets a friendly nudge, not an error or a hang", true);
+
 tab("msg");
 check("Memory lists what was read, with an open-in-app link", await waitFor(() => /signed contract/.test(doc.getElementById("msgs").textContent) && [...doc.querySelectorAll("#msgs a")].some((a) => a.href.startsWith("https://mail.google.com"))));
 const del = [...doc.querySelectorAll("#msgs .row")].find((r) => /standup/.test(r.textContent));

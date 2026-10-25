@@ -21,6 +21,7 @@ class Job:
     state: str = "running"  # running | done | error
     reply: dict[str, Any] = field(default_factory=dict)
     task_id: str | None = None
+    task: Any = None  # the asyncio task, so the user can stop it
 
 
 FRIENDLY = {
@@ -134,11 +135,75 @@ class ChatService:
             self.history = self.history[-12:]
             self._log_reply(job.reply.get("text", ""))
             job.state = "done"
+        except asyncio.CancelledError:
+            self._mark_cancelled(job)
+            job.reply, job.state = {"text": "Stopped. Nothing further was done.", "citations": [], "cancelled": True}, "cancelled"
         except Exception as exc:  # noqa: BLE001 - a failed turn becomes a message, never a crash
             log("chat_turn_failed", err=type(exc).__name__)
             job.reply, job.state = {"text": f"Something went wrong ({type(exc).__name__}).", "citations": []}, "error"
 
-    async def submit(self, text: str) -> dict[str, Any]:
+    def _mark_cancelled(self, job: Job) -> None:
+        """A stopped task must not come back after a restart: its unfinished steps are skipped and the task is closed."""
+        if not job.task_id:
+            return
+        try:
+            for n in self._agent.ledger.nodes_of(job.task_id):
+                if n["state"] not in ("succeeded", "failed", "skipped", "blocked"):
+                    self._agent.ledger.set_node_state(n["id"], "skipped", error_code="E_CANCELLED")
+            self._agent.ledger.set_task_state(job.task_id, "cancelled")
+        except Exception as exc:  # noqa: BLE001
+            log("cancel_mark_failed", err=type(exc).__name__)
+
+    def cancel(self, job_id: str) -> dict[str, Any]:
+        job = self.jobs.get(job_id)
+        if job is None or job.task is None:
+            return {"ok": False, "error": "E_NO_JOB"}
+        if job.state == "running":
+            job.task.cancel()
+        return {"ok": True}
+
+    async def submit_vision(self, question: str | None, image: bytes | None, delay_s: float = 0.0) -> dict[str, Any]:
+        """Explain the screen (no image) or answer about a picture. A job like any other, so it shows progress and can be stopped."""
+        vision = getattr(self._agent, "vision", None)
+        job = Job(new_id()[:10], question or ("a picture" if image else "my screen"))
+        self.jobs[job.id] = job
+
+        async def run() -> None:
+            try:
+                if vision is None:
+                    job.reply, job.state = {"text": "Vision is not set up on this machine.", "citations": []}, "error"
+                    return
+                if image is not None:
+                    text = await vision.ask(image, question)
+                else:
+                    if delay_s:
+                        await asyncio.sleep(delay_s)  # time to switch to the window that should be explained
+                    text = await vision.explain_screen(question)
+                job.reply, job.state = {"text": text, "citations": [], "tier": "L1", "backend": "vision", "why": ["You asked about " + ("a picture" if image else "your screen") + ": one local vision-model call, nothing stored"]}, "done"
+            except asyncio.CancelledError:
+                job.reply, job.state = {"text": "Stopped.", "citations": [], "cancelled": True}, "cancelled"
+            except Exception as exc:  # noqa: BLE001
+                job.reply, job.state = {"text": str(exc) if getattr(exc, "code", "").startswith("E_") else "I could not do that.", "citations": [], "error": getattr(exc, "code", "E_VISION")}, "error"
+
+        return await self._start(job, run(), 0.4)
+
+    async def _start(self, job: Job, coro: Any, quick_s: float | None = None) -> dict[str, Any]:
+        task = asyncio.get_running_loop().create_task(coro)
+        job.task = task
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
+        try:
+            await asyncio.wait_for(asyncio.shield(task), timeout=QUICK_S if quick_s is None else quick_s)
+        except TimeoutError:
+            return {"ok": True, "pending": True, "job": job.id, **self.interim(job)}
+        except asyncio.CancelledError:
+            pass
+        return {"ok": True, "pending": False, "job": job.id, "state": job.state, **job.reply}
+
+    async def submit(self, text: str, quick_s: float | None = None) -> dict[str, Any]:
+        text = text.strip()
+        if not text:
+            return {"ok": True, "pending": False, "job": "", "state": "done", "text": "Say something and I will answer. Try 'catch me up' or 'what did Ravi say'.", "citations": [], "tier": "L1", "backend": "rule", "ms": 0}
         if CONFIRM.match(text):  # approval is a click on a card, never a sentence: typed text cannot approve anything
             n = len(self._hub.pending()) if self._hub is not None else 0
             reply = (f"{n} action(s) are waiting for you in the Approvals tab. Each card shows exactly what will happen; press Approve there." if n else
@@ -148,14 +213,7 @@ class ChatService:
             return {"ok": True, "pending": False, "job": "", "state": "done", "text": reply, "citations": [], "tier": "L1", "backend": "rule", "ms": 0}
         job = Job(new_id()[:10], text)
         self.jobs[job.id] = job
-        task = asyncio.get_running_loop().create_task(self._run(job))
-        self._tasks.add(task)
-        task.add_done_callback(self._tasks.discard)
-        try:
-            await asyncio.wait_for(asyncio.shield(task), timeout=QUICK_S)
-        except TimeoutError:
-            return {"ok": True, "pending": True, "job": job.id, **self.interim(job)}
-        return {"ok": True, "pending": False, "job": job.id, "state": job.state, **job.reply}
+        return await self._start(job, self._run(job), quick_s)
 
     def poll(self, job_id: str) -> dict[str, Any]:
         job = self.jobs.get(job_id)

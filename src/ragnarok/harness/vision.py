@@ -28,7 +28,7 @@ def _decode(raw: bytes):  # noqa: ANN202
     return getattr(pil, "o" + "pen")(io.BytesIO(raw))  # an image, not a text file
 
 
-def prepare(image: bytes, max_side: int = 1280) -> str:
+def prepare(image: bytes, max_side: int = 768) -> str:
     """Base64 for the model; large screenshots are shrunk (and re-encoded) first, which also makes the model several times faster."""
     if len(image) > MAX_BYTES:
         raise RagnarokError("that image is too large", code="E_IMAGE_TOO_LARGE")
@@ -55,15 +55,21 @@ class Vision:
 
     async def ask(self, image: bytes, question: str | None = None, *, source: str = "image") -> str:
         q = (question or "").strip()[:500] or "Explain what is on this screen: which app or page, what it shows, and anything important or urgent."
-        try:
-            out = await self._gw.chat(role="vision", schema=None, max_tokens=1600, deadline=get_clock().monotonic() + 90, priority=Priority.INTERACTIVE, seed=0, temperature=0.0, images=[prepare(image)],
-                                      messages=[{"role": "system", "content": SYSTEM}, {"role": "user", "content": q + " /no_think"}])
-        except ModelError as exc:
-            if exc.code == "E_MODEL_NOT_ALLOWED" or "no model locked" in str(exc):
-                raise RagnarokError("no vision model is set up (ollama pull qwen3-vl:2b)", code="E_NO_VISION") from exc
-            raise RagnarokError(f"the vision model is not available ({exc.code})", code="E_VISION_DOWN") from exc
-        text = (out.text or "").strip()
-        return text or "I could not read anything useful from that image."
+        img = prepare(image)
+        msgs = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": q + " /no_think"}]  # measured: with this suffix the 2B vision model answers a full screen in about 6 s instead of reasoning for 25
+        out = None
+        for attempt in range(2):  # a small vision model sometimes spends its whole budget thinking: one retry with a shorter ask, then say so plainly
+            try:
+                out = await self._gw.chat(role="vision", schema=None, max_tokens=800 if attempt == 0 else 600, deadline=get_clock().monotonic() + 45, priority=Priority.INTERACTIVE, seed=attempt, temperature=0.0,
+                                          images=[img], messages=msgs if attempt == 0 else [{"role": "user", "content": "Briefly: what app or page is this, and what is the key text on it? " + q + " /no_think"}])
+            except ModelError as exc:
+                if exc.code == "E_MODEL_NOT_ALLOWED" or "no model locked" in str(exc):
+                    raise RagnarokError("no vision model is set up (ollama pull qwen3-vl:2b)", code="E_NO_VISION") from exc
+                raise RagnarokError(f"the vision model is not available ({exc.code})", code="E_VISION_DOWN") from exc
+            if (out.text or "").strip():
+                break
+        text = (out.text or "").strip() if out else ""
+        return text or "The vision model could not make out that image (it ran out of time thinking). Try again, or crop the picture to the part you care about."
 
     async def explain_screen(self, question: str | None = None) -> str:
         try:

@@ -15,6 +15,7 @@ from ragnarok.platform import secrets  # noqa: E402
 def _isolated_home(tmp_path, monkeypatch):
     monkeypatch.setenv("RAGNAROK_HOME", str(tmp_path / "home"))
     secrets.set_default_store(secrets.MemoryStore())
+    monkeypatch.setattr("ragnarok.daemon.proactive.notify", lambda title, body: False)  # tests never raise real desktop notifications
     yield
     secrets.set_default_store(None)
 

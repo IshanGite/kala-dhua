@@ -35,6 +35,7 @@ from ragnarok.harness.decompose import decompose, is_compound
 from ragnarok.harness.executor import ExecContext, Executor, TaskOutcome
 from ragnarok.harness.plan import Plan, PlanNode, validate_plan
 from ragnarok.harness.planner import Planner
+from ragnarok.harness.understand import understand
 from ragnarok.harness.verify import evaluate
 from ragnarok.harness.vision import SCREEN_ASK
 from ragnarok.llm_gateway.client import Gateway, Priority
@@ -308,6 +309,50 @@ class Agent:
             return None
         return plan if validate_plan(plan, self._manifest).ok else None
 
+    async def _answer_intent(self, request: str, u: Any, history: list[tuple[str, str]] | None, trust: str, t0: float, tm: dict[str, int]) -> TurnResult | None:
+        """Read-only paths chosen by the understanding model. None means 'not for me': the keyword paths below take over."""
+        assert self.answerer is not None
+        done = lambda fam, ans, trace: TurnResult("L1", RouteDecision(tier="L1", intent_family=fam, skills=[], plan_needed=False, risk_floor=0, memory_types=[], confidence=1.0, latency_ms=0.0,  # noqa: E731
+                                                                      backend="understand", trace=[f"The language model read your message as '{u.intent}'" + (f" about {u.person}" if u.person else "") + (f" ({u.topic})" if u.topic else "") + ": " + trace]),
+                                                  None, None, (time.perf_counter() - t0) * 1000, answer=ans, timings=tm)
+        if u.intent == "screen" and self.vision is not None:
+            if trust != "user_direct":
+                return done("vision", Answered("I only look at your screen when you ask me to in the chat."), "refused for an automatic run")
+            try:
+                text = await self.vision.explain_screen(request)
+            except Exception as exc:  # noqa: BLE001
+                text = str(exc) if getattr(exc, "code", "").startswith("E_") else "I could not look at the screen."
+            return done("vision", Answered(text, notes=["vision"]), "one capture, only to the local vision model, never stored")
+        if u.intent == "catchup":
+            return done("catchup", await self.answerer.catch_up(request, source=u.source, topic_hint=u.topic if u.topic and not u.person else ""), "summary built from your messages, grouped by context")
+        if u.intent == "agenda":
+            ans = await self.answerer.agenda(request)
+            if "agenda_empty" in ans.notes and u.topic:  # 'when is the budget review' is a memory question, not a calendar day
+                return None if False else await self._recall(request, u, history, done)
+            return done("agenda", ans, "read from your calendar")
+        if u.intent == "recall":
+            return await self._recall(request, u, history, done)
+        if u.intent == "unclear":
+            return done("unclear", Answered("I did not quite get that. You can ask me about your messages, ask for a summary ('catch me up'), or tell me to do something like 'remind me to call the bank at 5pm'."), "too vague to act on")
+        if u.intent == "chat":
+            if self._is_question(request) and len(request.split()) > 2:  # a question may still be about the user's data: memory first, general conversation if memory has nothing
+                ans = await self.answerer.answer(request, general=False, history=history, context_hint=self._hint(request, history))
+                if ans.grounded:
+                    return done("question", ans, "answered from your memory with citations")
+            return done("chat", await self.answerer._general(request, history), "ordinary conversation, not from your data")
+        return None
+
+    async def _recall(self, request: str, u: Any, history: list[tuple[str, str]] | None, done: Any) -> TurnResult:
+        assert self.answerer is not None
+        if u.person:
+            ans = await self.answerer.recall_person(u.person, u.topic)
+            if "person_empty" not in ans.notes:
+                return done("recall", ans, f"latest messages from {u.person}")
+        ans = await self.answerer.answer(request, general=False, history=history, context_hint=self._hint(request, history))
+        if not ans.grounded:
+            ans = await self.answerer._general(request, history)
+        return done("recall", ans, "answered from your memory with citations")
+
     async def handle(self, request: str, *, trust: str = "user_direct", history: list[tuple[str, str]] | None = None) -> TurnResult:
         t0 = time.perf_counter()
         if self._pending is not None:  # the last turn asked for a missing detail: a short plain reply completes that request
@@ -334,6 +379,25 @@ class Agent:
                                     trace=[f"Split into {len(d.clauses)} steps by code: " + " then ".join(f"{n.skill}" for n in d.plan.nodes) + "; later steps use earlier results, so anything derived from outside content asks for your click"])
                 return await self._run_plan(request, dec, d.plan, "C", [], t0, tm)
             decomposer_note = f"The step splitter could not handle it ({d.reason}), so the planner model tries"  # falls through to the cascade and the LLM planner
+        if (calc := try_calc(request)) is not None:  # arithmetic is done by code, never by the model
+            dec = RouteDecision(tier="L1", intent_family="calc", skills=[], plan_needed=False, risk_floor=0, memory_types=[], confidence=1.0, latency_ms=0.0, backend="rule", trace=["Arithmetic evaluated by code (a model is not trusted with sums)"])
+            return TurnResult("L1", dec, None, None, (time.perf_counter() - t0) * 1000, answer=Answered(calc if " " in calc else f"= {calc}", grounded=True), timings=tm)
+        if self.answerer is not None and TIME_ASK.search(request) and not self._is_action_request(request):
+            from datetime import datetime as _dt
+
+            n = _dt.fromtimestamp(get_clock().now_ms() / 1000).astimezone()
+            txt = n.strftime("It is %H:%M on %A %d %B %Y") + f" ({n.tzname()})."
+            dec = RouteDecision(tier="L1", intent_family="clock", skills=[], plan_needed=False, risk_floor=0, memory_types=[], confidence=1.0, latency_ms=0.0, backend="rule")
+            return TurnResult("L1", dec, None, None, (time.perf_counter() - t0) * 1000, answer=Answered(txt), timings=tm)
+        if self.answerer is not None and CAPABILITY_ASK.search(request) and not self._is_action_request(request.replace("can you", "")):
+            dec = RouteDecision(tier="L1", intent_family="capabilities", skills=[], plan_needed=False, risk_floor=0, memory_types=[], confidence=1.0, latency_ms=0.0, backend="rule")
+            return TurnResult("L1", dec, None, None, (time.perf_counter() - t0) * 1000, answer=Answered(CAPABILITIES))
+        u = await understand(self.gw, request, history) if (self.answerer is not None and trust in ("user_direct", "agent") and request.strip()) else None
+        mark("understand", t0 + sum(tm.values()) / 1000) if u else None
+        if u is not None and u.intent != "action":  # the model decided this is not a request to DO something: it can only be answered, never acted on
+            res = await self._answer_intent(request, u, history, trust, t0, tm)
+            if res is not None:
+                return res
         if self.vision is not None and SCREEN_ASK.search(request) and not self._is_action_request(re.sub(r"\b(?:read|check)\b", "", request, flags=re.I)):
             dec = RouteDecision(tier="L1", intent_family="vision", skills=[], plan_needed=False, risk_floor=0, memory_types=[], confidence=1.0, latency_ms=0.0, backend="vision",
                                 trace=["You asked about your screen: one capture, sent only to the local vision model, never stored"])
@@ -352,19 +416,6 @@ class Agent:
             ans = await self.answerer.recent_from(srcs)
             dec = RouteDecision(tier="L1", intent_family="recall", skills=[], plan_needed=False, risk_floor=0, memory_types=["episodic"], confidence=1.0, latency_ms=0.0, backend="rule")
             return TurnResult("L1", dec, None, None, (time.perf_counter() - t0) * 1000, answer=ans)
-        if (calc := try_calc(request)) is not None:  # arithmetic is done by code, never by the model
-            dec = RouteDecision(tier="L1", intent_family="calc", skills=[], plan_needed=False, risk_floor=0, memory_types=[], confidence=1.0, latency_ms=0.0, backend="rule", trace=["Arithmetic evaluated by code (a model is not trusted with sums)"])
-            return TurnResult("L1", dec, None, None, (time.perf_counter() - t0) * 1000, answer=Answered(calc if " " in calc else f"= {calc}", grounded=True), timings=tm)
-        if self.answerer is not None and TIME_ASK.search(request) and not self._is_action_request(request):
-            from datetime import datetime as _dt
-
-            n = _dt.fromtimestamp(get_clock().now_ms() / 1000).astimezone()
-            txt = n.strftime("It is %H:%M on %A %d %B %Y") + f" ({n.tzname()})."
-            dec = RouteDecision(tier="L1", intent_family="clock", skills=[], plan_needed=False, risk_floor=0, memory_types=[], confidence=1.0, latency_ms=0.0, backend="rule")
-            return TurnResult("L1", dec, None, None, (time.perf_counter() - t0) * 1000, answer=Answered(txt), timings=tm)
-        if self.answerer is not None and CAPABILITY_ASK.search(request) and not self._is_action_request(request.replace("can you", "")):
-            dec = RouteDecision(tier="L1", intent_family="capabilities", skills=[], plan_needed=False, risk_floor=0, memory_types=[], confidence=1.0, latency_ms=0.0, backend="rule")
-            return TurnResult("L1", dec, None, None, (time.perf_counter() - t0) * 1000, answer=Answered(CAPABILITIES))
         if self.answerer is not None and COMPLAINT.search(request) and history:
             dec = RouteDecision(tier="L1", intent_family="complaint", skills=[], plan_needed=False, risk_floor=0, memory_types=[], confidence=1.0, latency_ms=0.0, backend="rule")
             msg = ("Sorry about that. Tell me again as a clear command and I will do it; anything that changes something outside this computer waits for your click in the Approvals tab, "

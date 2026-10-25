@@ -75,8 +75,12 @@ NO_CLAIM = "I did not do anything: no message was sent and nothing was changed. 
 
 
 def drop_false_claims(text: str) -> str:
-    """Words are not actions. A model's prose may never say that something was sent, set or created: only the action path can, and it reports from the real result."""
-    return NO_CLAIM if CLAIM.search(text) else text
+    """Words are not actions. A model's prose may never say that something was sent, set or created: only the action path can, and it reports from the real result.
+    Only the offending sentences are removed, so an ordinary friendly reply survives; if nothing is left the user is told plainly that nothing was done."""
+    if not CLAIM.search(text):
+        return text
+    kept = [x for x in re.split(r"(?<=[.!?])\s+|\n+", text) if x.strip() and not CLAIM.search(x)]
+    return " ".join(kept).strip() or NO_CLAIM
 
 
 WITHHELD = "[withheld: this text tries to give the assistant instructions]"
@@ -106,6 +110,14 @@ GENERAL_SYSTEM = ("You are a small local assistant running on the user's own com
                   "If the user seems to want an action, say plainly that you did not do it and ask them to phrase it as a command. Answer briefly. If unsure, say so.\n\n"
                   "The REAL assistant around you CAN do these when the user gives a clear command (so never say it cannot): set reminders, add Google Calendar events, send and reply to email, post to Telegram, Discord and Slack, create Google Drive documents, and answer from the user's connected apps. "
                   "If the user says an action did not happen, apologise briefly and tell them to repeat it as a command and check the Approvals tab.")
+
+
+PERSONA = ("You are Ragnarok, a friendly private AI assistant that lives on the user's own computer and never sends their data to the cloud. "
+           "Talk like a thoughtful person: warm, natural, concise (usually one to four sentences), plain words, no lists unless asked, no emojis. You can chat about anything, answer general questions, explain things, give advice and keep the user company. "
+           "In THIS reply you cannot see their messages, calendar or files, and you have not done anything for them: never say or imply that you sent, set, created, scheduled or changed anything. "
+           "What you and the assistant around you can do, when the user asks for it directly: answer from their connected apps (Gmail, Calendar, Drive, Slack, Discord, Telegram, notifications), summarize everything in a Digest grouped by context, set reminders, add calendar events, send and reply to email, post to Telegram, Discord and Slack, create Drive documents, run small Python snippets in a sandbox, calculate, explain what is on their screen or in a picture, and remember things they tell you. "
+           "Their connected apps are handled by commands: if they want something done (send, remind, schedule, post, email), tell them to ask for it directly, for example 'remind me to call the bank at 5pm' or 'tell Ravi on telegram that I am late', and that it waits for their click. "
+           "If they ask about their own messages or data, say they can ask 'catch me up' or ask about a person or topic by name. If you do not know something, say so. Never invent facts about the user.")
 
 
 def _echo(answer: str, question: str) -> bool:
@@ -147,31 +159,62 @@ class Answerer:
         ]
         try:
             out = await self._gw.chat(role=self._role, messages=messages, schema=SCHEMA, max_tokens=90, deadline=get_clock().monotonic() + 20, priority=Priority.INTERACTIVE, seed=0, temperature=0.0)
-        except ModelError as exc:
+        except ModelError as exc:  # the model failed or answered badly: show the evidence itself, with who and when, instead of an error
             top = res.hits[0]
-            return Answered(f"The model is not available ({exc.code}). Closest memory: {top.text[:200]}", [{"n": 1, "citation": top.citation}], False, ["model_unavailable"])
+            c0 = ctx.get(top.id) or {}
+            who = f"{c0['author']}: " if c0.get("author") else ""
+            when = __import__("datetime").datetime.fromtimestamp(c0["ts"] / 1000).strftime("%a %d %b %H:%M") + " " if c0.get("ts") else ""
+            return Answered(f"{when}{who}{top.text[:300]}", [{"n": 1, "citation": top.citation, "kind": top.kind, "trust": top.trust}], True, ["extractive_fallback", exc.code])
         data = out.parsed or {}
         cites = [c for c in data.get("cites", []) if isinstance(c, int) and 1 <= c <= len(res.hits)]
         if not cites:
             return Answered(NOTHING, notes=["ungrounded_answer_discarded"])  # an answer with no valid citation is not shown as fact
         text = drop_false_claims(str(data.get("answer", "")).strip())
         if _echo(text, question) or len(text) < 8:  # a small model sometimes just repeats the question: show the evidence itself instead
-            quotes = " | ".join(f"[{c}] {res.hits[c - 1].text[:160]}" for c in dict.fromkeys(cites))
-            text = f"Here is what I found: {quotes}"
+            def _one(c: int) -> str:
+                h, cc = res.hits[c - 1], ctx.get(res.hits[c - 1].id) or {}
+                who = f"{cc['author']}: " if cc.get("author") else ""
+                when = __import__("datetime").datetime.fromtimestamp(cc["ts"] / 1000).strftime("%a %d %b %H:%M") + " " if cc.get("ts") else ""
+                return f"{when}{who}{h.text[:200]}"
+
+            text = " | ".join(_one(c) for c in dict.fromkeys(cites))
         if held:
             text += f"\n(Warning: {held} matching message(s) tried to give me instructions, so I did not read them as content.)"
         return Answered(text, [{"n": c, "citation": res.hits[c - 1].citation, "kind": res.hits[c - 1].kind, "trust": res.hits[c - 1].trust} for c in dict.fromkeys(cites)], True)
 
     async def _general(self, question: str, history: list[tuple[str, str]] | None = None) -> Answered:
-        """No tool fits and memory has nothing: an honest small-model answer, clearly labelled as not from the user's data."""
+        """Ordinary conversation and general knowledge, clearly not from the user's data. The persona answers; false action claims are stripped sentence by sentence."""
+        now = __import__("datetime").datetime.fromtimestamp(get_clock().now_ms() / 1000).astimezone().strftime("%A %d %B %Y, %H:%M")
         try:
-            out = await self._gw.chat(role="writer", messages=[{"role": "system", "content": GENERAL_SYSTEM}, *[{"role": r, "content": c[:600]} for r, c in (history or [])[-6:]], {"role": "user", "content": question[:1500]}], schema=None, max_tokens=250,
-                                      deadline=get_clock().monotonic() + 40, priority=Priority.INTERACTIVE, seed=0, temperature=0.2)
+            out = await self._gw.chat(role=self._role, messages=[{"role": "system", "content": PERSONA + f" It is {now}."}, *[{"role": r, "content": c[:600]} for r, c in (history or [])[-8:]], {"role": "user", "content": question[:1500]}],
+                                      schema=None, max_tokens=220, deadline=get_clock().monotonic() + 40, priority=Priority.INTERACTIVE, seed=0, temperature=0.5)
         except ModelError as exc:
-            return Answered(f"The local model is not available ({exc.code}).", notes=["model_unavailable"])
-        return Answered(drop_false_claims((out.text or "").strip()) or NOTHING, [], False, ["general_model_answer_not_from_your_data"])
+            return Answered(f"The local model is not available right now ({exc.code}). Reminders, calendar, time and searching your messages still work.", notes=["model_unavailable"])
+        text = drop_false_claims((out.text or "").strip())
+        return Answered(text or "I am here. Tell me what you need.", [], False, ["general_model_answer_not_from_your_data"])
 
-    async def catch_up(self, request: str, *, max_items: int = 20) -> Answered:
+    async def recall_person(self, person: str, topic: str = "") -> Answered:
+        """What a named person sent, newest first, straight from the messages (no model): who, where, when and the words. Text that tries to instruct the assistant is shown as held back."""
+        from datetime import datetime
+
+        cid = self._r.compartment_id(self._comp)
+        rows = self._r.items_by_person(cid, person, limit=8) if cid else []
+        if topic:
+            t = [w for w in re.findall(r"[a-z0-9]{3,}", topic.lower())]
+            rows = [r for r in rows if not t or any(w in (r["text"] + " " + (r["title"] or "")).lower() for w in t)] or rows
+        if not rows:
+            return Answered(f"I have nothing from {person} in memory yet.", notes=["person_empty"])
+        lines, held = [], 0
+        for r in rows[:6]:
+            body, was = guarded(r["text"]) if r["trust"] in ("received", "web") else (r["text"], False)
+            held += was
+            lines.append(f"{datetime.fromtimestamp((r['ts'] or 0) / 1000).strftime('%a %d %b %H:%M')}  {r['source']}" + (f" - {r['title']}" if r["title"] else "") + (f" ({r['author']})" if r["author"] and r["author"] != r["title"] else "") + f": {re.sub(chr(10), ' ', body)[:220]}")
+        text = f"Latest from {person}:\n" + "\n".join(lines)
+        if held:
+            text += "\nWARNING: a message tries to give me instructions; I only list it and will not act on it."
+        return Answered(text, [{"n": i + 1, "citation": f"{r['source']}: {r['title']}", "link": r.get("deep_link")} for i, r in enumerate(rows[:6])], True, ["person_recall"])
+
+    async def catch_up(self, request: str, *, max_items: int = 20, source: str = "", topic_hint: str = "") -> Answered:  # noqa: ARG002 - the model's topic is too loose for a filter; only an explicit "about X" in the words narrows a summary
         """'Catch me up', 'summarize everything': the digest, rendered for chat. Built by code from the real messages, grouped by context, with model rewrites only when validated."""
         from datetime import datetime
 
@@ -185,6 +228,10 @@ class Answerer:
         sources = {v for k, v in srcmap.items() if re.search(rf"\b{k}\b", low)} or None
         m = re.search(r"\b(?:on|about|regarding|around)\s+(?!everything|all|today|yesterday|this|the (?:last|past)|my )(.+?)[?.!]*$", request, re.I)
         topic = m.group(1).strip() if m and len(m.group(1)) > 2 and not (sources and m.group(1).strip().lower() in srcmap) else None
+        if topic and (any(re.search(rf"\b{k}\b", topic.lower()) for k in srcmap) or re.fullmatch(r"(?:the )?(?:last |past )?(?:today|yesterday|tonight|this \w+|\d+ \w+|hour|day|week)", topic.lower())):
+            topic = None  # 'on slack today' names an app and a day, not a subject
+        if source:
+            sources = (sources or set()) | {"gcal" if source == "calendar" else "gdrive" if source == "drive" else source}
         d = self._digest.build(hours, sources=sources, topic=topic)
         if topic and not d["sections"]:
             return Answered(f"I found nothing about '{topic}' in the last {hours:g} hours.", notes=["digest_empty"])

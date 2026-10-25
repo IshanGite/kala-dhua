@@ -198,10 +198,31 @@ class MemoryReader:
                                f"FROM items i WHERE i.source IN ({q}) AND i.occurred_at >= ? AND i.occurred_at < ? ORDER BY i.occurred_at LIMIT ?", (*sources, start_ms, end_ms, limit)).fetchall()
         return [dict(x) for x in rows]
 
+    CHAT_FILLER = {"the", "a", "channel", "chat", "group", "server", "on", "in", "to", "dm", "room", "conversation", "thread", "discord", "slack", "telegram", "gmail", "email"}
+
     def find_conversation(self, source: str, name: str) -> dict[str, Any] | None:
-        """The most recent conversation on a platform whose title matches a name: native_id is 'chat:message' for chat sources."""
+        """The most recent conversation on a platform whose title matches a name: native_id is 'chat:message' for chat sources.
+        'the general channel' matches a title like 'team #general': filler words are dropped and every remaining word must appear in the title."""
         row = self._r.execute("SELECT native_id, title FROM items WHERE source=? AND title LIKE ? ORDER BY coalesce(occurred_at,0) DESC LIMIT 1", (source, f"%{name}%")).fetchone()
+        if row is None:
+            words = [w for w in re.findall(r"[\w#@.-]+", name.lower()) if w not in self.CHAT_FILLER]
+            if words:
+                cond = " AND ".join("lower(title) LIKE ?" for _ in words)
+                row = self._r.execute(f"SELECT native_id, title FROM items WHERE source=? AND {cond} ORDER BY coalesce(occurred_at,0) DESC LIMIT 1", (source, *[f"%{w}%" for w in words])).fetchone()
         return dict(row) if row else None
+
+    def items_by_person(self, comp_id: str, person: str, *, limit: int = 8) -> list[dict[str, Any]]:
+        """The latest items sent by, or titled with, a person (name or address), newest first, with text. For 'what did Ravi say'."""
+        import json as _json
+
+        like = f"%{person.lower()}%"
+        rows = [dict(x) for x in self._r.execute("SELECT i.id, i.source, i.title, i.trust, i.deep_link, coalesce(i.occurred_at, i.ingested_at) AS ts, i.flags_json FROM items i "
+                                                 "WHERE i.compartment_id=? AND (lower(i.flags_json) LIKE ? OR lower(i.title) LIKE ?) ORDER BY ts DESC LIMIT ?", (comp_id, like, like, limit))]
+        for r in rows:
+            fl = _json.loads(r.pop("flags_json") or "{}")
+            r["author"] = fl.get("author") or fl.get("from") or ""
+            r["text"] = "\n".join(t for (t,) in self._r.execute("SELECT text FROM chunks WHERE item_id=? ORDER BY ordinal LIMIT 3", (r["id"],)))[:600]
+        return rows
 
     def chunk_text(self, chunk_id: str) -> str | None:
         r = self._r.execute("SELECT text FROM chunks WHERE id=?", (chunk_id,)).fetchone()

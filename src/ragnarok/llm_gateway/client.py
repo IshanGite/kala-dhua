@@ -185,8 +185,7 @@ class OllamaGateway:
             "keep_alive": self.keep_alive,
             "options": {"num_ctx": ctx, "num_predict": max_tokens, "temperature": temperature, "seed": seed or 0},
         }
-        if role != "vision":  # qwen3-class text models reason silently by default and spend the whole token cap before answering (spike 2); qwen3-vl returns nothing at all with think off, so it is asked to skip reasoning in words instead
-            body["think"] = False
+        body["think"] = role == "vision"  # qwen3-class text models reason silently and spend the whole token cap before answering (spike 2), so thinking is off; qwen3-vl needs it on explicitly (reasoning then goes to its own field, not the answer)
         if schema is not None:
             body["format"] = schema
         started = get_clock().monotonic()
