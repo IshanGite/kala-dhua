@@ -263,6 +263,15 @@ class MemoryReader:
         return int(self._r.execute(f"SELECT count(*) FROM {table}").fetchone()[0])
 
 
+    def user_messages(self, comp_id: str, since_ms: int, limit: int = 400) -> list[dict[str, Any]]:
+        """What the user typed since a time, oldest first: the raw material for noticing habits and for replaying a day."""
+        rows = self._r.execute("SELECT seq, ts, content FROM events WHERE compartment_id=? AND kind='user_message' AND ts>=? ORDER BY seq LIMIT ?", (comp_id, since_ms, limit)).fetchall()
+        return [{"seq": r[0], "ts": r[1], "text": r[2]} for r in rows]
+
+    def day_events(self, comp_id: str, since_ms: int, limit: int = 600) -> list[dict[str, Any]]:
+        rows = self._r.execute("SELECT seq, ts, kind, content FROM events WHERE compartment_id=? AND ts>=? AND kind IN ('user_message','assistant_message') ORDER BY seq LIMIT ?", (comp_id, since_ms, limit)).fetchall()
+        return [{"seq": r[0], "ts": r[1], "kind": r[2], "text": r[3]} for r in rows]
+
     def conversation_tail(self, comp_id: str, limit: int = 12) -> list[tuple[str, str]]:
         """The last turns of the chat, oldest first, to restore working memory after a restart (NFR3.2)."""
         rows = self._r.execute("SELECT kind, content FROM events WHERE compartment_id=? AND kind IN ('user_message','assistant_message') ORDER BY seq DESC LIMIT ?", (comp_id, limit)).fetchall()

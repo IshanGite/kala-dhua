@@ -113,6 +113,7 @@ class ChatService:
         self._triggers = triggers
         self.jobs: dict[str, Job] = {}
         self.history: list[tuple[str, str]] = []  # the running conversation, in memory only
+        self.on_activity: Any = None  # the dreamer is told when the person is here
         self._tasks: set[asyncio.Task[None]] = set()
 
     def _log_reply(self, text: str) -> None:
@@ -239,6 +240,8 @@ class ChatService:
         return {"ok": True, "pending": False, "job": job.id, "state": job.state, **job.reply}
 
     async def submit(self, text: str, quick_s: float | None = None) -> dict[str, Any]:
+        if self.on_activity is not None:
+            self.on_activity()
         text = text.strip()
         if not text:
             return {"ok": True, "pending": False, "job": "", "state": "done", "text": "Say something and I will answer. Try 'catch me up' or 'what did Ravi say'.", "citations": [], "tier": "L1", "backend": "rule", "ms": 0}

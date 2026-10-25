@@ -243,6 +243,10 @@ section.show{animation:secIn .32s var(--ease) both}
   </div><div class="small" id="mm_msg" style="margin-top:6px"></div></div>
 <div id="showpop" class="pop" style="display:none;position:fixed;left:50%;top:52px;bottom:auto;transform:translateX(-50%);width:min(420px,calc(100% - 20px));max-height:calc(100% - 70px);overflow:auto" role="dialog" aria-label="Showcase">
   <div class="pt">Showcase</div><div class="small">Each button runs a real feature on your real data, so it works even when a sentence is misunderstood. What it does appears in the chat. Anything that sends still waits for your click.</div><div id="showbox"></div><button class="btn" id="show_close" type="button" style="margin-top:8px">Close</button></div>
+<div id="scrollview" class="pop" style="display:none;position:fixed;left:50%;top:48px;bottom:auto;transform:translateX(-50%);width:min(560px,calc(100% - 16px));max-height:calc(100% - 64px);overflow:auto;z-index:20" role="dialog" aria-label="Skill scroll">
+  <div class="pt" id="sv_t"></div><div class="small" id="sv_s"></div><div id="sv_w" class="small err" style="margin:6px 0"></div>
+  <pre id="sv_pre" style="white-space:pre-wrap;word-break:break-word;font:12px/1.45 ui-monospace,Menlo,monospace;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px;max-height:46vh;overflow:auto;margin:6px 0"></pre>
+  <div class="pb" id="sv_b"></div></div>
 <div id="edgemenu" class="pop" style="display:none;position:fixed;left:50%;top:56px;bottom:auto;transform:translateX(-50%);width:min(340px,calc(100% - 24px))" role="dialog" aria-label="Window options">
   <div class="pt" id="em_t">Window options</div><div class="small" id="em_s"></div>
   <div class="pb" style="flex-direction:column;align-items:stretch">
@@ -400,6 +404,41 @@ section.show{animation:secIn .32s var(--ease) both}
     if(window.__demo){box.appendChild(el("h2","","Demo data"));var r2=el("div","pb");var b=el("button","btn","Send me a message now");b.onclick=function(){api("/demo/incoming",{}).then(function(r){if(r.ok){$("showpop").style.display="none";goto("chat");addBot("Demo message arrived on "+r.source+" from "+(r.from||r.title)+": "+r.text)}})};r2.appendChild(b);box.appendChild(r2)}}
   function openShowcase(){$("moremenu").style.display="none";var go2=function(){buildShowcase($("showbox"));$("showpop").style.display="block"};if(showItems)go2();else api("/showcase").then(function(d){showItems=d.items||[];go2()})}
   $("mm_show").onclick=openShowcase;$("show_close").onclick=function(){$("showpop").style.display="none"};
+  /* ---------------- dreaming and skill scrolls ---------------- */
+  var scrollNew="";
+  function pre(box,text,diff){box.textContent="";var lines=String(text).split("\n");lines.forEach(function(l){var s=el("div","",l||" ");if(diff){if(l[0]==="+"&&l.slice(0,3)!=="+++")s.style.cssText="background:#1f6f4a33;color:var(--ink)";else if(l[0]==="-"&&l.slice(0,3)!=="---")s.style.cssText="background:#a42d2d33;color:var(--ink)"}box.appendChild(s)})}
+  function openScrollView(o){var v=$("scrollview");$("sv_t").textContent=o.title;$("sv_s").textContent=o.sub||"";$("sv_w").textContent=o.warn||"";pre($("sv_pre"),o.text,!!o.diff);var b=$("sv_b");b.textContent="";
+    (o.buttons||[]).forEach(function(x){var bt=el("button","btn"+(x.pri?" pri":""),x.label);bt.onclick=function(){bt.disabled=true;x.fn(function(){v.style.display="none";loadScrolls()})};b.appendChild(bt)});
+    var c=el("button","btn","Close");c.onclick=function(){v.style.display="none"};b.appendChild(c);v.style.display="block"}
+  function viewScroll(name){api("/scrolls/"+name).then(function(d){if(!d.ok)return;var pending=d.status==="pending";
+      openScrollView({title:"Scroll: "+name,sub:(d.source==="builtin"?"Built in. ":"Yours. ")+"Status: "+d.status+". A scroll only writes text for you to read: it cannot send or change anything.",warn:d.suspect?"The scanner found text in this scroll that looks like instructions aimed at an assistant. Read it carefully before approving.":"",text:d.text,
+        buttons:pending?[{label:"Approve exactly this text",pri:1,fn:function(done){api("/scrolls/"+name+"/approve?sha="+d.sha,{}).then(done)}}]:[]})})}
+  function viewDraft(dr){openScrollView({title:(dr.new?"New scroll proposed: ":"Improved scroll: ")+dr.name,sub:dr.reason,warn:dr.suspect?"Flagged by the scanner: read every line.":"",text:dr.new?dr.text:(dr.diff||dr.text),diff:!dr.new,
+      buttons:[{label:"Approve",pri:1,fn:function(done){api("/scrolls/drafts/"+dr.id+"/approve",{}).then(done)}},{label:"Reject",fn:function(done){api("/scrolls/drafts/"+dr.id+"/reject",{}).then(done)}}]})}
+  function loadScrolls(){api("/scrolls").then(function(d){var c=$("scrollcard");if(!c)return;c.textContent="";var items=d.items||[];
+      c.appendChild(el("div","small","One local model, many specialists. Only each scroll's short header is kept in memory ("+((d.stats||{}).header_tokens||0)+" tokens for all of them); the full text loads only for the scroll that fits what you ask. Say: use the explain-simply scroll on photosynthesis."));
+      (d.drafts||[]).forEach(function(dr){var r=el("div","row"),g=el("div","grow");g.appendChild(el("div","",(dr.new?"New: ":"Improved: ")+dr.name));g.appendChild(el("div","small",dr.reason));r.appendChild(g);var b=el("button","btn pri","Review");b.onclick=function(){viewDraft(dr)};r.appendChild(b);c.appendChild(r)});
+      items.forEach(function(s){var r=el("div","row"),g=el("div","grow");var t=el("div","");t.appendChild(document.createTextNode(s.name+" "));t.appendChild(el("span","tag "+(s.status==="approved"?"src":"warn"),s.status==="approved"?(s.source==="builtin"?"built in":"approved"):s.status));g.appendChild(t);g.appendChild(el("div","small",s.description));
+        var tt=s.tests?(s.tests.passed+"/"+s.tests.total+" self-tests pass"):(s.examples?s.examples+" self-test(s), not run yet":"no self-tests");g.appendChild(el("div","small",tt+" - header "+s.header_tokens+" tokens, full "+s.full_tokens+(s.chain.length?" - then "+s.chain.join(", "):"")));r.appendChild(g);
+        var rd=el("button","btn",s.status==="pending"?"Read and approve":"Read");rd.onclick=function(){viewScroll(s.name)};r.appendChild(rd);
+        if(s.examples){var ts=el("button","btn","Test");ts.onclick=function(){ts.disabled=true;ts.textContent="Testing...";api("/scrolls/"+s.name+"/test",{}).then(function(){loadScrolls()})};r.appendChild(ts)}
+        c.appendChild(r)});
+      var er=Object.keys(d.errors||{});if(er.length)c.appendChild(el("div","small err","Not valid, ignored: "+er.map(function(k){return k+" ("+d.errors[k]+")"}).join("; ")));
+      var ta=el("textarea");ta.rows=4;ta.placeholder="Paste a scroll here (a header between --- lines, then the instructions)";ta.style.cssText="width:100%;margin-top:8px;font:12px ui-monospace,Menlo,monospace";ta.value=scrollNew;ta.oninput=function(){scrollNew=ta.value};c.appendChild(ta);
+      var row=el("div","row");row.style.borderBottom="0";var sv=el("button","btn","Save as pending");var msg=el("span","small");sv.onclick=function(){api("/scrolls/new",{text:ta.value}).then(function(r){msg.textContent=r.ok?"Saved. Read it and approve it to use it.":"Not saved: "+(r.detail||r.error);if(r.ok){scrollNew="";loadScrolls()}})};
+      var hb=el("button","btn","Look for habits to write scrolls for");hb.onclick=function(){hb.disabled=true;hb.textContent="Looking...";api("/scrolls/author",{}).then(function(r){hb.disabled=false;hb.textContent="Look for habits to write scrolls for";msg.textContent=r.ok?(r.drafts.length?"Drafted: "+r.drafts.join(", ")+". Review it above.":"Nothing repeated enough yet ("+r.messages_seen+" messages seen)."):"Could not look.";loadScrolls()})};
+      row.appendChild(sv);row.appendChild(hb);row.appendChild(msg);c.appendChild(row)}).catch(function(){})}
+  function loadDream(){api("/dream/status").then(function(d){var c=$("dreamcard");if(!c)return;c.textContent="";
+      c.appendChild(el("div","","When the computer is plugged in and you are away, I replay the day, tidy memory, re-read what went wrong, and draft better skills. I never send or change anything: drafts wait for your approval."));
+      var st=el("div","small");st.style.margin="6px 0";st.textContent=d.running?("Dreaming now: "+(d.progress||"working")+"..."):(d.enabled?(d.eligible?"Ready to dream.":("Not dreaming: "+d.reason+".")):"Switched off.")+(d.plugged_in===false?" On battery.":d.plugged_in?" Plugged in.":"")+(d.last_at?" Last dream "+ago(d.last_at)+".":"");c.appendChild(st);
+      var row=el("div","row");row.style.borderBottom="0";var on=el("button","btn",d.enabled?"Dreaming: on":"Dreaming: off");on.onclick=function(){api("/dream/settings",{enabled:!d.enabled}).then(loadDream)};
+      var bat=el("button","btn",d.battery_ok?"Also on battery: yes":"Also on battery: no");bat.onclick=function(){api("/dream/settings",{battery_ok:!d.battery_ok}).then(loadDream)};
+      var now=el("button","btn pri",d.running?"Stop":"Dream now");now.onclick=function(){now.disabled=true;api(d.running?"/dream/stop":"/dream/run",{}).then(function(){setTimeout(loadDream,600)})};
+      row.appendChild(on);row.appendChild(bat);row.appendChild(now);c.appendChild(row);
+      var rp=d.report&&d.report.phases;if(rp){var l=[];if(rp.replay&&rp.replay.summary)l.push("Day: "+rp.replay.summary);if(rp.rehearse&&rp.rehearse.rehearsed)l.push("Re-read "+rp.rehearse.rehearsed+" thing(s) that went wrong; "+rp.rehearse.would_work_now+" would work now.");
+        if(rp.scrolls&&rp.scrolls.tested)l.push("Scroll tests: "+rp.scrolls.tested.map(function(t){return t.name+" "+t.passed+"/"+t.total}).join(", "));if(rp.scrolls&&rp.scrolls.drafts&&rp.scrolls.drafts.length)l.push(rp.scrolls.drafts.length+" skill draft(s) waiting for approval.");
+        if(l.length){var rb=el("div","small");rb.style.marginTop="6px";rb.textContent="Last dream: "+l.join(" ");c.appendChild(rb)}}}).catch(function(){})}
+  setInterval(function(){if(cur==="src"&&$("dreamcard")){var rn=document.querySelector("#dreamcard .btn.pri");if(rn&&/Stop/.test(rn.textContent))loadDream()}},2500);
   /* ---------------- window shell: pin to an edge (the raven waits there), split screen, desktops ---------------- */
   var emEdge="right",emAll=false;
   function emClose(){$("edgemenu").style.display="none"}
@@ -431,6 +470,8 @@ section.show{animation:secIn .32s var(--ease) both}
       au.onclick=function(){var on=au.textContent.indexOf("on")>0;api("/demo/auto?enabled="+(!on),{}).then(function(r){au.textContent="Auto messages: "+(r.auto?"on":"off")})};
       dr.appendChild(inb);dr.appendChild(au);dc.appendChild(dr);box.appendChild(dc)}
     box.appendChild(el("h2","","Showcase"));var sc=el("div","card");sc.appendChild(el("div","small","One button per feature. If a command is ever misread, these still work. Results appear in the chat."));var sb=el("button","btn pri","Open the feature buttons");sb.style.marginTop="8px";sb.onclick=function(){goto("chat");openShowcase()};sc.appendChild(sb);box.appendChild(sc);
+    box.appendChild(el("h2","","Dreaming (idle time)"));var dc=el("div","card");dc.id="dreamcard";box.appendChild(dc);loadDream();
+    box.appendChild(el("h2","","Skill scrolls"));var scard=el("div","card");scard.id="scrollcard";box.appendChild(scard);loadScrolls();
     box.appendChild(el("h2","","Connected apps (checked continuously)"));
     var names=Object.keys(rt.sources||{});
     if(!names.length&&!window.__demo)box.appendChild(el("p","small","No sources connected yet. Run: ragnarok connect <name>"));
@@ -559,7 +600,7 @@ section.show{animation:secIn .32s var(--ease) both}
   function loadInbox(){api("/inbox").then(function(d){var it=d.items||[],b=$("ibox");alertsToChat(it);$("ibadge").textContent=it.length?String(it.length):"";if(cur!=="inb")return;loadReminders();b.textContent="";
       if(!it.length)b.appendChild(el("p","small","Nothing new. Try: every day at 8am catch me up on my emails, or: when I get an email from Dev, tell me."));
       it.forEach(function(m){var c=el("div","card"+(m.kind==="attention"||m.kind==="alert"?" need":""));c.appendChild(el("div","small",(KIND[m.kind]||m.kind)+" - "+ago(m.ts)+(m.source?" - "+m.source:"")));c.appendChild(el("div","",m.title));var bd=el("div","small",m.body);bd.style.whiteSpace="pre-wrap";c.appendChild(bd);
-        var row=el("div","row");row.style.borderBottom="0";if(m.link){var l=el("a","small","Open");l.href=m.link;l.target="_blank";l.rel="noopener noreferrer";row.appendChild(l)}var x=el("button","btn","Dismiss");x.onclick=function(){api("/inbox/dismiss?item_id="+encodeURIComponent(m.id),{}).then(loadInbox)};row.appendChild(x);c.appendChild(row);b.appendChild(c)})}).catch(function(){})}
+        var row=el("div","row");row.style.borderBottom="0";if(/scroll (proposed|ready)|Improved scroll/.test(m.title)){var rv=el("button","btn pri","Review");rv.onclick=function(){api("/scrolls").then(function(d){var nm=(m.title.split(": ")[1]||"").trim();var dr=(d.drafts||[]).find(function(x){return x.name===nm});if(dr)viewDraft(dr);else{goto("src")}})};row.appendChild(rv)}if(m.link){var l=el("a","small","Open");l.href=m.link;l.target="_blank";l.rel="noopener noreferrer";row.appendChild(l)}var x=el("button","btn","Dismiss");x.onclick=function(){api("/inbox/dismiss?item_id="+encodeURIComponent(m.id),{}).then(loadInbox)};row.appendChild(x);c.appendChild(row);b.appendChild(c)})}).catch(function(){})}
   $("idis").onclick=function(){api("/inbox/dismiss",{}).then(loadInbox)};
 
   /* ---------------- live refresh ---------------- */

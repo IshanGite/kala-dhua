@@ -169,7 +169,20 @@ def build_world(*, use_laya: bool = True, sandbox: bool = True, embed_rungs: boo
         _load_index(mem, reader, index)
 
     skills_admin = SkillsAdmin(registry, ledger, broker, hub, selector, gw, builtin_names)
+    from ragnarok.scrolls.library import ScrollLibrary
+    from ragnarok.scrolls.runner import ScrollRunner
+
+    scroll_lib = ScrollLibrary(Path(__file__).resolve().parents[1] / "scrolls" / "builtin", root / "scrolls", gw)
+    scroll_runner = ScrollRunner(scroll_lib, gw, reader, index, COMPARTMENT, answerer, mem)
+    agent.scrolls = scroll_runner
     services = Services(runtime, answerer, notif, chat, reader, hub, proactive, mem, reindex, skills_admin, digest, vision)
+    services.scrolls = scroll_runner
+    from ragnarok.daemon.dream import Dreamer
+
+    dreamer = Dreamer(mem=mem, reader=reader, ledger=ledger, state=state, inbox=proactive.inbox, gateway=gw, index=index, runner=scroll_runner, maintenance=runtime.maintenance, rehearse=agent.rehearse, compartment=COMPARTMENT, data_dir=root)
+    runtime.dreamer = dreamer
+    chat.on_activity = dreamer.notify_activity
+    services.dreamer = dreamer
     from ragnarok.harness.showcase import Showcase
 
     services.showcase = Showcase(agent, answerer, digest, proactive, actions, reader, vision, runtime.commitments)

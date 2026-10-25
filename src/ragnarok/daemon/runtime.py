@@ -42,6 +42,7 @@ class Runtime:
         self.digest: Any = None  # the digest engine: its model rewrites are refreshed in the background
         self._digest_seen = ""
         self.proactive: Any = None  # set by the wiring: the FR4 engine (triggers, heads-ups, briefing)
+        self.dreamer: Any = None  # idle-time dreaming
         self.reminders: deque[dict[str, Any]] = deque(maxlen=50)
         self.governor = governor or Governor()
         self.activity: deque[dict[str, Any]] = deque(maxlen=200)
@@ -80,6 +81,11 @@ class Runtime:
                 await self.proactive.run()
             except Exception as exc:  # noqa: BLE001 - proactivity must never stop ingestion
                 log("proactive_failed", err=type(exc).__name__)
+        if self.dreamer is not None and not self.dreamer.running:
+            try:
+                await self.dreamer.tick()
+            except Exception as exc:  # noqa: BLE001 - dreaming is a bonus and never stops the agent
+                log("dream_failed", err=type(exc).__name__)
         if self.maintenance is not None and self.maintenance.due():
             try:
                 rep = self.maintenance.run()  # one small transaction a day: same thread as the database connection

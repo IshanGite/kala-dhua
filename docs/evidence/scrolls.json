@@ -1,0 +1,55 @@
+{
+ "n_scrolls": 8,
+ "routing": {
+  "n": 29,
+  "correct": 28,
+  "ms_each_after_cache": 38,
+  "misses": [
+   {
+    "message": "help me decide between a lodge and a city loft",
+    "expected": "decision-helper",
+    "got": null,
+    "score": null
+   }
+  ]
+ },
+ "self_tests": {
+  "action-items": {
+   "passed": 1,
+   "total": 1,
+   "failures": []
+  },
+  "decision-helper": {
+   "passed": 1,
+   "total": 1,
+   "failures": []
+  },
+  "email-triage": {
+   "passed": 1,
+   "total": 1,
+   "failures": []
+  },
+  "explain-simply": {
+   "passed": 1,
+   "total": 1,
+   "failures": []
+  },
+  "meeting-notes": {
+   "passed": 1,
+   "total": 1,
+   "failures": []
+  },
+  "reply-drafter": {
+   "passed": 1,
+   "total": 1,
+   "failures": []
+  }
+ },
+ "progressive_loading": {
+  "all_in_one_prompt_tokens": 2295,
+  "headers_only_tokens": 569,
+  "headers_plus_one_scroll_tokens": 938,
+  "saving_percent": 59.1
+ },
+ "note": "token counts are a cheap estimate (characters / 3); routing set is author-written"
+}

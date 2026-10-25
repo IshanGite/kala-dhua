@@ -1,8 +1,13 @@
 """Accuracy of the intent reading on a labelled set of everyday messages (author-written, one labeller: a regression guard, not a benchmark).
 Run: uv run python scripts/eval_understand.py"""
-import asyncio, json, sys, time
+import asyncio
+import json
+import sys
+import time
+
 sys.path.insert(0, "src")
 from pathlib import Path
+
 from ragnarok.harness.understand import understand
 from ragnarok.llm_gateway.client import OllamaGateway
 from ragnarok.llm_gateway.models import ModelLock

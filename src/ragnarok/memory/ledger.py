@@ -59,6 +59,10 @@ class Ledger:
 
         return self._m.with_tx(op)
 
+    def recent_tasks(self, since_ms: int, states: tuple[str, ...] = ("failed", "partial"), limit: int = 20) -> list[dict[str, Any]]:
+        ph = ",".join("?" * len(states))
+        return self._m.with_tx(lambda c: [dict(r) for r in c.execute(f"SELECT id, goal, state, created_at, updated_at FROM tasks WHERE state IN ({ph}) AND created_at>=? ORDER BY created_at DESC LIMIT ?", (*states, since_ms, limit))])
+
     def non_terminal_tasks(self) -> list[dict[str, Any]]:
         ph = ",".join("?" * len(TERMINAL_TASK))
         return self._m.with_tx(lambda c: [dict(r) for r in c.execute(f"SELECT * FROM tasks WHERE state NOT IN ({ph}) ORDER BY created_at", TERMINAL_TASK)])

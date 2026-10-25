@@ -52,6 +52,7 @@ from ragnarok.router.intent_rules import match_intent
 from ragnarok.router.route_library import RouteLibrary
 from ragnarok.router.slots import detect
 from ragnarok.router.types import RouteDecision
+from ragnarok.scrolls.library import EXPLICIT as EXPLICIT_SCROLL
 from ragnarok.skills.manifest import Manifest
 from ragnarok.skills.registry import SkillRegistry
 from ragnarok.store.vectors import VectorIndex
@@ -85,8 +86,9 @@ LLM_PARSED = {"reminder.add", "calendar.add", "mail.send", "mail.draft", "mail.r
 
 class Agent:
     def __init__(self, *, mem: MemoryService, ledger: Ledger, reader: MemoryReader, index: VectorIndex, gateway: Gateway, cascade: Cascade, planner: Planner,
-                 executor: Executor, registry: SkillRegistry, library: RouteLibrary | None, routes: RoutesStore | None, ctx: ExecContext, answerer: Answerer | None = None, fast_refuse: bool = False, calendar_mirror: Any = None, memcmd: Any = None, vision: Any = None) -> None:
+                 executor: Executor, registry: SkillRegistry, library: RouteLibrary | None, routes: RoutesStore | None, ctx: ExecContext, answerer: Answerer | None = None, fast_refuse: bool = False, calendar_mirror: Any = None, memcmd: Any = None, vision: Any = None, scrolls: Any = None) -> None:
         self.memcmd = memcmd
+        self.scrolls = scrolls
         self.vision = vision
         self._mirror = calendar_mirror  # callable -> bool: is Google write access connected, so reminders also go on the calendar
         self.answerer = answerer
@@ -507,6 +509,8 @@ class Agent:
     async def _answer_intent(self, request: str, u: Any, history: list[tuple[str, str]] | None, trust: str, t0: float, tm: dict[str, int]) -> TurnResult | None:
         """Read-only paths chosen by the understanding model. None means 'not for me': the keyword paths below take over."""
         assert self.answerer is not None
+        if u.intent in ("chat", "unclear", "recall") and self.scrolls is not None and trust == "user_direct" and (sc := await self._scroll_turn(request, t0, tm)) is not None:
+            return sc  # a specialist scroll fits this message better than a general answer
         if not plausible(u.intent, request):  # the model read it as something the words do not support ('berlin time' as a summary request): treat it as conversation instead of showing the wrong thing
             u = Understanding("chat", u.person, u.source, u.topic)
         done = lambda fam, ans, trace: TurnResult("L1", RouteDecision(tier="L1", intent_family=fam, skills=[], plan_needed=False, risk_floor=0, memory_types=[], confidence=1.0, latency_ms=0.0,  # noqa: E731
@@ -540,6 +544,47 @@ class Agent:
                     return done("question", ans, "answered from your memory with citations")
             return done("chat", await self.answerer._general(request, history if len(request.split()) > 3 else None), "ordinary conversation, not from your data")
         return None
+
+    async def rehearse(self, text: str) -> tuple[bool, str]:
+        """A DRY RUN used while dreaming: read the sentence the way the live path would and build the plan, without executing anything or contacting anything. True when it would now be understood."""
+        saved = getattr(self, "_clarify", None)
+        try:
+            steps = await parse_steps(self.gw, text)
+            if not steps:
+                u = await understand(self.gw, text, None)
+                if u is not None and u.intent not in ("unclear",):
+                    return True, f"would be read as '{u.intent}'"
+                return False, "still not clear what is being asked"
+            plan = await self._plan_from_steps(text, steps)
+            if plan is None:
+                return False, getattr(self, "_clarify", None) or "a valid plan could not be built (a name, time or address is missing)"
+            return True, "would plan: " + ", ".join(n.skill for n in plan.nodes)
+        except Exception as exc:  # noqa: BLE001
+            return False, f"rehearsal error {type(exc).__name__}"
+        finally:
+            self._clarify = saved
+
+    async def _scroll_turn(self, request: str, t0: float, tm: dict[str, int], *, explicit_only: bool = False) -> TurnResult | None:
+        """Skill Scrolls (FR2.4): route by the headers only, load the one chosen scroll in full, and answer as that specialist. Text out only: nothing is sent or changed."""
+        lib = self.scrolls.lib
+        em = EXPLICIT_SCROLL.search(request)
+        named = lib.peek((em.group(1) or em.group(2) or "").lower()) if em else None
+        if named is not None and lib.status(named) != "approved":  # asked for by name but not approved (or switched off): say so instead of silently ignoring it
+            why = "has not been approved yet. Open Sources > Skill scrolls, read it, and approve it." if lib.status(named) == "pending" else "is switched off. You can turn it back on in Sources > Skill scrolls."
+            dec = RouteDecision(tier="L1", intent_family="scroll", skills=[], plan_needed=False, risk_floor=0, memory_types=[], confidence=1.0, latency_ms=0.0, backend="scroll", trace=["Scrolls are untrusted until a person approves the exact text"])
+            return TurnResult("L1", dec, None, None, (time.perf_counter() - t0) * 1000, answer=Answered(f"The scroll {named.name} {why}", notes=["scroll_not_approved"]), timings=tm)
+        r = await lib.route(request)
+        if r is None or (explicit_only and not r.explicit):
+            return None
+        text = re.sub(r"\b(?:use|run|apply|with)\s+(?:the\s+)?[a-z0-9-]+\s+(?:scroll|skill)\b(?:\s+(?:on|for|to))?\s*:?", "", request, flags=re.I).strip() or request
+        res = await self.scrolls.run(r.name, text)
+        head, full = res.header_tokens, res.full_tokens
+        allh = lib.stats["header_tokens"]
+        trace = [f"Skill scroll '{' then '.join(res.steps) or r.name}': picked from the headers alone (about {allh} tokens for all scrolls), then loaded only that scroll in full (about {full - head} more) instead of every scroll in one prompt",
+                 "A scroll produces text only: it cannot send, post or change anything"] + [f"Note: {n}" for n in res.notes]
+        dec = RouteDecision(tier="L1", intent_family="scroll", skills=[], plan_needed=False, risk_floor=0, memory_types=[], confidence=min(1.0, r.score), latency_ms=0.0, backend="scroll", trace=trace)
+        lib.record_use(r.name, res.ok)
+        return TurnResult("L1", dec, None, None, (time.perf_counter() - t0) * 1000, answer=Answered(res.text, grounded=False, notes=[f"scroll:{r.name}"]), timings=tm)
 
     async def _recall(self, request: str, u: Any, history: list[tuple[str, str]] | None, done: Any) -> TurnResult:
         assert self.answerer is not None
@@ -601,6 +646,8 @@ class Agent:
         if strong is None and self.answerer is not None and CAPABILITY_ASK.search(request) and not self._is_action_request(request.replace("can you", "")):
             dec = RouteDecision(tier="L1", intent_family="capabilities", skills=[], plan_needed=False, risk_floor=0, memory_types=[], confidence=1.0, latency_ms=0.0, backend="rule")
             return TurnResult("L1", dec, None, None, (time.perf_counter() - t0) * 1000, answer=Answered(CAPABILITIES))
+        if self.scrolls is not None and trust == "user_direct" and EXPLICIT_SCROLL.search(request) and (sc := await self._scroll_turn(request, t0, tm, explicit_only=True)) is not None:
+            return sc
         self._said_action = False
         u, steps = None, []
         if self.answerer is not None and trust in ("user_direct", "agent") and request.strip():

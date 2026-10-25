@@ -77,6 +77,15 @@ click([...doc.querySelectorAll("#range button")].find((b) => b.dataset.h === "16
 check("the range chips reload the Digest", await waitFor(() => /week|7 days|168|Today/.test(doc.getElementById("digbox").textContent)));
 tab("src");
 check("Sources shows skills and proactive settings", await waitFor(() => /reminder.add/.test(doc.getElementById("src").textContent) && doc.getElementById("briefat")));
+check("Sources lists the skill scrolls and the dreaming card", await waitFor(() => /meeting-notes/.test(doc.getElementById("scrollcard")?.textContent || "") && /Dreaming|dream/i.test(doc.getElementById("dreamcard")?.textContent || "")));
+const rd = await waitFor(() => [...doc.querySelectorAll("#scrollcard .row")].find((r) => /meeting-notes/.test(r.textContent))?.querySelector("button"));
+if (rd) click(rd);
+check("reading a scroll shows its full text", await waitFor(() => /careful note|Decisions/.test(doc.getElementById("sv_pre")?.textContent || "") || /Decisions/.test(doc.getElementById("sv_pre")?.textContent || "")));
+click([...doc.querySelectorAll("#sv_b button")].find((b) => b.textContent === "Close"));
+const ta = doc.querySelector("#scrollcard textarea");
+ta.value = "not a scroll"; ta.dispatchEvent(new window.Event("input"));
+click([...doc.querySelectorAll("#scrollcard button")].find((b) => b.textContent === "Save as pending"));
+check("a file that is not a valid scroll is refused with a reason", await waitFor(() => /Not saved/.test(doc.getElementById("scrollcard").textContent)));
 const sw = doc.getElementById("sw"); click(sw);
 check("the on/off switch pauses reading", await waitFor(() => /paused/.test(doc.getElementById("state").textContent)));
 

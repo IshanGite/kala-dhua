@@ -40,6 +40,8 @@ class Services:
     demo: Any = None  # demo mode state (synthetic data, fake sends), or None
     voice: Any = None  # the microphone recorder
     showcase: Any = None  # one button per feature, for demos
+    scrolls: Any = None  # Skill Scrolls runner (library inside)
+    dreamer: Any = None  # idle-time dreaming
     shell: Any = None  # the window shell: pin, snap, desktops, the raven (None when there is no native window)
 
 
@@ -60,6 +62,21 @@ class SpeakIn(BaseModel):
 class MascotSize(BaseModel):
     w: int = Field(ge=20, le=420)
     h: int = Field(ge=20, le=300)
+
+
+class DreamIn(BaseModel):
+    enabled: bool | None = None
+    idle_min: int | None = Field(default=None, ge=1, le=240)
+    battery_ok: bool | None = None
+
+
+class ScrollRunIn(BaseModel):
+    name: str = Field(min_length=3, max_length=41)
+    text: str = Field(min_length=1, max_length=6000)
+
+
+class ScrollTextIn(BaseModel):
+    text: str = Field(min_length=20, max_length=9000)
 
 
 class ToggleIn(BaseModel):
@@ -337,6 +354,108 @@ def create_app(guard: TokenGuard | None = None, port: int = DEFAULT_PORT, servic
             return {"ok": False, "error": "E_UNSUPPORTED"}
         subprocess.run(["open", f"x-apple.systempreferences:com.apple.preference.security?{panes[pane]}"], check=False, timeout=10)  # noqa: S603, S607
         return {"ok": True}
+
+    @app.get("/dream/status")
+    async def dream_status() -> dict[str, Any]:
+        return svc.dreamer.status() if svc.dreamer else {"enabled": False, "eligible": False, "reason": "not available"}
+
+    @app.post("/dream/settings")
+    async def dream_settings(body: DreamIn) -> dict[str, Any]:
+        if svc.dreamer is None:
+            return {"ok": False, "error": "E_NO_DREAMER"}
+        svc.dreamer.configure(enabled=body.enabled, idle_min=body.idle_min, battery_ok=body.battery_ok)
+        return {"ok": True, **svc.dreamer.status()}
+
+    @app.post("/dream/run")
+    async def dream_run() -> dict[str, Any]:
+        """Dream now (the person asked): same phases, same safety, without waiting for idle or the charger. Runs in the background; poll /dream/status."""
+        import asyncio as _a
+
+        if svc.dreamer is None:
+            return {"ok": False, "error": "E_NO_DREAMER"}
+        if svc.dreamer.running:
+            return {"ok": True, "started": False, "reason": "already dreaming"}
+        _a.get_running_loop().create_task(svc.dreamer.run(force=True))
+        return {"ok": True, "started": True}
+
+    @app.post("/dream/stop")
+    async def dream_stop() -> dict[str, Any]:
+        if svc.dreamer is not None:
+            svc.dreamer.notify_activity()
+        return {"ok": True}
+
+    @app.post("/scrolls/author")
+    async def scrolls_author() -> dict[str, Any]:
+        """Look for habits now and draft scrolls (they wait in the list as drafts)."""
+        from ragnarok.core.clock import get_clock as _clock
+        from ragnarok.scrolls import author
+
+        if svc.scrolls is None or svc.reader is None:
+            return {"ok": False, "error": "E_NO_SCROLLS"}
+        cid = svc.reader.compartment_id("work")
+        texts = [m["text"] for m in svc.reader.user_messages(cid, _clock().now_ms() - 30 * 86_400_000, 400)] if cid else []
+        drafts = await author.propose_new(svc.scrolls._gw, svc.scrolls, texts, max_new=2)
+        return {"ok": True, "drafts": [d["name"] for d in drafts], "messages_seen": len(texts)}
+
+    @app.get("/scrolls")
+    async def scrolls_list() -> dict[str, Any]:
+        if svc.scrolls is None:
+            return {"items": [], "drafts": [], "errors": {}}
+        lib = svc.scrolls.lib
+        return {"items": lib.list(), "drafts": lib.drafts(), "errors": lib.errors, "stats": lib.stats}
+
+    @app.get("/scrolls/{name}")
+    async def scroll_get(name: str) -> dict[str, Any]:
+        s = svc.scrolls.lib.peek(name) if svc.scrolls else None
+        if s is None:
+            return {"ok": False, "error": "E_NO_SCROLL"}
+        return {"ok": True, "name": s.name, "text": s.raw, "sha": s.sha, "suspect": s.suspect, "status": svc.scrolls.lib.status(s), "source": s.source}
+
+    @app.post("/scrolls/{name}/approve")
+    async def scroll_approve(name: str, sha: str) -> dict[str, Any]:
+        """A person read the scroll and clicked Approve: it is pinned to exactly that text."""
+        return {"ok": bool(svc.scrolls and svc.scrolls.lib.approve(name, sha))}
+
+    @app.post("/scrolls/{name}/enable")
+    async def scroll_enable(name: str, on: bool = True) -> dict[str, Any]:
+        return {"ok": bool(svc.scrolls and svc.scrolls.lib.set_enabled(name, on))}
+
+    @app.post("/scrolls/{name}/test")
+    async def scroll_test(name: str) -> dict[str, Any]:
+        if svc.scrolls is None or svc.scrolls.lib.peek(name) is None:
+            return {"ok": False, "error": "E_NO_SCROLL"}
+        p, t, detail = await svc.scrolls.self_test(name)
+        return {"ok": True, "passed": p, "total": t, "detail": detail}
+
+    @app.post("/scrolls/run")
+    async def scroll_run(body: ScrollRunIn) -> dict[str, Any]:
+        if svc.scrolls is None:
+            return {"ok": False, "error": "E_NO_SCROLLS"}
+        res = await svc.scrolls.run(body.name, body.text)
+        svc.scrolls.lib.record_use(body.name, res.ok)
+        return {"ok": res.ok, "text": res.text, "steps": res.steps, "notes": res.notes, "tokens": {"headers": res.header_tokens, "loaded": res.full_tokens}}
+
+    @app.post("/scrolls/new")
+    async def scroll_new(body: ScrollTextIn) -> dict[str, Any]:
+        """Saves text as the user's own scroll. It stays pending until a person approves it."""
+        from ragnarok.scrolls.format import ScrollError
+
+        if svc.scrolls is None:
+            return {"ok": False, "error": "E_NO_SCROLLS"}
+        try:
+            s = svc.scrolls.lib.write_user_scroll(body.text)
+        except ScrollError as exc:
+            return {"ok": False, "error": "E_BAD_SCROLL", "detail": str(exc)}
+        return {"ok": True, "name": s.name, "sha": s.sha, "status": svc.scrolls.lib.status(s)}
+
+    @app.post("/scrolls/drafts/{draft_id}/approve")
+    async def scroll_draft_approve(draft_id: str) -> dict[str, Any]:
+        name = svc.scrolls.lib.approve_draft(draft_id) if svc.scrolls else None
+        return {"ok": name is not None, "name": name}
+
+    @app.post("/scrolls/drafts/{draft_id}/reject")
+    async def scroll_draft_reject(draft_id: str) -> dict[str, Any]:
+        return {"ok": bool(svc.scrolls and svc.scrolls.lib.reject_draft(draft_id))}
 
     @app.get("/showcase")
     async def showcase_list() -> dict[str, Any]:
