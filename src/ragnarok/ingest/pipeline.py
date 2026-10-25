@@ -65,8 +65,8 @@ async def ingest_text(
         visibility=visibility, thread_id=thread_id, deep_link=deep_link, occurred_at=occurred_at, chunks=chunks, flags=flags,  # type: ignore[arg-type]
     )
     res = mem.write_item(item)
-    if res.action == "unchanged":
-        return IngestResult(res.item_id, "unchanged", flags=flags)
+    if res.action in ("unchanged", "excluded"):
+        return IngestResult(res.item_id, res.action, flags=flags)
     embedded = 0
     if gateway is not None and chunks:
         deadline = get_clock().monotonic() + 120

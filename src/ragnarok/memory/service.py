@@ -142,8 +142,15 @@ class MemoryService:
             return eid
 
     # ------------------------------------------------------------------ items and chunks
+    def clear_exclusion(self, source: str, native_id: str) -> None:
+        """The user explicitly wants a previously deleted source back."""
+        with self._lock, transaction(self._w):
+            self._w.execute("DELETE FROM ingest_exclusions WHERE source=? AND native_id=?", (source, native_id))
+
     def write_item(self, item: CanonicalItem) -> ItemResult:
         with self._lock:
+            if self._w.execute("SELECT 1 FROM ingest_exclusions WHERE source=? AND native_id=?", (item.source, item.native_id)).fetchone():
+                return ItemResult(item_id="", action="excluded")  # deleted by the user: never silently comes back
             comp = self.ensure_compartment(item.compartment)
             chash = item.content_hash or sha256_hex("\x1e".join([item.title or "", *[c.text for c in item.chunks]]))
             now = self._now()

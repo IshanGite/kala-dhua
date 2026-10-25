@@ -81,5 +81,5 @@ class FactResult(BaseModel):
 
 class ItemResult(BaseModel):
     item_id: str
-    action: Literal["inserted", "unchanged", "replaced"]
+    action: Literal["inserted", "unchanged", "replaced", "excluded"]
     chunk_ids: list[str] = Field(default_factory=list)
