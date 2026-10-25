@@ -2,14 +2,39 @@
 
 **A sovereign, always-on personal AI agent that runs entirely on your own machine.**
 
-![Python](https://img.shields.io/badge/python-3.12-3776AB?logo=python&logoColor=white)
-![AI](https://img.shields.io/badge/AI-local%20only-2ea44f)
-![Storage](https://img.shields.io/badge/storage-SQLCipher-orange)
-![Status](https://img.shields.io/badge/status-under%20construction-yellow)
+<p align="center">
+  <img alt="Python 3.12" src="https://img.shields.io/badge/python-3.12-3776AB?logo=python&logoColor=white">
+  <img alt="Local-first AI" src="https://img.shields.io/badge/AI-100%25%20local-2ea44f">
+  <img alt="Zero Trust" src="https://img.shields.io/badge/security-zero%20trust-8b5cf6">
+  <img alt="Encrypted storage" src="https://img.shields.io/badge/storage-SQLCipher-orange">
+  <img alt="Platforms" src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-427%20automated-2ea44f">
+  <img alt="Status" src="https://img.shields.io/badge/status-under%20active%20construction-yellow">
+</p>
 
 Ragnarok reads your **mail, calendar, files and chats**, remembers them **with provenance**, plans and executes multi-step tasks through **sandboxed skills** — and never sends, deletes or changes anything outside its workspace **without a click bound to the exact content**.
 
-Local models. Encrypted memory. Zero Trust. Every write gated behind a click.
+> **Local models. Encrypted memory. Zero Trust. Every write gated behind a click.**
+
+---
+
+## Contents
+
+- [Why Ragnarok?](#why-ragnarok)
+- [What it does](#what-it-does)
+- [How it works](#how-it-works)
+- [Quickstart](#quickstart)
+- [Command-line interface](#command-line-interface)
+- [Connectors](#connectors)
+- [Models](#models)
+- [Skills, skill scrolls & dreaming](#skills-skill-scrolls--dreaming)
+- [Voice, vision & screen](#voice-vision--screen)
+- [Security & privacy](#security--privacy)
+- [Evaluation & evidence](#evaluation--evidence)
+- [Repository layout](#repository-layout)
+- [Documentation](#documentation)
+- [Status](#status)
+- [Prior work](#prior-work)
 
 ---
 
@@ -23,21 +48,23 @@ Five principles guide every feature:
 | **Memory with provenance** | Eleven memory types in a single encrypted file; every fact links to a quote in a source; delete cascades and is verified by a scan. |
 | **Safe autonomy** | Zero Trust: the model is assumed already tricked. Code-enforced policy, sandboxing, taint tracking, and content-bound approvals. |
 | **Fast by design** | A confidence-gated cascade; most decisions never reach a generative model, and the cascade learns from its own successes. |
-| **Evidence, not claims** | Every number comes from this project's own harness, per machine, merged into `docs/EVIDENCE.md`. |
+| **Evidence, not claims** | Every number comes from this project's own harness, per machine, merged into `docs/evidence/` and `docs/EVALS.md`. |
 
 ---
 
 ## What it does
 
-- **Ingests** Gmail, Google Calendar, Drive, Meet, Slack, Telegram, Discord, Outlook, local files, and desktop notifications.
+- **Ingests** Gmail, Google Calendar, Drive, Meet, Slack, Telegram, Discord, Outlook, local files, and desktop notifications — each source on its own live poller.
 - **Remembers** everything in an encrypted SQLCipher store with provenance, bitemporal facts, and hash-chained events.
 - **Routes** every request through a four-tier cascade (learned routes → Laya → small model → big model), so repeat tasks get faster.
-- **Plans and executes** multi-step tasks: a request like *"look up what Dev needs and remind me about it tomorrow"* is split into an execution graph by code in about 0.1 s (the LLM planner is only the fallback), with crash recovery, retries and one self-correcting re-plan.
+- **Plans and executes** multi-step tasks: *"look up what Dev needs and remind me about it tomorrow"* is split into an execution graph by code in about 0.1 s (the LLM planner is only the fallback), with crash recovery, retries and one self-correcting re-plan.
 - **Works on its own, within limits**: user-defined triggers (*"every day at 8am catch me up"*, *"when I get an email from Dev, tell me"*), heads-ups before meetings, "needs your attention" flags, a daily briefing, and an inbox — autonomous runs are never trusted more than typed ones.
+- **Distils your day into a Digest**: a context-grouped summary across apps with a timeline, faithful citations, and grouped notifications.
+- **Sees and hears**: explain your screen or ask about an image with a local vision model; speak in ~99 languages with a local Whisper model.
 - **You control the memory**: search, edit, export (JSON or Markdown with provenance) and permanently delete (preview, confirmation token, verified receipt) from the window; every reply has a **Why?** panel.
-- **Skills**: `ragnarok skill new/add/list`, turn on with a step-up approval, run in a sandbox.
+- **Skills**: create, register and run your own sandboxed skills (`ragnarok skill new/add/list`), plus Markdown **skill scrolls** that draft and self-improve.
 - **Guards every write** behind an approval card bound to the exact content — sends, deletes and edits happen only when you click.
-- **Serves a local UI** (always-on-top window) plus a CLI for everything.
+- **Serves a local UI** (always-on-top window) plus a CLI for everything, and a **demo mode** that runs the whole app on synthetic data.
 
 ---
 
@@ -95,6 +122,7 @@ ollama pull nomic-embed-text
 ollama pull qwen3:0.6b
 ollama pull qwen3:1.7b
 ollama pull qwen3:4b
+ollama pull qwen3-vl:2b
 uv run ragnarok doctor
 ```
 
@@ -110,8 +138,11 @@ ollama pull nomic-embed-text
 ollama pull qwen3:0.6b
 ollama pull qwen3:1.7b
 ollama pull qwen3:4b
+ollama pull qwen3-vl:2b
 uv run ragnarok doctor
 ```
+
+> The local voice model (`openai/whisper-base`, ~290 MB) downloads **once, with your approval, on first use**, then transcribes offline.
 
 `uv run ragnarok doctor` is the **sync tool**: run it after every pull, on every machine. `uv run ragnarok check` is the pre-push gate.
 
@@ -120,20 +151,22 @@ uv run ragnarok doctor
 ```bash
 uv run ragnarok run       # always-on agent + local API (no window)
 uv run ragnarok window    # always-on-top chat/activity window with an on/off switch
+uv run ragnarok window --demo   # throwaway copy with synthetic data for every app
 ```
 
 On an empty store the agent answers *"I don't have anything about that in memory yet"*.
 
 ---
 
-## CLI
+## Command-line interface
 
 | Command | Purpose |
 |---|---|
 | `ragnarok doctor [--benchmark] [--restore-test]` | Check this machine. Run after every pull. |
 | `ragnarok check` | Lint + fast tests (the pre-push gate). |
-| `ragnarok run [--port] [--interval] [--folder]` | Start the always-on agent + local API. |
-| `ragnarok window [--port] [--no-top]` | Start the always-on-top window. |
+| `ragnarok run [--port] [--interval] [--folder] [--demo]` | Start the always-on agent + local API. |
+| `ragnarok window [--port] [--no-top] [--demo]` | Start the always-on-top window. |
+| `ragnarok evals [--suite …] [--report-only]` | Run the benchmark suites against the real local models and write `docs/EVALS.md`. |
 | `ragnarok connect slack\|telegram\|discord` | Store a bot token in the OS keychain. |
 | `ragnarok connect google --client-file <json> [--write]` | Google OAuth sign-in (Gmail, Calendar, Drive, Meet). |
 | `ragnarok connect outlook --client-id <id>` | Outlook device-code sign-in. |
@@ -153,7 +186,7 @@ Read and write tokens are **separate**; tokens live in the OS keychain, never in
 | Google Drive | ✅ | Create document |
 | Google Meet | ✅ (transcripts) | — |
 | Slack | ✅ (polling) | Post in a channel (needs the `chat:write` scope) |
-| Telegram | ✅ | Send message |
+| Telegram | ✅ (long-poll) | Send message |
 | Discord | ✅ | Post in channel |
 | Outlook | ✅ (coded, not yet live-tested) | Draft & send (designed) |
 | Local files | ✅ | — |
@@ -165,7 +198,7 @@ See **[`docs/CONNECTOR_SETUP.md`](docs/CONNECTOR_SETUP.md)** for the exact conso
 
 ## Models
 
-Pinned in [`models.lock`](models.lock) (name + digest); the daemon refuses a model whose digest differs.
+All generation and embeddings go only to Ollama on `127.0.0.1:11434`, plus Laya in-process. Names and digests are pinned in [`models.lock`](models.lock); the daemon refuses a model whose digest differs.
 
 | Role | Model |
 |---|---|
@@ -173,8 +206,35 @@ Pinned in [`models.lock`](models.lock) (name + digest); the daemon refuses a mod
 | Writer (chat & drafts) | `qwen3:0.6b` |
 | Arbiter (L2) | `qwen3:1.7b` |
 | Planner (L3) | `qwen3:4b` |
+| Vision (screen & images) | `qwen3-vl:2b` |
+| Voice (speech-to-text) | `openai/whisper-base` (local, offline) |
+| Classifier (L1) | Laya (in-process; optional local fine-tune checkpoint) |
 
-No cloud AI service, SDK, key or endpoint. Generation and embeddings go only to Ollama on `127.0.0.1:11434`.
+No cloud AI service, SDK, key or endpoint is used at any point.
+
+---
+
+## Skills, skill scrolls & dreaming
+
+**Skills** are small programs the agent may call, run in a sandbox and hash-verified at execution time.
+
+- **Built-in**: `fs.read`, `fs.search`, `fs.write`, `note.add`, `python.run`.
+- **Native**: `calendar.add`, `calendar.agenda`, `chat.reply`, `drive.create`, `mail.draft`, `mail.reply`, `mail.send`, `memory.search`, `reminder.add`, `reminder.list`.
+- **Your own**: `ragnarok skill new` / `add` / `list`, enabled with a step-up approval in the window.
+
+**Skill scrolls** are short Markdown specialists (`src/ragnarok/scrolls/builtin/`): only their headers stay in memory and the full text loads for the one that fits. Eight ship with the app — `meeting-notes`, `email-triage`, `reply-drafter`, `triage-and-reply` (a chain), `explain-simply`, `action-items`, `decision-helper`, `standup-writer`. A scroll is **read-only** (its tools are lookups performed by code) and untrusted until you approve its exact text.
+
+**Dreaming**: when the laptop is plugged in and idle, the agent replays the day, tidies memory, rehearses what failed, and drafts improvements to its own scrolls — all waiting for your approval, never acting outside the computer.
+
+See **[`docs/SKILL_SCROLLS.md`](docs/SKILL_SCROLLS.md)**.
+
+---
+
+## Voice, vision & screen
+
+- **Voice**: the microphone button records, and a local Whisper model transcribes it offline in about 99 languages with automatic detection; free-form requests in other languages and with typos are understood.
+- **Screen & images**: capture the whole screen, a region, or a window on any display and run **Smart**, **Read-text**, or **Deep** engines (OS text reader + a language model, with the vision model as fallback). A 3-second countdown, one capture, never stored; text inside an image is treated as data, never instructions.
+- **The bolt**: drag the window to a screen edge to pin it — the window hides and a small teal lightning bolt (**Muninn**) waits there, dims when idle and flares with a speech bubble for approvals and reminders until you click it.
 
 ---
 
@@ -184,7 +244,23 @@ No cloud AI service, SDK, key or endpoint. Generation and embeddings go only to 
 - **Encrypted at rest** — SQLCipher, per-file AES-GCM blobs, secrets only in the OS vault.
 - **Zero Trust** — identities, hash-verified skills, taint tracking, gateway scanning, canaries, budgets, step-up approval.
 - **Reversible** — deletes go to trash, snapshots before bulk changes, an undo window on every write.
-- **Evidence** — `tests/security/` doubles as the red-team suite (SEC-01 … SEC-20).
+- **Red team** — the security requirements **SEC-01 … SEC-20** are enforced and tested across `tests/security/` and `tests/unit/`, and the benchmark harness includes an injection suite with a second opinion.
+
+---
+
+## Evaluation & evidence
+
+Every claim is measured on this project's own harness and recorded in [`docs/evidence/`](docs/evidence/) and [`docs/EVALS.md`](docs/EVALS.md). The `evals/` harness (`ragnarok evals`) runs ten suites — utility, intent, actions, tasks, security, memory, digest, forgetting, reliability, and multimodal — against the real local models.
+
+Selected results (macOS M4, real local models):
+
+- **Retrieval** over 2,000 messages: p50 45 ms, p95 94 ms, recall@5 1.0.
+- **Intent understanding**: 93% accuracy (145/156) with a 0% false-action rate on held-out samples.
+- **Exact answers by code** (time, dates, units, arithmetic): 100% (93/93).
+- **Crash recovery**: state restored in ~3.3 s after `kill -9` (gate 5 s).
+- **Resource use** under load: 4.9% mean / 12.2% peak of the machine (gate 30%).
+
+Confidence intervals are Wilson 95%; small samples are reported as such. See `docs/EVALS.md` for the full report and the honest misses.
 
 ---
 
@@ -192,29 +268,37 @@ No cloud AI service, SDK, key or endpoint. Generation and embeddings go only to 
 
 ```
 kala-dhua/
-├─ src/ragnarok/          # the agent itself
-│  ├─ core/               # clock, ids, errors, logging, failpoints
-│  ├─ store/              # SQLCipher db, crypto, migrations, vectors
-│  ├─ memory/             # 11 memory types, retrieval, delete, retention
-│  ├─ llm_gateway/        # the only path to models
-│  ├─ router/             # L0→L1→L2→L3 cascade + route library
-│  ├─ harness/            # planner, executor, verifier, recovery
-│  ├─ policy/             # declarative rules (fail closed)
-│  ├─ broker/             # click-gated approvals
-│  ├─ security/           # guard, vault, canaries, snapshots
-│  ├─ sandbox/            # seatbelt / container / windows backends
-│  ├─ connectors/         # gmail, calendar, drive, meet, slack, telegram, discord, outlook, files
-│  ├─ ingest/             # queue + parse + sanitize + chunk + index
-│  ├─ daemon/             # always-on runtime + local API
-│  └─ skills/             # builtin + native skills (hash-verified)
-├─ ui/                    # the always-on-top window (single HTML page)
-├─ tests/                 # unit, contract, security suites
-├─ scripts/               # spikes, evals, e2e
-├─ docs/                  # architecture, build plan, ADRs, spikes, setup
-├─ evidence/              # measured results
-├─ models.lock            # pinned model names + digests
-├─ pyproject.toml         # dependencies + the ragnarok entry point
-└─ CLAUDE.md              # operating rules for the build
+├─ src/ragnarok/              # the agent itself
+│  ├─ core/                   # clock, ids, errors, logging, failpoints
+│  ├─ config/                 # data directories and paths
+│  ├─ store/                  # SQLCipher db, crypto, migrations, vectors, selftest
+│  ├─ memory/                 # 11 memory types, retrieval, delete, retention, ledger
+│  ├─ llm_gateway/            # the only path to models
+│  ├─ gateway_scan/           # prompt & egress scanning (fast + deep)
+│  ├─ router/                 # L0 → L1 → L2 → L3 cascade + route library
+│  │  └─ backends/            # laya, ollama_small, fake
+│  ├─ harness/                # planner, executor, verifier, recovery, digest, vision, calc
+│  ├─ policy/                 # declarative rules + taint tracking (fail closed)
+│  ├─ broker/                 # click-gated approvals and autonomy modes
+│  ├─ security/               # guard, vault, canaries, snapshots, identities
+│  ├─ sandbox/                # seatbelt / container / windows backends
+│  │  └─ suite/               # shared attack suite
+│  ├─ connectors/             # gmail, calendar, drive, meet, slack, telegram, discord, outlook, files, notifications
+│  ├─ ingest/                 # queue + parse + sanitize + chunk + index
+│  ├─ daemon/                 # always-on runtime, local API, proactive, dream, demo
+│  ├─ platform/               # screen, voice, ocr, notify, power, procs, secrets
+│  ├─ skills/                 # builtin + native skills (hash-verified)
+│  ├─ scrolls/                # Markdown specialists + dreaming author
+│  ├─ evidence/               # crash-lab evidence helpers
+│  └─ ui/                     # the always-on-top window (index.html + mascot.html)
+├─ evals/                     # benchmark suites (utility, intent, actions, tasks, security, …)
+├─ tests/                     # unit, security, and browser-level UI smoke tests
+├─ scripts/                   # spikes, evals, e2e, and live probes
+├─ docs/                      # architecture, build plan, ADRs, spikes, setup, evidence
+├─ evidence/                  # Laya calibration data and router synth set
+├─ models.lock                # pinned model names + digests
+├─ pyproject.toml             # dependencies + the ragnarok entry point
+└─ CLAUDE.md                  # operating rules for the build
 ```
 
 ---
@@ -225,31 +309,21 @@ kala-dhua/
 - [`docs/BUILD_PLAN.md`](docs/BUILD_PLAN.md) — the ordered, testable build plan with gates.
 - [`CLAUDE.md`](CLAUDE.md) — operating rules for the build (binding).
 - [`docs/CONNECTOR_SETUP.md`](docs/CONNECTOR_SETUP.md) — step-by-step connector setup.
-- [`docs/HANDOVER_TUSHAR.md`](docs/HANDOVER_TUSHAR.md) — Windows handover and honest gap list.
+- [`docs/SKILL_SCROLLS.md`](docs/SKILL_SCROLLS.md) — skill scrolls and idle-time dreaming.
+- [`docs/EVALS.md`](docs/EVALS.md) — the measured evaluation report (regenerated by `ragnarok evals`).
 - [`docs/REQUIREMENTS_TRACE.md`](docs/REQUIREMENTS_TRACE.md) — every requirement of the original problem statement, its implementation, evidence and gaps.
 - [`docs/BRIEF_MID_EVAL.md`](docs/BRIEF_MID_EVAL.md) — measured numbers, security posture, and the demo script.
+- [`docs/HANDOVER_TUSHAR.md`](docs/HANDOVER_TUSHAR.md) — Windows handover and honest gap list.
 - [`docs/adr/`](docs/adr/) — one decision record per deviation.
 - [`docs/spikes/`](docs/spikes/) — measured spike results (Laya, Ollama, calibration).
 
 ---
 
-## Voice, languages, the raven
-
-The microphone button records and a local Whisper model transcribes it offline in about 99 languages; free-form requests in other languages and with typos are understood. Drag the window to a screen edge to pin it: the window hides and a small raven (Muninn) perches there until you click it. See `docs/BRIEF_MID_EVAL.md`.
-
-## Skill scrolls and dreaming
-
-Specialists are short Markdown files (`src/ragnarok/scrolls/builtin/`); only their headers are kept in memory and the full text loads for the one that fits. When the laptop is plugged in and idle, the agent replays the day, tidies memory, rehearses what failed and drafts improvements to its own scrolls, which wait for your approval. See `docs/SKILL_SCROLLS.md`.
-
-## Demo mode (a safe fallback for any demo)
-
-`ragnarok window --demo` starts a complete copy of the app in a throwaway folder with made-up data for every connected app (Gmail, Slack, Discord, Telegram, Calendar, Drive, Meet, notifications), including a hostile email for the injection demo. Every send is a local fake that only appears in the Activity tab's "Demo outbox"; it holds no real credentials and cannot reach a real account. A DEMO badge is shown the whole time. Sources > "Send me a message now" (and an automatic feed every 50 s) makes new messages arrive live, so the Digest, Inbox and proactive heads-ups can be shown without any real traffic. Close the real window first (both use port 8765, or pass `--port`).
-
 ## Status
 
 Under active construction for a hackathon deadline of **09:00 IST, 26 October 2026**.
 
-**Done (verified live on real accounts, with evidence in `docs/evidence/`):** encrypted store and memory (view, edit, export, verified delete), Zero Trust layer, executor with crash recovery (state back in 3.3 s after `kill -9`), the four-tier router that learns routes, deterministic multi-step decomposition, always-on triggers and proactivity, read connectors (Gmail, Calendar, Drive, Meet, Slack, Telegram, Discord) and click-gated writes (email, reply, draft, calendar, Drive, Telegram, Discord, Slack), live per-app ingestion (Telegram long poll, Gmail/Slack/Discord every 4 s), a context-grouped Digest with a timeline, explain-my-screen and picture questions with a local vision model, the always-on window (chat, digest, inbox, approvals, memory, sources/skills), user-defined skills, a sandboxed Python skill, a safe calculator. Retrieval p95 94 ms and classification p95 537 ms on a 2,000-message corpus (gate 800 ms). 360+ automated tests plus a 16-check browser-level UI test.
+**Done (verified live on real accounts, with evidence in `docs/evidence/`):** encrypted store and memory (view, edit, export, verified delete), Zero Trust layer, executor with crash recovery (state back in ~3.3 s after `kill -9`), the four-tier router that learns routes, deterministic multi-step decomposition, always-on triggers and proactivity, read connectors (Gmail, Calendar, Drive, Meet, Slack, Telegram, Discord) and click-gated writes (email, reply, draft, calendar, Drive, Telegram, Discord, Slack), live per-app ingestion, a context-grouped Digest with a timeline, explain-my-screen and picture questions with a local vision model, local multilingual voice, skill scrolls and idle-time dreaming, user-defined skills, a sandboxed Python skill, and a benchmark harness with ten eval suites.
 
 **Honest gaps:** Windows sandbox backends and notification reader, Laya fine-tuning (it is calibrated, not fine-tuned), Outlook and notifications on real accounts, the full red-team report, and the 90-simulated-day pruning run. The requirement-by-requirement trace against the original problem statement is in [`docs/REQUIREMENTS_TRACE.md`](docs/REQUIREMENTS_TRACE.md).
 
