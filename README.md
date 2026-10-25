@@ -32,7 +32,10 @@ Five principles guide every feature:
 - **Ingests** Gmail, Google Calendar, Drive, Meet, Slack, Telegram, Discord, Outlook, local files, and desktop notifications.
 - **Remembers** everything in an encrypted SQLCipher store with provenance, bitemporal facts, and hash-chained events.
 - **Routes** every request through a four-tier cascade (learned routes → Laya → small model → big model), so repeat tasks get faster.
-- **Plans and executes** multi-step tasks with crash recovery and self-correction.
+- **Plans and executes** multi-step tasks: a request like *"look up what Dev needs and remind me about it tomorrow"* is split into an execution graph by code in about 0.1 s (the LLM planner is only the fallback), with crash recovery, retries and one self-correcting re-plan.
+- **Works on its own, within limits**: user-defined triggers (*"every day at 8am catch me up"*, *"when I get an email from Dev, tell me"*), heads-ups before meetings, "needs your attention" flags, a daily briefing, and an inbox — autonomous runs are never trusted more than typed ones.
+- **You control the memory**: search, edit, export (JSON or Markdown with provenance) and permanently delete (preview, confirmation token, verified receipt) from the window; every reply has a **Why?** panel.
+- **Skills**: `ragnarok skill new/add/list`, turn on with a step-up approval, run in a sandbox.
 - **Guards every write** behind an approval card bound to the exact content — sends, deletes and edits happen only when you click.
 - **Serves a local UI** (always-on-top window) plus a CLI for everything.
 
@@ -89,6 +92,7 @@ git clone https://github.com/IshanGite/kala-dhua.git
 cd kala-dhua
 uv sync --extra laya --extra window
 ollama pull nomic-embed-text
+ollama pull qwen3:0.6b
 ollama pull qwen3:1.7b
 ollama pull qwen3:4b
 uv run ragnarok doctor
@@ -103,6 +107,7 @@ git clone https://github.com/IshanGite/kala-dhua.git
 cd kala-dhua
 uv sync --extra laya --extra window
 ollama pull nomic-embed-text
+ollama pull qwen3:0.6b
 ollama pull qwen3:1.7b
 ollama pull qwen3:4b
 uv run ragnarok doctor
@@ -132,6 +137,7 @@ On an empty store the agent answers *"I don't have anything about that in memory
 | `ragnarok connect slack\|telegram\|discord` | Store a bot token in the OS keychain. |
 | `ragnarok connect google --client-file <json> [--write]` | Google OAuth sign-in (Gmail, Calendar, Drive, Meet). |
 | `ragnarok connect outlook --client-id <id>` | Outlook device-code sign-in. |
+| `ragnarok skill new <name>` / `add <folder>` / `list` | Create, register and list your own skills (turn them on in the window). |
 | `ragnarok version` | Print the version. |
 
 ---
@@ -146,7 +152,7 @@ Read and write tokens are **separate**; tokens live in the OS keychain, never in
 | Google Calendar | ✅ | Create event |
 | Google Drive | ✅ | Create document |
 | Google Meet | ✅ (transcripts) | — |
-| Slack | ✅ (polling) | Posting not enabled yet |
+| Slack | ✅ (polling) | Post in a channel (needs the `chat:write` scope) |
 | Telegram | ✅ | Send message |
 | Discord | ✅ | Post in channel |
 | Outlook | ✅ (coded, not yet live-tested) | Draft & send (designed) |
@@ -220,6 +226,7 @@ kala-dhua/
 - [`CLAUDE.md`](CLAUDE.md) — operating rules for the build (binding).
 - [`docs/CONNECTOR_SETUP.md`](docs/CONNECTOR_SETUP.md) — step-by-step connector setup.
 - [`docs/HANDOVER_TUSHAR.md`](docs/HANDOVER_TUSHAR.md) — Windows handover and honest gap list.
+- [`docs/REQUIREMENTS_TRACE.md`](docs/REQUIREMENTS_TRACE.md) — every requirement of the original problem statement, its implementation, evidence and gaps.
 - [`docs/BRIEF_MID_EVAL.md`](docs/BRIEF_MID_EVAL.md) — measured numbers, security posture, and the demo script.
 - [`docs/adr/`](docs/adr/) — one decision record per deviation.
 - [`docs/spikes/`](docs/spikes/) — measured spike results (Laya, Ollama, calibration).
@@ -230,9 +237,9 @@ kala-dhua/
 
 Under active construction for a hackathon deadline of **09:00 IST, 26 October 2026**.
 
-**Done (verified live on real accounts):** encrypted store + memory service, Zero Trust layer, executor with crash recovery, router + route library, read-side connectors (Gmail, Calendar, Drive, Meet, Slack, Telegram, Discord), the always-on window, and click-gated actions (email, calendar, Drive, Telegram, Discord).
+**Done (verified live on real accounts, with evidence in `docs/evidence/`):** encrypted store and memory (view, edit, export, verified delete), Zero Trust layer, executor with crash recovery (state back in 3.3 s after `kill -9`), the four-tier router that learns routes, deterministic multi-step decomposition, always-on triggers and proactivity, read connectors (Gmail, Calendar, Drive, Meet, Slack, Telegram, Discord) and click-gated writes (email, reply, draft, calendar, Drive, Telegram, Discord, Slack), the always-on window (chat, inbox, messages, approvals, sources/skills), user-defined skills, a sandboxed Python skill, a safe calculator. Retrieval p95 94 ms and classification p95 537 ms on a 2,000-message corpus (gate 800 ms). 360+ automated tests plus a 16-check browser-level UI test.
 
-**Honest gaps:** Windows sandbox backends and notification reader, Laya fine-tuning, Outlook and notifications on real accounts, Slack posting permission, the full red-team report, and the memory explorer / delete preview / route library screens in the window.
+**Honest gaps:** Windows sandbox backends and notification reader, Laya fine-tuning (it is calibrated, not fine-tuned), Outlook and notifications on real accounts, the full red-team report, and the 90-simulated-day pruning run. The requirement-by-requirement trace against the original problem statement is in [`docs/REQUIREMENTS_TRACE.md`](docs/REQUIREMENTS_TRACE.md).
 
 See [`docs/HANDOVER_TUSHAR.md`](docs/HANDOVER_TUSHAR.md) for the full list.
 
