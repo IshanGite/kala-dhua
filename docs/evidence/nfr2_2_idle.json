@@ -1,0 +1,186 @@
+{
+ "summary": {
+  "seconds": 120,
+  "cores": 10,
+  "samples": 24,
+  "agent_plus_models_machine_share_pct": {
+   "mean": 1.45,
+   "p95": 4.14,
+   "max": 11.79
+  },
+  "agent_alone_mean_pct": 0.28,
+  "gate_pct": 30,
+  "passes": true,
+  "rss_mb_max": 237
+ },
+ "trace": [
+  {
+   "t": 5,
+   "app": 0.01,
+   "ollama": 11.76,
+   "system": 18.5,
+   "rss_mb": 184
+  },
+  {
+   "t": 10,
+   "app": 0.04,
+   "ollama": 11.75,
+   "system": 19.0,
+   "rss_mb": 185
+  },
+  {
+   "t": 15,
+   "app": 0.6,
+   "ollama": 3.54,
+   "system": 31.7,
+   "rss_mb": 214
+  },
+  {
+   "t": 20,
+   "app": 0.34,
+   "ollama": 0.06,
+   "system": 18.1,
+   "rss_mb": 215
+  },
+  {
+   "t": 25,
+   "app": 0.24,
+   "ollama": 0.06,
+   "system": 16.6,
+   "rss_mb": 215
+  },
+  {
+   "t": 30,
+   "app": 0.2,
+   "ollama": 0.03,
+   "system": 7.7,
+   "rss_mb": 216
+  },
+  {
+   "t": 35,
+   "app": 0.28,
+   "ollama": 0.03,
+   "system": 7.8,
+   "rss_mb": 216
+  },
+  {
+   "t": 40,
+   "app": 0.22,
+   "ollama": 0.03,
+   "system": 8.4,
+   "rss_mb": 216
+  },
+  {
+   "t": 45,
+   "app": 0.21,
+   "ollama": 0.04,
+   "system": 11.2,
+   "rss_mb": 216
+  },
+  {
+   "t": 50,
+   "app": 0.15,
+   "ollama": 0.03,
+   "system": 7.6,
+   "rss_mb": 216
+  },
+  {
+   "t": 55,
+   "app": 0.12,
+   "ollama": 0.03,
+   "system": 7.1,
+   "rss_mb": 216
+  },
+  {
+   "t": 61,
+   "app": 0.13,
+   "ollama": 0.03,
+   "system": 6.4,
+   "rss_mb": 216
+  },
+  {
+   "t": 66,
+   "app": 0.14,
+   "ollama": 0.03,
+   "system": 7.2,
+   "rss_mb": 216
+  },
+  {
+   "t": 71,
+   "app": 0.2,
+   "ollama": 0.03,
+   "system": 6.7,
+   "rss_mb": 216
+  },
+  {
+   "t": 76,
+   "app": 0.27,
+   "ollama": 0.03,
+   "system": 8.4,
+   "rss_mb": 218
+  },
+  {
+   "t": 81,
+   "app": 0.23,
+   "ollama": 0.03,
+   "system": 8.4,
+   "rss_mb": 218
+  },
+  {
+   "t": 86,
+   "app": 0.24,
+   "ollama": 0.03,
+   "system": 10.4,
+   "rss_mb": 218
+  },
+  {
+   "t": 91,
+   "app": 0.3,
+   "ollama": 0.03,
+   "system": 12.4,
+   "rss_mb": 219
+  },
+  {
+   "t": 96,
+   "app": 0.29,
+   "ollama": 0.03,
+   "system": 9.1,
+   "rss_mb": 224
+  },
+  {
+   "t": 101,
+   "app": 0.35,
+   "ollama": 0.03,
+   "system": 9.7,
+   "rss_mb": 224
+  },
+  {
+   "t": 106,
+   "app": 0.38,
+   "ollama": 0.03,
+   "system": 8.6,
+   "rss_mb": 224
+  },
+  {
+   "t": 111,
+   "app": 0.55,
+   "ollama": 0.03,
+   "system": 9.3,
+   "rss_mb": 225
+  },
+  {
+   "t": 116,
+   "app": 0.3,
+   "ollama": 0.28,
+   "system": 10.0,
+   "rss_mb": 231
+  },
+  {
+   "t": 121,
+   "app": 0.91,
+   "ollama": 0.13,
+   "system": 13.1,
+   "rss_mb": 237
+  }
+ ]
+}

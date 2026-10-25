@@ -6,7 +6,12 @@ import psutil
 pid, seconds = int(sys.argv[1]), int(sys.argv[2])
 cores = psutil.cpu_count()
 proc = psutil.Process(pid)
-ollama = [p for p in psutil.process_iter(["name", "cmdline"]) if "ollama" in (p.info["name"] or "").lower()]
+def is_ollama(p):
+    cmd = " ".join(p.info.get("cmdline") or [])
+    return "ollama" in (p.info["name"] or "").lower() or "/ollama/" in cmd or "llama-server" in cmd  # the models run in llama-server child processes
+
+
+ollama = [p for p in psutil.process_iter(["name", "cmdline"]) if is_ollama(p)]
 for p in [proc, *ollama]:
     p.cpu_percent(None)
 psutil.cpu_percent(None)
@@ -15,7 +20,8 @@ t_end = time.time() + seconds
 while time.time() < t_end:
     time.sleep(5)
     app = proc.cpu_percent(None) / cores + sum(c.cpu_percent(None) for c in proc.children(recursive=True)) / cores
-    oll = sum(p.cpu_percent(None) for p in ollama if p.is_running()) / cores
+    ollama[:] = [p for p in ollama if p.is_running()] + [p for p in psutil.process_iter(["name", "cmdline"]) if is_ollama(p) and p.pid not in {q.pid for q in ollama}]  # a model may load mid-run
+    oll = sum(p.cpu_percent(None) for p in ollama) / cores
     rows.append({"t": round(time.time() - (t_end - seconds)), "app": round(app, 2), "ollama": round(oll, 2), "system": psutil.cpu_percent(None), "rss_mb": round(proc.memory_info().rss / 1e6)})
 tot = [r["app"] + r["ollama"] for r in rows]
 out = {"seconds": seconds, "cores": cores, "samples": len(rows), "agent_plus_models_machine_share_pct": {"mean": round(statistics.mean(tot), 2), "p95": round(sorted(tot)[int(0.95 * (len(tot) - 1))], 2), "max": round(max(tot), 2)},

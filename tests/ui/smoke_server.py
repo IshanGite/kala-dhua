@@ -1,5 +1,10 @@
 """A throwaway app (fake models, fake senders, seeded memory) that the browser-level UI smoke test drives. Prints one JSON line when ready, exits when stdin closes."""
-import asyncio, json, os, sys, tempfile
+import asyncio
+import json
+import os
+import sys
+import tempfile
+
 os.environ["RAGNAROK_HOME"] = tempfile.mkdtemp()
 os.environ["HOME"] = os.environ["RAGNAROK_HOME"]
 sys.path.insert(0, "src")
