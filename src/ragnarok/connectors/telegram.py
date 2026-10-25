@@ -20,14 +20,15 @@ API = "https://api.telegram.org"
 class Telegram:
     name = "telegram"
 
-    def __init__(self, bot_token: str, *, client: httpx.AsyncClient | None = None) -> None:
+    def __init__(self, bot_token: str, *, client: httpx.AsyncClient | None = None, long_poll_s: int = 0) -> None:
         self._tok, self._http = bot_token, client or new_client()
+        self._lp = max(0, min(long_poll_s, 50))  # >0: getUpdates waits up to this long for a message and returns the moment one arrives
 
     def describe(self) -> ConnectorInfo:
         return ConnectorInfo("telegram", "Telegram", ("message",), domains=("api.telegram.org",), default_minimisation="text only; unknown senders held until paired")
 
     async def _call(self, method: str, body: dict[str, Any], token: str | None = None) -> Any:
-        r = await request(self._http, "POST", f"{API}/bot{token or self._tok}/{method}", json=body)
+        r = await request(self._http, "POST", f"{API}/bot{token or self._tok}/{method}", json=body, timeout=httpx.Timeout(self._lp + 15.0, connect=10.0))
         d = r.json()
         if not d.get("ok"):
             raise ConnectorError(f"telegram {method}: {d.get('error_code')}", code="E_AUTH" if d.get("error_code") in (401, 403) else "E_TELEGRAM")
@@ -38,7 +39,7 @@ class Telegram:
         refs: list[ItemRef] = []
         nxt = offset
         more = False
-        updates = await self._call("getUpdates", {"offset": offset, "limit": 100, "timeout": 0, "allowed_updates": ["message", "channel_post"]})
+        updates = await self._call("getUpdates", {"offset": offset, "limit": 100, "timeout": self._lp, "allowed_updates": ["message", "channel_post"]})
         for u in updates:
             nxt = max(nxt, u["update_id"] + 1)
             m = u.get("message") or u.get("channel_post")

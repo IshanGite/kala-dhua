@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import time
 from collections import deque
 from dataclasses import dataclass
 from typing import Any
@@ -17,6 +16,9 @@ from ragnarok.memory.commitments import Commitments
 from ragnarok.memory.runtime_state import RuntimeState
 
 PAIRED = {"telegram"}  # sources where an unknown sender is held until the user approves
+# Seconds between polls per source. Telegram long-polls (the call itself waits for a message), so it is effectively instant; the rest are cheap list calls.
+DEFAULT_INTERVALS = {"telegram": 0.2, "slack": 5.0, "discord": 5.0, "gmail": 8.0, "outlook": 15.0, "gcal": 30.0, "outlook_cal": 60.0, "gdrive": 60.0, "gmeet": 180.0, "notifications": 3.0, "files": 5.0}
+BURST_S = 1.0  # right after something arrived, look again quickly: messages come in bursts
 
 
 @dataclass
@@ -30,8 +32,11 @@ class Governor:
 
 
 class Runtime:
-    def __init__(self, state: RuntimeState, runners: dict[str, ConnectorRunner], *, interval_s: float = 60.0, governor: Governor | None = None, commitments: Commitments | None = None) -> None:
+    def __init__(self, state: RuntimeState, runners: dict[str, ConnectorRunner], *, interval_s: float = 60.0, governor: Governor | None = None, commitments: Commitments | None = None,
+                 intervals: dict[str, float] | None = None) -> None:
         self.state, self.runners, self.interval = state, runners, interval_s
+        self.intervals = dict(intervals or {})  # per source; a source not listed uses interval_s
+        self._tasks: list[asyncio.Task[None]] = []
         self.commitments = commitments
         self.maintenance: Any = None  # FR1.3: consolidation and forgetting, once a day
         self.proactive: Any = None  # set by the wiring: the FR4 engine (triggers, heads-ups, briefing)
@@ -39,7 +44,6 @@ class Runtime:
         self.governor = governor or Governor()
         self.activity: deque[dict[str, Any]] = deque(maxlen=200)
         self.last: dict[str, dict[str, Any]] = {}
-        self._task: asyncio.Task[None] | None = None
         self._stop = asyncio.Event()
 
     @property
@@ -66,8 +70,8 @@ class Runtime:
                 self.proactive.inbox.add("reminder", f"Reminder: {d['what'][:80]}", d["what"], key=f"rem:{d['id']}", os_notify=self.proactive.settings()["os_notify"])
         return due
 
-    async def tick(self) -> dict[str, CycleReport]:
-        out: dict[str, CycleReport] = {}
+    async def housekeeping(self) -> None:
+        """Reminders, proactivity and the daily maintenance: independent of ingestion, so they run even while a slow source is waiting."""
         self.fire_reminders()
         if self.proactive is not None:
             try:
@@ -81,45 +85,85 @@ class Runtime:
                     self._note("maintenance", "memory", "ok", **{k: v for k, v in rep.items() if isinstance(v, int)})
             except Exception as exc:  # noqa: BLE001 - housekeeping must never stop the agent
                 log("maintenance_failed", err=type(exc).__name__)
+
+    async def _cycle_one(self, name: str, runner: ConnectorRunner) -> CycleReport | None:
+        try:
+            rep = await runner.cycle()
+        except Exception as exc:  # noqa: BLE001 - one broken source never stops the others
+            code = getattr(exc, "code", type(exc).__name__)
+            log("runtime_cycle_failed", src=name, err=code)
+            prev = self.last.get(name, {})
+            if prev.get("code") != str(code):  # the feed shows a change of state, not the same error every few seconds
+                self._note("error", name, str(code))
+            self.last[name] = {"ok": False, "code": str(code), "at": get_clock().now_ms(), "since": prev.get("since") or get_clock().now_ms(), "interval": self._interval(name)}
+            return None
+        now = get_clock().now_ms()
+        self.last[name] = {"ok": True, "at": now, "ingested": rep.ingested, "held": rep.held, "failed": rep.failed, "interval": self._interval(name),
+                           "last_new": now if (rep.ingested or rep.held) else self.last.get(name, {}).get("last_new")}
+        if rep.ingested or rep.held or rep.failed:
+            self._note("ingested", name, "ok", ingested=rep.ingested, held=rep.held, failed=rep.failed)
+        return rep
+
+    async def tick(self) -> dict[str, CycleReport]:
+        """One pass over everything, all sources at once (the Sync now button, and the tests)."""
+        out: dict[str, CycleReport] = {}
+        await self.housekeeping()
         if not self.enabled:
             return out
-        for name, runner in self.runners.items():
-            if not self.governor.admit():
-                self._note("skipped", name, "busy")
-                continue
-            try:
-                rep = await runner.cycle()
-            except Exception as exc:  # noqa: BLE001 - one broken source never stops the others
-                code = getattr(exc, "code", type(exc).__name__)
-                log("runtime_cycle_failed", src=name, err=code)
-                self._note("error", name, str(code))
-                self.last[name] = {"ok": False, "code": str(code), "at": get_clock().now_ms()}
-                continue
-            out[name] = rep
-            self.last[name] = {"ok": True, "at": get_clock().now_ms(), "ingested": rep.ingested, "held": rep.held, "failed": rep.failed}
-            if rep.ingested or rep.held or rep.failed:
-                self._note("ingested", name, "ok", ingested=rep.ingested, held=rep.held, failed=rep.failed)
+        names = [n for n in self.runners if self.governor.admit() or self._note("skipped", n, "busy")]
+        reps = await asyncio.gather(*[self._cycle_one(n, self.runners[n]) for n in names])
+        for n, rep in zip(names, reps, strict=True):
+            if rep is not None:
+                out[n] = rep
         return out
 
-    async def _loop(self) -> None:
+    def _interval(self, name: str) -> float:
+        return self.intervals.get(name, self.interval)
+
+    async def _sleep(self, seconds: float) -> None:
+        try:
+            await asyncio.wait_for(self._stop.wait(), timeout=max(seconds, 0.01))
+        except TimeoutError:
+            pass
+
+    async def _poll(self, name: str, runner: ConnectorRunner) -> None:
+        """One endless loop per source: a slow or failing source never delays another. Fast after activity, backing off on errors."""
+        backoff = 0.0
         while not self._stop.is_set():
-            started = time.monotonic()
-            await self.tick()
-            try:
-                await asyncio.wait_for(self._stop.wait(), timeout=max(self.interval - (time.monotonic() - started), 0.01))
-            except TimeoutError:
-                pass
+            if not (self.enabled and self.governor.admit()):
+                await self._sleep(1.0)
+                continue
+            work = asyncio.ensure_future(self._cycle_one(name, runner))
+            stop = asyncio.ensure_future(self._stop.wait())
+            await asyncio.wait({work, stop}, return_when=asyncio.FIRST_COMPLETED)  # a long poll must not delay shutdown
+            if not work.done():
+                work.cancel()
+                break
+            stop.cancel()
+            rep = work.result()
+            if rep is None:
+                backoff = min(max(backoff * 2, 2.0), 60.0)
+                await self._sleep(backoff)
+            else:
+                backoff = 0.0
+                await self._sleep(min(BURST_S, self._interval(name)) if (rep.ingested or rep.held) else self._interval(name))
+
+    async def _aux(self) -> None:
+        while not self._stop.is_set():
+            await self.housekeeping()
+            await self._sleep(5.0)
 
     def start(self) -> None:
-        if self._task is None:
+        if not self._tasks:
             self._stop.clear()
-            self._task = asyncio.get_running_loop().create_task(self._loop())
+            loop = asyncio.get_running_loop()
+            self._tasks = [loop.create_task(self._aux())] + [loop.create_task(self._poll(n, r)) for n, r in self.runners.items()]
 
     async def stop(self) -> None:
         self._stop.set()
-        if self._task:
-            await self._task
-            self._task = None
+        if self._tasks:
+            await asyncio.gather(*self._tasks, return_exceptions=True)
+            self._tasks = []
 
     def approve_sender(self, platform: str, handle: str) -> int:
         r = self.runners.get(platform)
@@ -133,5 +177,5 @@ class Runtime:
             self._note("paired", platform, "blocked")
 
     def status(self) -> dict[str, Any]:
-        return {"enabled": self.enabled, "interval_s": self.interval, "sources": {n: self.last.get(n, {"ok": None}) for n in self.runners},
+        return {"enabled": self.enabled, "interval_s": self.interval, "sources": {n: {**self.last.get(n, {"ok": None}), "interval": self._interval(n)} for n in self.runners},
                 "held": [{"platform": p, "handle": h} for p, h in self.state.held_senders()], "reminders": list(self.reminders)[:5]}

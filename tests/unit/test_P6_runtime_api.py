@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
+import json
+import time
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -171,3 +175,92 @@ def test_messages_endpoint_lists_what_was_read_newest_first_with_search(world):
     items = c.get("/messages").json()["items"]
     assert items and items[0]["source"] == "feed" and "Orion" in items[0]["preview"]
     assert c.get("/messages?q=Orion").json()["items"] and c.get("/messages?q=zebra").json()["items"] == []
+
+
+class SlowFeed(Feed):
+    name = "slow"
+
+    async def sync(self, cursor):
+        await asyncio.sleep(0.4)  # a slow source, like a long poll
+        return await super().sync(cursor)
+
+
+class DownFeed(Feed):
+    name = "down"
+    calls = 0
+
+    async def sync(self, cursor):
+        DownFeed.calls += 1
+        raise ConnectionError("down")
+
+
+async def test_sources_are_polled_independently_a_slow_one_never_delays_a_fast_one(world):
+    mem, keys, rt, reader, gw, idx = world
+    q = IngestQueue(mem)
+    rt.runners = {"fast": ConnectorRunner(mem, q, Feed(), "work", gateway=gw, index=idx), "slow": ConnectorRunner(mem, q, SlowFeed(), "work", gateway=gw, index=idx)}
+    rt.intervals = {"fast": 0.02, "slow": 0.02}
+    rt.start()
+    await asyncio.sleep(0.9)
+    await rt.stop()
+    fast = reader._r.execute("select count(*) from items where source='feed'").fetchone()[0]
+    assert fast >= 8, f"the fast source kept its own pace ({fast} cycles) while the slow one waited"
+    assert rt.last["fast"]["ok"] and rt.last["slow"]["ok"]
+
+
+async def test_a_failing_source_backs_off_reports_once_and_recovers_on_its_own(world, monkeypatch):
+    mem, keys, rt, reader, gw, idx = world
+    DownFeed.calls = 0
+    rt.runners = {"down": ConnectorRunner(mem, IngestQueue(mem), DownFeed(), "work")}
+    rt.intervals = {"down": 0.01}
+    monkeypatch.setattr("ragnarok.daemon.runtime.asyncio.sleep", asyncio.sleep)
+    rt.start()
+    await asyncio.sleep(0.5)
+    await rt.stop()
+    assert DownFeed.calls <= 3, "exponential backoff: it does not hammer a broken service"
+    assert rt.last["down"]["ok"] is False and len([a for a in rt.activity if a["kind"] == "error"]) == 1, "one entry in the feed for one continuing problem"
+
+
+async def test_stopping_does_not_wait_for_a_long_poll(world):
+    mem, keys, rt, reader, gw, idx = world
+
+    class Hang(Feed):
+        name = "hang"
+
+        async def sync(self, cursor):
+            await asyncio.sleep(30)
+
+    rt.runners = {"hang": ConnectorRunner(mem, IngestQueue(mem), Hang(), "work")}
+    rt.intervals = {"hang": 0.01}
+    rt.start()
+    await asyncio.sleep(0.2)
+    t = time.monotonic()
+    await rt.stop()
+    assert time.monotonic() - t < 2.0
+
+
+async def test_telegram_long_poll_asks_the_server_to_wait_and_returns_at_once_when_a_message_comes():
+    import httpx
+
+    from ragnarok.connectors.http import new_client
+    from ragnarok.connectors.telegram import Telegram
+
+    seen = {}
+
+    def h(req):
+        seen.update(json.loads(req.content))
+        return httpx.Response(200, json={"ok": True, "result": [{"update_id": 5, "message": {"message_id": 1, "date": 1, "chat": {"id": 9, "type": "private"}, "from": {"id": 9, "first_name": "A"}, "text": "hi"}}]})
+
+    tg = Telegram("1:x", client=new_client(httpx.MockTransport(h)), long_poll_s=25)
+    res = await tg.sync(None)
+    assert seen["timeout"] == 25 and len(res.refs) == 1 and res.cursor.value["offset"] == 6
+
+
+def test_test_scripts_can_exclude_telegram_so_they_never_consume_the_real_queue(monkeypatch):
+    from ragnarok.connectors.registry import connected
+    from ragnarok.platform.secrets import MemoryStore, token_name
+
+    v = MemoryStore()
+    v.set(token_name("telegram", "read"), "1:x")
+    v.set(token_name("slack", "read"), "xoxb-x")
+    monkeypatch.setenv("RAGNAROK_SKIP_SOURCES", "telegram")
+    assert connected(v) == ["slack"]

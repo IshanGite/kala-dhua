@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -31,7 +32,7 @@ def build(name: str, vault: SecretStore, **opts: Any) -> Any:
     if name == "slack":
         return Slack(raw)
     if name == "telegram":
-        return Telegram(raw)
+        return Telegram(raw, long_poll_s=int(opts.get("long_poll_s", 0)))
     if name == "discord":
         return Discord(raw)
     if name in MS:
@@ -43,10 +44,11 @@ def build(name: str, vault: SecretStore, **opts: Any) -> Any:
 
 
 def connected(vault: SecretStore) -> list[str]:
+    skip = {x.strip() for x in os.environ.get("RAGNAROK_SKIP_SOURCES", "").split(",") if x.strip()}  # test scripts set this so they never consume the real Telegram queue
     out = []
     for n in NAMES:
         if n == "files":
             continue
-        if vault.get(token_name(_key(n), "read")):
+        if n not in skip and vault.get(token_name(_key(n), "read")):
             out.append(n)
     return out

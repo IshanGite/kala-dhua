@@ -89,7 +89,7 @@ def _load_index(mem: MemoryService, reader: MemoryReader, index: VectorIndex) ->
 
 
 def build_world(*, use_laya: bool = True, sandbox: bool = True, embed_rungs: bool = True, rules: bool = True, senders: dict | None = None, vault: SecretStore | None = None, gateway: Gateway | None = None, lock_path: Path | None = None, interval_s: float = 60.0,
-                files: list[str] | None = None, max_cpu: float = 60.0) -> World:
+                files: list[str] | None = None, max_cpu: float = 60.0, live_telegram_s: int = 0, intervals: dict[str, float] | None = None) -> World:
     vault = vault or default_store()
     root = ensure_dirs()
     keys = KeyHierarchy.load_or_create(vault)
@@ -102,7 +102,7 @@ def build_world(*, use_laya: bool = True, sandbox: bool = True, embed_rungs: boo
     queue.recover()
     runners: dict[str, ConnectorRunner] = {}
     for name in connected(vault):
-        runners[name] = ConnectorRunner(mem, queue, build(name, vault), COMPARTMENT, gateway=gw, index=index, require_pairing=name in PAIRED)
+        runners[name] = ConnectorRunner(mem, queue, build(name, vault, long_poll_s=live_telegram_s), COMPARTMENT, gateway=gw, index=index, require_pairing=name in PAIRED)
     if files:
         runners["files"] = ConnectorRunner(mem, queue, build("files", vault, folders=files), COMPARTMENT, gateway=gw, index=index)
     state = RuntimeState(mem)
@@ -141,7 +141,7 @@ def build_world(*, use_laya: bool = True, sandbox: bool = True, embed_rungs: boo
     state = RuntimeState(mem)
     notif = Notifications(default_source(), lambda: json.loads(state.get("notif_apps", "[]")))
     runners["notifications"] = ConnectorRunner(mem, queue, notif, COMPARTMENT, gateway=gw, index=index)
-    runtime = Runtime(state, runners, interval_s=interval_s, governor=Governor(max_cpu), commitments=Commitments(mem))
+    runtime = Runtime(state, runners, interval_s=interval_s, governor=Governor(max_cpu), commitments=Commitments(mem), intervals=intervals)
     async def run_command(cmd: str) -> str:
         return str(summarize(await agent.handle(cmd, trust="agent")).get("text", ""))  # a trigger's task is not more trusted than a typed one: sends still wait for a card
 

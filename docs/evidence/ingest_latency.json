@@ -1,0 +1,9 @@
+{
+ "gmail_arrival_to_memory_s": [
+  6.2,
+  5.7,
+  7.2
+ ],
+ "poll_interval_gmail_s": 8,
+ "note": "includes Gmail's own delivery delay (about 1 to 3 s) and the polling interval"
+}
