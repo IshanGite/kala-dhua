@@ -1,0 +1,58 @@
+// Browser-level smoke test of the window page: real DOM (jsdom), real API (a seeded throwaway app), real clicks. Run: node tests/ui/smoke.mjs  (needs: npm i jsdom in tests/ui)
+import { spawn } from "node:child_process";
+import { JSDOM } from "jsdom";
+
+const server = spawn(".venv/bin/python", ["tests/ui/smoke_server.py", "8794"], { env: { ...process.env, PYTHONPATH: "src" }, stdio: ["pipe", "pipe", "inherit"] });
+const info = await new Promise((res) => { let buf = ""; server.stdout.on("data", (d) => { buf += d; const l = buf.split("\n").find((x) => x.startsWith("{")); if (l) res(JSON.parse(l)); }); });
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const results = [];
+const check = (name, ok, detail = "") => { results.push([name, !!ok]); console.log(`${ok ? "PASS" : "FAIL"}  ${name} ${ok ? "" : detail}`); };
+
+const url = `http://127.0.0.1:${info.port}/`;
+const dom = await JSDOM.fromURL(url + `#token=${info.token}`, { runScripts: "dangerously", resources: "usable", pretendToBeVisual: true,
+  beforeParse(w) { w.fetch = (u, o) => fetch(new URL(u, url), o); w.history.replaceState = () => {}; } });
+const { window } = dom, doc = window.document;
+const waitFor = async (fn, ms = 8000) => { const t = Date.now(); while (Date.now() - t < ms) { try { const v = fn(); if (v) return v; } catch {} await sleep(100); } return null; };
+const click = (el) => el.dispatchEvent(new window.MouseEvent("click", { bubbles: true, cancelable: true }));
+const tab = (name) => click(doc.querySelector(`nav button[data-t="${name}"]`));
+const say = async (text) => { doc.getElementById("q").value = text; doc.getElementById("f").dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true })); };
+
+check("page loads and shows the agent state", await waitFor(() => /reading continuously|paused/.test(doc.getElementById("state").textContent)));
+await say("remind me to call mom tomorrow at 8am");
+check("a reminder command is answered in the chat", await waitFor(() => /Reminder set: call mom/.test(doc.getElementById("log").textContent)));
+check("the reply has a Why? panel that opens", await waitFor(() => { const a = [...doc.querySelectorAll("#log a")].find((x) => x.textContent === "Why?"); if (!a) return false; click(a); return /built-in rule for reminder.add/.test(doc.getElementById("log").textContent); }));
+await say("what did Ishan say about the standup");
+check("a question is answered from memory with a citation chip", await waitFor(() => /standup moved to ten/.test(doc.getElementById("log").textContent) && doc.querySelector("#log .chip")));
+await say("do it");
+check("typing 'do it' never approves anything", await waitFor(() => /Approvals tab|Nothing is waiting/.test(doc.getElementById("log").textContent)));
+
+await say("put a call with Priya on my calendar tomorrow at 4pm");
+tab("appr");
+const card = await waitFor(() => [...doc.querySelectorAll("#cards .card")].find((c) => /calendar/i.test(c.textContent)));
+check("an approval card appears for a calendar write", card);
+if (card) click([...card.querySelectorAll("button")].find((b) => b.textContent === "Approve"));
+tab("chat");
+check("after the click the event is reported as added", await waitFor(() => /Added to Google Calendar: call with Priya/.test(doc.getElementById("log").textContent)));
+
+tab("msg");
+check("Messages lists what was read, with an open-in-app link", await waitFor(() => /signed contract/.test(doc.getElementById("msgs").textContent) && [...doc.querySelectorAll("#msgs a")].some((a) => a.href.startsWith("https://mail.google.com"))));
+const del = [...doc.querySelectorAll("#msgs .row")].find((r) => /standup/.test(r.textContent));
+if (del) click([...del.querySelectorAll("button")].find((b) => b.textContent === "Delete"));
+const confirm = await waitFor(() => [...doc.querySelectorAll("#msgs button")].find((b) => b.textContent === "Delete permanently"));
+check("delete shows a preview before anything is removed", confirm && /permanently/i.test(doc.getElementById("msgs").textContent));
+if (confirm) click(confirm);
+check("after confirming, the message is gone and the receipt says verified", await waitFor(() => !/standup moved/.test(doc.getElementById("msgs").textContent) || /Verification scan found 0/.test(doc.getElementById("msgs").textContent)));
+
+tab("inb");
+check("the Inbox shows what the agent noticed on its own", await waitFor(() => /Needs your attention: Dev/.test(doc.getElementById("ibox").textContent)));
+check("the Inbox badge counts unread items", await waitFor(() => /\(\d+\)/.test(doc.getElementById("ibadge").textContent)));
+tab("src");
+check("Sources shows skills and proactive settings", await waitFor(() => /reminder.add/.test(doc.getElementById("src").textContent) && doc.getElementById("briefat")));
+const sw = doc.getElementById("sw"); click(sw);
+check("the on/off switch pauses reading", await waitFor(() => /paused/.test(doc.getElementById("state").textContent)));
+
+const failed = results.filter((r) => !r[1]);
+console.log(`\n${results.length - failed.length}/${results.length} UI checks passed`);
+server.stdin.end();
+window.close();
+process.exit(failed.length ? 1 : 0);

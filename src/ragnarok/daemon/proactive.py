@@ -57,6 +57,7 @@ class Inbox:
     def add(self, kind: str, title: str, body: str, *, key: str, source: str = "", link: str | None = None, os_notify: bool = False) -> dict[str, Any] | None:
         if self.seen(key):
             return None
+        link = link if isinstance(link, str) and link.startswith("https://") else None  # only web links: never a javascript: or file: URL from outside content
         item = {"id": new_id()[:10], "ts": get_clock().now_ms(), "kind": kind, "title": title[:120], "body": body[:600], "source": source, "link": link, "dismissed": False, "key": key}
         self._s.set("inbox", json.dumps(([item] + self._load("inbox"))[:KEEP]))
         self._s.set("inbox_keys", json.dumps((self._load("inbox_keys") + [key])[-600:]))
