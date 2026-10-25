@@ -164,6 +164,7 @@ class OllamaGateway:
             "model": entry.name,
             "messages": messages,
             "stream": False,
+            "think": False,  # qwen3-class models reason silently by default and spend the whole token cap before answering (spike 2)
             "keep_alive": self.keep_alive,
             "options": {"num_ctx": ctx, "num_predict": max_tokens, "temperature": temperature, "seed": seed or 0},
         }
