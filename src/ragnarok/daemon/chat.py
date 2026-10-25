@@ -38,7 +38,10 @@ def summarize(turn: TurnResult) -> dict[str, Any]:
             if "reminder_id" in res:
                 lines.append(f"Reminder set: {res['text']} ({res['when']}).")
             elif "draft" in res:
-                lines.append(f"Draft saved to {res['draft']['to']}: {res['draft']['body'][:200]}")
+                where = "in your Gmail drafts" if res.get("in_gmail") else "locally (connect Google write access to put it in Gmail)"
+                lines.append(f"Draft to {res['draft']['to']} saved {where}: {res['draft']['body'][:200]}")
+            elif res.get("added"):
+                lines.append(f"Added to Google Calendar: {res['title']} ({res['when']}).")
             elif res.get("sent"):
                 lines.append("Email sent.")
             elif res.get("posted"):

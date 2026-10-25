@@ -1,0 +1,78 @@
+{
+  "name": "calendar.add",
+  "version": "0.1.0",
+  "description": "Use when the user asks to put a meeting, call or event on their calendar.",
+  "entrypoint": {
+    "type": "native",
+    "action": "calendar.add"
+  },
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "title": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 200,
+        "description": "the event title without the time words"
+      },
+      "when": {
+        "type": "string",
+        "maxLength": 80,
+        "description": "the time exactly as the user said it, e.g. 'tomorrow at 3pm'"
+      },
+      "minutes": {
+        "type": "integer",
+        "minimum": 5,
+        "maximum": 480
+      }
+    },
+    "required": [
+      "title",
+      "when"
+    ],
+    "additionalProperties": false
+  },
+  "permissions": [
+    {
+      "permission": "calendar.write"
+    }
+  ],
+  "side_effects": "reversible",
+  "dry_run": true,
+  "param_roles": {
+    "free": [
+      "title",
+      "when"
+    ]
+  },
+  "examples": [
+    {
+      "params": {
+        "title": "Call with Priya",
+        "when": "tomorrow at 3pm"
+      },
+      "note": "put a call with Priya on my calendar tomorrow at 3pm"
+    },
+    {
+      "params": {
+        "title": "Call with Priya",
+        "when": "tomorrow at 3pm"
+      },
+      "note": "schedule a meeting with Dev on Friday at 11am"
+    },
+    {
+      "params": {
+        "title": "Call with Priya",
+        "when": "tomorrow at 3pm"
+      },
+      "note": "add the dentist to my calendar on Monday morning"
+    },
+    {
+      "params": {
+        "title": "Call with Priya",
+        "when": "tomorrow at 3pm"
+      },
+      "note": "block an hour tomorrow afternoon for the Orion review"
+    }
+  ]
+}

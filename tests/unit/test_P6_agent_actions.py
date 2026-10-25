@@ -22,15 +22,29 @@ async def fake_post(chat_id, text):
     return "m1"
 
 
+async def fake_cal(p, due):
+    SENT.append(("calendar", p["title"], due))
+    return "https://calendar.example/e1"
+
+
+async def fake_gmail_draft(draft):
+    SENT.append(("gmail_draft", draft["to"]))
+    return "d1"
+
+
 def responder(messages, schema):
     props = (schema or {}).get("properties", {})
     user = messages[-1]["content"]
     if "skill" in props and "needs_plan" in props:  # L2 arbiter: pick by keyword
         req = user.split('Request: """')[1].split('"""')[0].lower() if 'Request: """' in user else user.lower()
-        pick = "reminder.add" if "remind" in req else "chat.reply" if "tell " in req else "memory.search"
+        pick = "reminder.add" if "remind" in req else "chat.reply" if "tell " in req else "calendar.add" if "calendar" in req else "mail.draft" if "draft" in req else "memory.search"
         return {"skill": {"choice": pick, "confidence": 0.85}, "needs_plan": {"answer": False, "confidence": 0.85}}
     if "text" in props and "platform" in props:  # chat.reply params
         return {"platform": "telegram", "target": "Ravi", "text": "I will be late"}
+    if "title" in props and "when" in props:
+        return {"title": "Call with Priya", "when": "tomorrow at 3pm"}
+    if "to" in props and "body" in props and "subject" in props:
+        return {"to": "priya@acme.com", "subject": "Invoice", "body": "Hi Priya, the invoice is attached."}
     if "query" in props:
         return {"query": "standup"}
     if "answer" in props and "cites" in props:
@@ -43,7 +57,7 @@ def world(tmp_path, monkeypatch):
     set_clock(RealClock())
     monkeypatch.setenv("RAGNAROK_HOME", str(tmp_path / "home"))
     SENT.clear()
-    w = build_world(vault=MemoryStore(), gateway=FakeGateway(responder), sandbox=False, use_laya=False, embed_rungs=False, senders={"telegram": fake_post}, max_cpu=101)
+    w = build_world(vault=MemoryStore(), gateway=FakeGateway(responder), sandbox=False, use_laya=False, embed_rungs=False, senders={"telegram": fake_post, "calendar": fake_cal, "gmail_draft": fake_gmail_draft}, max_cpu=101)
     yield w
     w.mem.close()
 
@@ -113,3 +127,17 @@ async def test_due_reminders_fire_once_even_when_ingestion_is_off(world):
     assert [r["what"] for r in world.services.runtime.fire_reminders()] == ["stand up"]
     assert world.services.runtime.fire_reminders() == []
     assert "stand up" in json.dumps(list(world.services.runtime.reminders))
+
+
+async def test_a_calendar_event_waits_for_a_click_then_lands_in_the_calendar(world):
+    await start(world)
+    task = asyncio.create_task(world.agent.handle("put a call with Priya on my calendar tomorrow at 3pm"))
+    cards = await asyncio.wait_for(approve_all(world, True), 5)
+    out = summarize(await asyncio.wait_for(task, 5))
+    assert cards[0]["skill"] == "calendar.add" and SENT[-1][0] == "calendar" and SENT[-1][1] == "Call with Priya" and "Added to Google Calendar" in out["text"]
+
+
+async def test_a_mail_draft_goes_to_gmail_drafts_not_a_send(world):
+    await start(world)
+    out = summarize(await world.agent.handle("draft an email to priya@acme.com about the invoice"))
+    assert SENT[-1] == ("gmail_draft", "priya@acme.com") and "Gmail drafts" in out["text"]

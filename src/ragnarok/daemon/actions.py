@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import Any
 
 from ragnarok.connectors.discord import Discord
-from ragnarok.connectors.google import Gmail, GoogleAuth, valid_address
+from ragnarok.connectors.google import Calendar, Gmail, GoogleAuth, valid_address
 from ragnarok.connectors.slack import Slack
 from ragnarok.connectors.telegram import Telegram
 from ragnarok.core.clock import get_clock
@@ -72,8 +72,36 @@ class Actions:
         draft = {"to": p["to"], "subject": p.get("subject", ""), "body": p["body"]}
         if dry_run:
             return {"would_draft": draft}
+        auth = self._write_auth()
+        if self._senders and "gmail_draft" in self._senders:
+            return {"draft": draft, "in_gmail": True, "id": await self._senders["gmail_draft"](draft)}
+        if auth is not None:  # a real draft in Gmail, where the user will see it with their own mail
+            did = await Gmail(auth).create_draft(auth, p["to"], draft["subject"], p["body"])
+            return {"draft": draft, "in_gmail": True, "id": did}
         self._m.write_event(EventIn(compartment=self._comp, kind="draft", actor="agent", content=json.dumps(draft), trust="agent"))
         return {"draft": draft}
+
+    def _write_auth(self) -> GoogleAuth | None:
+        raw = self._vault.get(token_name("google", "write"))
+        if raw is None:
+            return None
+        g = json.loads(raw)
+        return GoogleAuth(g["client_id"], g["client_secret"], g["refresh_token"])
+
+    async def calendar_add(self, p: dict[str, Any], ctx: ExecContext, *, dry_run: bool) -> dict[str, Any]:
+        due = parse_due(p["when"])
+        if due is None:
+            raise ActionError("I could not tell what time that is; say it like 'tomorrow at 3pm'", code="E_NO_TIME")
+        shown = datetime.fromtimestamp(due / 1000).strftime("%a %d %b, %H:%M")
+        if dry_run:
+            return {"would_add": {"title": p["title"], "when": shown, "minutes": p.get("minutes", 30)}}
+        if self._senders and "calendar" in self._senders:
+            return {"added": True, "title": p["title"], "when": shown, "link": await self._senders["calendar"](p, due)}
+        auth = self._write_auth()
+        if auth is None:
+            raise ActionError("adding events needs the write sign-in: ragnarok connect google --write", code="E_NOT_CONNECTED")
+        link = await Calendar(auth).insert_event(auth, p["title"], datetime.fromtimestamp(due / 1000), int(p.get("minutes", 30)))
+        return {"added": True, "title": p["title"], "when": shown, "link": link}
 
     # ------------------------------------------------------------------ external writes (always behind an approval card)
     async def mail_send(self, p: dict[str, Any], ctx: ExecContext, *, dry_run: bool) -> dict[str, Any]:
@@ -115,4 +143,4 @@ class Actions:
 
     def natives(self) -> dict[str, NativeHandler]:
         return {"memory.search": self.memory_search, "reminder.add": self.reminder_add, "reminder.list": self.reminder_list, "mail.draft": self.mail_draft,
-                "mail.send": self.mail_send, "chat.reply": self.chat_reply}
+                "mail.send": self.mail_send, "chat.reply": self.chat_reply, "calendar.add": self.calendar_add}

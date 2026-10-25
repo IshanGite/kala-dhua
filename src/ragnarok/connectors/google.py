@@ -169,12 +169,20 @@ class Gmail:
             return None
         flags = {"auth_ok": p["auth_ok"], "from": p["from"], "attachments": p["attachments"]}
         return RawItem(source=self.name, native_id=ref.native_id, text=p["text"], trust="received", title=p["subject"] or None, kind="message", visibility="private",
-                       thread_id=p["thread"], occurred_at=p["date"], html_hidden=p["hidden"], strip_quotes=True, author=p["from_name"] or p["from"], flags=flags)
+                       thread_id=p["thread"], occurred_at=p["date"], html_hidden=p["hidden"], strip_quotes=True, author=p["from_name"] or p["from"], flags=flags,
+                       deep_link=f"https://mail.google.com/mail/u/0/#all/{ref.native_id}")
 
     async def send(self, write_auth: GoogleAuth, to: str, subject: str, body: str) -> str:
         r = await request(write_auth.http, "POST", f"{self.API}/messages/send", headers={"Authorization": f"Bearer {await write_auth.token()}"}, json={"raw": build_raw(to, subject, body)})
         if r.status_code >= 300:
             raise ConnectorError(f"gmail send {r.status_code}", code="E_GOOGLE")
+        return str(r.json().get("id", ""))
+
+    async def create_draft(self, write_auth: GoogleAuth, to: str, subject: str, body: str) -> str:
+        """A real draft in the user's Gmail (needs the gmail.compose write sign-in). Nothing is sent."""
+        r = await request(write_auth.http, "POST", f"{self.API}/drafts", headers={"Authorization": f"Bearer {await write_auth.token()}"}, json={"message": {"raw": build_raw(to, subject, body)}})
+        if r.status_code >= 300:
+            raise ConnectorError(f"gmail draft {r.status_code}", code="E_GOOGLE")
         return str(r.json().get("id", ""))
 
     def actions(self) -> list[ActionSpec]:
@@ -247,6 +255,17 @@ class Calendar:
             pass
         return RawItem(source=self.name, native_id=ref.native_id, text="\n".join(lines), trust="user_file" if own else "received", title=e.get("summary"), kind="event",
                        occurred_at=occurred, deep_link=e.get("htmlLink"))
+
+    async def insert_event(self, write_auth: GoogleAuth, summary: str, start: datetime, minutes: int = 30) -> str:
+        """A real event in the user's primary Google Calendar (needs the calendar.events write sign-in)."""
+        tz = start.astimezone().tzname() or "UTC"
+        local = start.astimezone()
+        end = local + timedelta(minutes=minutes)
+        body = {"summary": summary[:200], "start": {"dateTime": local.isoformat()}, "end": {"dateTime": end.isoformat()}, "reminders": {"useDefault": True}}
+        r = await request(write_auth.http, "POST", self.API, headers={"Authorization": f"Bearer {await write_auth.token()}"}, json=body)
+        if r.status_code >= 300:
+            raise ConnectorError(f"calendar insert {r.status_code} {tz}", code="E_GOOGLE")
+        return str(r.json().get("htmlLink", ""))
 
     def actions(self) -> list[ActionSpec]:
         return [ActionSpec("calendar.write", "Create or change a calendar event", {"summary": "string", "start": "string", "end": "string"}, tier=2)]

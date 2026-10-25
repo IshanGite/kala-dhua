@@ -108,7 +108,7 @@ class MemoryReader:
 
     def recent_items(self, *, limit: int = 40, source: str | None = None, query: str | None = None) -> list[dict[str, Any]]:
         """What has been read, newest first, with a short preview. For the user's own window only; never logged."""
-        sql = ("SELECT i.id, i.source, i.title, i.kind, i.trust, i.visibility, coalesce(i.occurred_at, i.ingested_at) AS ts, "
+        sql = ("SELECT i.id, i.source, i.title, i.kind, i.trust, i.visibility, coalesce(i.occurred_at, i.ingested_at) AS ts, i.deep_link, "
                "(SELECT text FROM chunks c WHERE c.item_id = i.id ORDER BY ordinal LIMIT 1) AS preview FROM items i")
         where, args = [], []
         if source:

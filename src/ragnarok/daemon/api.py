@@ -132,7 +132,7 @@ def create_app(guard: TokenGuard | None = None, port: int = DEFAULT_PORT, servic
         if svc.reader is None:
             return {"items": []}
         rows = svc.reader.recent_items(limit=limit, source=source, query=q)
-        return {"items": [{**r, "preview": (r["preview"] or "")[:240]} for r in rows]}
+        return {"items": [{**r, "preview": (r["preview"] or "")[:240], "deep_link": r["deep_link"] if str(r["deep_link"] or "").startswith("https://") else None} for r in rows]}
 
     @app.get("/approvals")
     async def approvals() -> dict[str, Any]:

@@ -37,7 +37,7 @@ FREE = "{free}"  # a free-text parameter in a stored route: refilled from the ne
 CRITERIA: dict[str, list[dict]] = {
     "reminder.add": [{"kind": "field_present", "path": "reminder_id"}], "reminder.list": [{"kind": "field_present", "path": "reminders"}],
     "mail.draft": [{"kind": "field_present", "path": "draft"}], "mail.send": [{"kind": "equals", "path": "sent", "value": True}],
-    "chat.reply": [{"kind": "equals", "path": "posted", "value": True}], "memory.search": [{"kind": "field_present", "path": "hits"}],
+    "chat.reply": [{"kind": "equals", "path": "posted", "value": True}], "calendar.add": [{"kind": "equals", "path": "added", "value": True}], "memory.search": [{"kind": "field_present", "path": "hits"}],
 }
 
 

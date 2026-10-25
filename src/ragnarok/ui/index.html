@@ -118,7 +118,7 @@ h2{font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:var(--mute)
   function pullCards(){api("/approvals").then(function(d){renderCards(d.items||[])}).catch(function(){})}
   function loadMsgs(){var q=document.getElementById("mq").value.trim();api("/messages?limit=60"+(q?"&q="+encodeURIComponent(q):"")).then(function(d){var b=document.getElementById("msgs");b.textContent="";var it=d.items||[];
       if(!it.length)b.appendChild(el("p","small",q?"Nothing matches.":"Nothing has been read yet. Connected sources are polled every minute."));
-      it.forEach(function(m){var r=el("div","row"),g=el("div","grow");g.appendChild(el("div","small",m.source+" - "+(m.title||m.kind)+" - "+ago(m.ts)+(m.trust==="received"?" - from outside":"")));g.appendChild(el("div","",m.preview||""));r.appendChild(g);b.appendChild(r)})}).catch(function(){})}
+      it.forEach(function(m){var r=el("div","row"),g=el("div","grow");g.appendChild(el("div","small",m.source+" - "+(m.title||m.kind)+" - "+ago(m.ts)+(m.trust==="received"?" - from outside":"")));g.appendChild(el("div","",m.preview||""));if(m.deep_link){var l=el("a","small","Open in "+m.source);l.href=m.deep_link;l.target="_blank";l.rel="noopener noreferrer";g.appendChild(l)}r.appendChild(g);b.appendChild(r)})}).catch(function(){})}
   var mt;document.getElementById("mq").oninput=function(){clearTimeout(mt);mt=setTimeout(loadMsgs,300)};
   tabs.forEach(function(b){b.addEventListener("click",function(){if(b.dataset.t==="msg")loadMsgs()})});setInterval(function(){if(document.getElementById("msg").classList.contains("show")&&!document.getElementById("mq").value)loadMsgs()},5000);
   refresh();pullCards();setInterval(refresh,4000);setInterval(pullCards,1500);
