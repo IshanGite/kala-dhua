@@ -33,6 +33,7 @@ class Runtime:
     def __init__(self, state: RuntimeState, runners: dict[str, ConnectorRunner], *, interval_s: float = 60.0, governor: Governor | None = None, commitments: Commitments | None = None) -> None:
         self.state, self.runners, self.interval = state, runners, interval_s
         self.commitments = commitments
+        self.maintenance: Any = None  # FR1.3: consolidation and forgetting, once a day
         self.proactive: Any = None  # set by the wiring: the FR4 engine (triggers, heads-ups, briefing)
         self.reminders: deque[dict[str, Any]] = deque(maxlen=50)
         self.governor = governor or Governor()
@@ -73,6 +74,13 @@ class Runtime:
                 await self.proactive.run()
             except Exception as exc:  # noqa: BLE001 - proactivity must never stop ingestion
                 log("proactive_failed", err=type(exc).__name__)
+        if self.maintenance is not None and self.maintenance.due():
+            try:
+                rep = self.maintenance.run()  # one small transaction a day: same thread as the database connection
+                if rep:
+                    self._note("maintenance", "memory", "ok", **{k: v for k, v in rep.items() if isinstance(v, int)})
+            except Exception as exc:  # noqa: BLE001 - housekeeping must never stop the agent
+                log("maintenance_failed", err=type(exc).__name__)
         if not self.enabled:
             return out
         for name, runner in self.runners.items():

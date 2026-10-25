@@ -71,7 +71,8 @@ class TurnResult:
 
 class Agent:
     def __init__(self, *, mem: MemoryService, ledger: Ledger, reader: MemoryReader, index: VectorIndex, gateway: Gateway, cascade: Cascade, planner: Planner,
-                 executor: Executor, registry: SkillRegistry, library: RouteLibrary | None, routes: RoutesStore | None, ctx: ExecContext, answerer: Answerer | None = None, fast_refuse: bool = False, calendar_mirror: Any = None) -> None:
+                 executor: Executor, registry: SkillRegistry, library: RouteLibrary | None, routes: RoutesStore | None, ctx: ExecContext, answerer: Answerer | None = None, fast_refuse: bool = False, calendar_mirror: Any = None, memcmd: Any = None) -> None:
+        self.memcmd = memcmd
         self._mirror = calendar_mirror  # callable -> bool: is Google write access connected, so reminders also go on the calendar
         self.answerer = answerer
         self.fast_refuse = fast_refuse  # the daemon sets it: one unresolved action is refused at once instead of spending the slow planner on it
@@ -284,8 +285,13 @@ class Agent:
         tm: dict[str, int] = {}
         mark = lambda name, since: tm.__setitem__(name, round((time.perf_counter() - since) * 1000))  # noqa: E731
         now = get_clock().now_ms()
-        self.mem.write_event(EventIn(compartment=self.ctx.compartment, kind="user_message", actor="user", content=request, trust=trust))  # type: ignore[arg-type]
+        eid = self.mem.write_event(EventIn(compartment=self.ctx.compartment, kind="user_message", actor="user", content=request, trust=trust))  # type: ignore[arg-type]
         mark("log", t0)
+        if self.memcmd is not None and trust == "user_direct":  # remembering and recalling what the user told us, and our shared history: all by code, all local
+            said = self.memcmd.remember(request, eid) or self.memcmd.recall(request) or self.memcmd.history(request)
+            if said:
+                dec = RouteDecision(tier="L1", intent_family="memory_cmd", skills=[], plan_needed=False, risk_floor=0, memory_types=["semantic", "episodic"], confidence=1.0, latency_ms=0.0, backend="rule")
+                return TurnResult("L1", dec, None, None, (time.perf_counter() - t0) * 1000, answer=Answered(said, grounded=True), timings=tm)
         if self.answerer is not None and is_catchup(request):  # a briefing is read-only and needs no routing
             ans = await self.answerer.catch_up(request)
             dec = RouteDecision(tier="L1", intent_family="catchup", skills=[], plan_needed=False, risk_floor=0, memory_types=[], confidence=1.0, latency_ms=0.0, backend="catchup")

@@ -54,7 +54,7 @@ class MemoryReader:
         rows = self._r.execute(
             "SELECT e.id AS id, e.content AS text, e.ts AS ts, e.trust AS trust, e.kind AS kind, bm25(events_fts) AS s"
             " FROM events_fts JOIN events e ON e.rowid = events_fts.rowid"
-            " WHERE events_fts MATCH ? AND e.compartment_id=? AND e.kind NOT IN ('user_message','clarification','task_result','draft') ORDER BY s LIMIT ?",
+            " WHERE events_fts MATCH ? AND e.compartment_id=? AND e.kind NOT IN ('user_message','assistant_message','clarification','task_result','draft') ORDER BY s LIMIT ?",
             (q, comp_id, k),
         ).fetchall()
         return [dict(r) for r in rows]
@@ -205,3 +205,9 @@ class MemoryReader:
         if table not in allowed:
             raise ValueError("unknown table")
         return int(self._r.execute(f"SELECT count(*) FROM {table}").fetchone()[0])
+
+
+    def conversation_tail(self, comp_id: str, limit: int = 12) -> list[tuple[str, str]]:
+        """The last turns of the chat, oldest first, to restore working memory after a restart (NFR3.2)."""
+        rows = self._r.execute("SELECT kind, content FROM events WHERE compartment_id=? AND kind IN ('user_message','assistant_message') ORDER BY seq DESC LIMIT ?", (comp_id, limit)).fetchall()
+        return [("user" if r[0] == "user_message" else "assistant", r[1]) for r in reversed(rows)]

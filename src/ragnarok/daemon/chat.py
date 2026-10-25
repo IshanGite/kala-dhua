@@ -85,11 +85,27 @@ class ChatService:
         self.history: list[tuple[str, str]] = []  # the running conversation, in memory only
         self._tasks: set[asyncio.Task[None]] = set()
 
+    def _log_reply(self, text: str) -> None:
+        """Replies are logged as events so the conversation survives a restart (NFR3.2); they are never retrieved as knowledge."""
+        try:
+            from ragnarok.memory.models import EventIn
+
+            self._agent.mem.write_event(EventIn(compartment=self._agent.ctx.compartment, kind="assistant_message", actor="agent", content=text[:1500] or "(empty)", trust="agent"))
+        except Exception as exc:  # noqa: BLE001 - logging a reply must never break the chat
+            log("assistant_log_failed", err=type(exc).__name__)
+
+    def restore(self) -> int:
+        """Working memory after a restart: the last turns of the conversation, read back from the encrypted log."""
+        cid = self._agent.reader.compartment_id(self._agent.ctx.compartment)
+        self.history = self._agent.reader.conversation_tail(cid, 12) if cid else []
+        return len(self.history)
+
     async def _run(self, job: Job) -> None:
         try:
             job.reply = summarize(await self._agent.handle(job.text, history=list(self.history)))
             self.history += [("user", job.text), ("assistant", job.reply.get("text", "")[:600])]
             self.history = self.history[-12:]
+            self._log_reply(job.reply.get("text", ""))
             job.state = "done"
         except Exception as exc:  # noqa: BLE001 - a failed turn becomes a message, never a crash
             log("chat_turn_failed", err=type(exc).__name__)
