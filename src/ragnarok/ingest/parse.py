@@ -30,6 +30,8 @@ _ENV_KEEP = ("PATH", "SYSTEMROOT", "TEMP", "TMP", "HOME", "USERPROFILE", "LANG",
 def clean_env() -> dict[str, str]:
     env = {k: v for k, v in os.environ.items() if k in _ENV_KEEP}
     env["PYTHONUTF8"] = "1"
+    # Never depend on an editable-install .pth file (it is hidden, and so skipped, on macOS: docs/adr/002).
+    env["PYTHONPATH"] = str(Path(__file__).resolve().parents[2])
     return env
 
 

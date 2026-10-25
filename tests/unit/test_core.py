@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -46,8 +47,9 @@ def test_log_refuses_content():
 
 def test_failpoint_exits_abruptly_with_137():
     code = "from ragnarok.core.failpoints import failpoint; failpoint('p1'); print('survived')"
-    env = {**os.environ, "RAGNAROK_FAILPOINT": "p1"}
+    src = str(Path(__file__).resolve().parents[2] / "src")
+    env = {**os.environ, "RAGNAROK_FAILPOINT": "p1", "PYTHONPATH": src}
     r = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True)
     assert r.returncode == 137 and "survived" not in r.stdout
-    r2 = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
+    r2 = subprocess.run([sys.executable, "-c", code], env={**os.environ, "PYTHONPATH": src}, capture_output=True, text=True)
     assert r2.returncode == 0 and "survived" in r2.stdout
