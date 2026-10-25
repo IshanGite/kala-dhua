@@ -101,7 +101,7 @@ class ScrollRunner:
                     return ScrollResult(f"The local model is not available ({exc2.code}).", name, [name], h, f, notes, ok=False)
             else:
                 return ScrollResult(f"The local model is not available ({exc.code}).", name, [name], h, f, notes, ok=False)
-        text_out = drop_false_claims((out.text or "").strip())[:3500]
+        text_out = drop_false_claims(re.sub(r"^\s*(?:<<<|>>>)\s*$|^\s*<<<\s*|\s*>>>\s*$", "", (out.text or "").strip(), flags=re.M).strip())[:3500]  # the model sometimes echoes the delimiters it was given
         if not text_out:
             return ScrollResult("The scroll produced no answer.", name, [name], h, f, notes, ok=False)
         steps = [name]

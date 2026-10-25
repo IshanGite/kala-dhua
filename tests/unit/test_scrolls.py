@@ -250,3 +250,10 @@ async def test_each_scroll_gets_its_own_memory_namespace(runner, tmp_path, keys)
     rd = MemoryReader(mem.db_path, keys)
     assert rd.compartment_id("scroll-meeting-notes") and rd.compartment_id("work") is None  # kept apart from the shared memory
     mem.close()
+
+
+async def test_echoed_delimiters_are_removed_from_a_scroll_answer(runner):
+    r, gw = runner
+    gw.responder = lambda m, s: "<<<\nDecisions: ship Friday.\n>>>"
+    res = await r.run("meeting-notes", "x")
+    assert res.text == "Decisions: ship Friday." and "<<<" not in res.text
