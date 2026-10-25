@@ -65,3 +65,10 @@ def test_write_sign_in_asks_only_for_write_scopes_and_uses_a_separate_vault_name
     og.sign_in("cid", "sec", v, services=["gmail", "calendar"], write=True)
     assert "gmail.send" in seen["url"] and "calendar.events" in seen["url"] and "readonly" not in seen["url"]
     assert v.get(token_name("google", "write")) and v.get(token_name("google", "read")) is None
+
+
+def test_registry_builds_outlook_from_vault():
+    v = MemoryStore()
+    v.set(token_name("outlook", "read"), json.dumps({"client_id": "c", "refresh_token": "r"}))
+    assert build("outlook", v).name == "outlook" and build("outlook_cal", v).name == "outlook_cal"
+    assert set(connected(v)) == {"outlook", "outlook_cal"}

@@ -84,6 +84,34 @@ def connect_google(
     typer.echo(f"google: {'write access' if write else 'read access'} connected (token is in the keychain; the JSON file can be deleted)")
 
 
+@connect_app.command("outlook")
+def connect_outlook(client_id: str = typer.Option(..., "--client-id", help="Application (client) ID from the Entra app registration")) -> None:
+    """Sign in to Outlook mail and calendar (read-only) with a device code."""
+    import asyncio
+    import json
+    import time
+
+    from ragnarok.connectors.outlook import device_code_poll, device_code_start
+    from ragnarok.platform.secrets import default_store, token_name
+
+    async def run() -> str:
+        d = await device_code_start(client_id)
+        if "device_code" not in d:
+            raise typer.Exit(typer.echo(f"outlook: {d.get('error_description', 'could not start sign-in')[:200]}", err=True) or 1)
+        typer.echo(d["message"])
+        deadline = time.monotonic() + int(d.get("expires_in", 900))
+        while time.monotonic() < deadline:
+            await asyncio.sleep(int(d.get("interval", 5)))
+            rt = await device_code_poll(client_id, d["device_code"])
+            if rt:
+                return rt
+        raise typer.Exit(typer.echo("outlook: sign-in timed out", err=True) or 1)
+
+    rt = asyncio.run(run())
+    default_store().set(token_name("outlook", "read"), json.dumps({"client_id": client_id, "refresh_token": rt}))
+    typer.echo("outlook: connected (refresh token is in the keychain)")
+
+
 @app.command()
 def check() -> None:
     """Lint and run the fast tests (the pre-push gate)."""
