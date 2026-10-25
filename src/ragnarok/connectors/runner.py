@@ -6,6 +6,7 @@ any point re-delivers at worst; nothing is lost and nothing is duplicated.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 
 from ragnarok.connectors.base import Connector, Cursor, ItemRef
@@ -62,7 +63,7 @@ class ConnectorRunner:
                 item_ref = f"{sender}{SEP}{ref.native_id}" if sender else ref.native_id
                 if "version" in ref.hint:
                     item_ref += f"{VER}{ref.hint['version']}"
-                if self._q.enqueue(self._c.name, item_ref, priority=ref.priority, held=(state == "held")):
+                if self._q.enqueue(self._c.name, item_ref, priority=ref.priority, held=(state == "held"), payload=json.dumps(ref.hint) if ref.hint else None):
                     rep.held += state == "held"
                     rep.queued += state != "held"
             self._store.save_cursor(res.cursor.value)
@@ -79,7 +80,7 @@ class ConnectorRunner:
             native = row.item_ref.split(VER, 1)[0]
             native = native.split(SEP, 1)[1] if (self._pair and SEP in native) else native
             try:
-                raw = await self._c.fetch(ItemRef(native))
+                raw = await self._c.fetch(ItemRef(native, json.loads(row.payload) if row.payload else {}))
                 if raw is None:
                     self._q.complete(row.id)
                     continue

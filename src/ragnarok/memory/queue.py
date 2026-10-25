@@ -26,6 +26,7 @@ class QueueRow:
     priority: int
     attempts: int
     payload_blob_id: str | None
+    payload: str | None = None
 
 
 class IngestQueue:
@@ -35,15 +36,15 @@ class IngestQueue:
     def _now(self) -> int:
         return get_clock().now_ms()
 
-    def enqueue(self, source: str, item_ref: str, *, priority: int = BACKFILL, held: bool = False, payload_blob_id: str | None = None) -> bool:
+    def enqueue(self, source: str, item_ref: str, *, priority: int = BACKFILL, held: bool = False, payload_blob_id: str | None = None, payload: str | None = None) -> bool:
         """Returns True if newly queued, False if (source, item_ref) was already known (idempotent delivery)."""
 
         def op(c) -> bool:
             now = self._now()
             cur = c.execute(
-                "INSERT OR IGNORE INTO ingest_queue(id,source,item_ref,stage,state,priority,attempts,payload_blob_id,created_at,updated_at)"
-                " VALUES (?,?,?,'detect',?,?,0,?,?,?)",
-                (new_id(), source, item_ref, "held" if held else "queued", priority, payload_blob_id, now, now),
+                "INSERT OR IGNORE INTO ingest_queue(id,source,item_ref,stage,state,priority,attempts,payload_blob_id,payload,created_at,updated_at)"
+                " VALUES (?,?,?,'detect',?,?,0,?,?,?,?)",
+                (new_id(), source, item_ref, "held" if held else "queued", priority, payload_blob_id, payload, now, now),
             )
             return cur.rowcount == 1
 
@@ -52,14 +53,14 @@ class IngestQueue:
     def claim(self, limit: int = 1) -> list[QueueRow]:
         def op(c) -> list[QueueRow]:
             rows = c.execute(
-                "SELECT id,source,item_ref,stage,priority,attempts,payload_blob_id FROM ingest_queue WHERE state='queued'"
+                "SELECT id,source,item_ref,stage,priority,attempts,payload_blob_id,payload FROM ingest_queue WHERE state='queued'"
                 " ORDER BY priority, created_at LIMIT ?",
                 (limit,),
             ).fetchall()
             now = self._now()
             for r in rows:
                 c.execute("UPDATE ingest_queue SET state='running', attempts=attempts+1, updated_at=? WHERE id=?", (now, r[0]))
-            return [QueueRow(r[0], r[1], r[2], r[3], r[4], r[5] + 1, r[6]) for r in rows]
+            return [QueueRow(r[0], r[1], r[2], r[3], r[4], r[5] + 1, r[6], r[7]) for r in rows]
 
         return self._mem.with_tx(op)
 
