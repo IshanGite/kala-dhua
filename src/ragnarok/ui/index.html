@@ -140,7 +140,7 @@ textarea#q{flex:1;resize:none;max-height:140px;min-height:38px;line-height:1.4}
       <div class="sugs" id="sugs"></div>
     </div>
     <button id="jump" class="btn jump" type="button">Latest</button>
-    <div class="qa" id="qa"></div>
+    <div class="qa" id="qa" style="display:none"></div>
     <form id="f"><button type="button" class="ib" id="attb" title="Ask about a picture (or paste / drop one)" aria-label="Attach picture"><svg viewBox="0 0 24 24"><path d="M21 12l-8.5 8.5a5 5 0 0 1-7-7L14 5a3.5 3.5 0 0 1 5 5l-8.5 8.5a2 2 0 0 1-3-3L15 8"/></svg></button><button type="button" class="ib" id="shotb" title="Explain what is on my screen (3 second countdown)" aria-label="Explain my screen"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg></button><input type="file" id="file" accept="image/png,image/jpeg,image/webp" style="display:none"><textarea id="q" rows="1" autocomplete="off" placeholder="Message Ragnarok   (Enter to send, Shift+Enter for a new line)" aria-label="Message" maxlength="4000"></textarea><button class="ib go" type="submit" id="sendb" title="Send" aria-label="Send"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></form>
   </section>
   <section id="dig">
@@ -195,7 +195,7 @@ textarea#q{flex:1;resize:none;max-height:140px;min-height:38px;line-height:1.4}
     lines.forEach(function(ln){var mm=ln.match(/^\s*(?:[-*•]|\d+[.)])\s+(.*)$/);
       if(mm){if(!ul){ul=el("ul");c.appendChild(ul)}var li=el("li");inline(li,mm[1]);ul.appendChild(li)}
       else{ul=null;if(!ln.trim())return;var p=el("p");inline(p,ln);c.appendChild(p)}})}
-  function intro(){var h=$("hello");if(h){h.remove();$("sugs").remove()}}
+  function intro(){var h=$("hello");if(h){h.remove();$("sugs").remove()}$("qa").style.display="flex"}
   function addUser(text,thumb){intro();var m=el("div","m u"),bub=el("div","bub");if(thumb){var im=el("img","shot");im.src=thumb;bub.appendChild(im)}bub.appendChild(document.createTextNode(text));m.appendChild(bub);log.appendChild(m);down(true);return m}
   function addBot(text,cites){intro();var m=el("div","m b");m.appendChild(el("div","av","R"));var bub=el("div","bub"),body=el("div","body");rich(body,text);bub.appendChild(body);
     if(cites&&cites.length){var c=el("div","cites");cites.forEach(function(x){c.appendChild(el("span","chip","["+x.n+"] "+(x.citation||x.kind||"memory")))});bub.appendChild(c)}
@@ -215,9 +215,10 @@ textarea#q{flex:1;resize:none;max-height:140px;min-height:38px;line-height:1.4}
     var cp=el("button","","Copy");cp.onclick=function(){try{navigator.clipboard.writeText(t);cp.textContent="Copied";setTimeout(function(){cp.textContent="Copy"},1200)}catch(e){}};meta.appendChild(cp);
     if(d.error==="E_SCREEN"){var ob=el("button","btn","Open Screen Recording settings");ob.style.marginTop="8px";ob.onclick=function(){api("/system/open?pane=screen",{})};m._bub.appendChild(ob)}
     if(document.hidden&&d.ok!==false)toast("Ragnarok replied",function(){goto("chat")})}
-  function poll(w,n){api("/chat/"+w.job).then(function(d){if(d.pending&&n<900){w.set((d.text?d.text+" ":"")+"Waiting for your OK: approve below or in the Approvals tab.");setTimeout(function(){poll(w,n+1)},n<30?500:1000)}else finish(w,d)}).catch(function(){w.remove();setBusy(null);addBot("Lost contact with the agent.")})}
+  function waitText(t){t=String(t||"").replace(/Waiting for your OK[^.]*\.?/g,"").trim();return (t?t+" ":"")+"Waiting for your OK: tap \u2713 below, or open the Approvals tab."}
+  function poll(w,n){api("/chat/"+w.job).then(function(d){if(d.pending&&n<900){w.set(waitText(d.text));setTimeout(function(){poll(w,n+1)},n<30?500:1000)}else finish(w,d)}).catch(function(){w.remove();setBusy(null);addBot("Lost contact with the agent.")})}
   function go(path,body,label,wlabel,thumb){if(busy)return;goto("chat");addUser(label,thumb);var w=waiting(wlabel);setBusy(w);
-    api(path,body).then(function(d){if(w.stopped&&!d.pending){finish(w,d);return}if(d.pending){w.job=d.job;if(w.stopped)api("/chat/"+w.job+"/cancel",{});w.set((d.text?d.text+" ":"")+(wlabel||"Working on it"));poll(w,0)}else finish(w,d)}).catch(function(){w.remove();setBusy(null);addBot("Could not reach the agent.")})}
+    api(path,body).then(function(d){if(w.stopped&&!d.pending){finish(w,d);return}if(d.pending){w.job=d.job;if(w.stopped)api("/chat/"+w.job+"/cancel",{});w.set(d.text?waitText(d.text):(wlabel||"Working on it"));poll(w,0)}else finish(w,d)}).catch(function(){w.remove();setBusy(null);addBot("Could not reach the agent.")})}
   function send(t){t=(t||"").trim();if(!t||busy)return;sent.push(t);sentI=sent.length;go("/chat",{text:t,quick_s:0.5},t,"Thinking")}
   var sentI=0;
   function grow(){q.style.height="auto";q.style.height=Math.min(q.scrollHeight,140)+"px"}
@@ -319,7 +320,7 @@ textarea#q{flex:1;resize:none;max-height:140px;min-height:38px;line-height:1.4}
     d.sections.forEach(function(s){var c=el("div","card"+(s.needs_action?" need":""));var h=el("h3","");h.appendChild(document.createTextNode(s.title));if(s.needs_action)h.appendChild(el("span","tag warn","Needs you"));s.sources.forEach(function(x){h.appendChild(el("span","tag src",x))});h.appendChild(el("span","tag",s.count+" item"+(s.count===1?"":"s")));c.appendChild(h);
       c.appendChild(el("div","small",ago(s.end)+(s.start!==s.end?" - since "+ago(s.start):"")));
       c.appendChild(el("div","sum",s.summary));
-      if(s.points&&s.points.length){var ul=el("ul","pts");s.points.forEach(function(p){ul.appendChild(el("li","",p.text+(p.cite?" ["+p.cite+"]":"")))});c.appendChild(ul)}
+      var pts=(s.points||[]).filter(function(p){return s.summary.indexOf(p.text)<0});if(pts.length){var ul=el("ul","pts");pts.forEach(function(p){ul.appendChild(el("li","",p.text+(p.cite?" ["+p.cite+"]":"")))});c.appendChild(ul)}
       (s.warnings||[]).forEach(function(w){c.appendChild(el("div","small err",w))});
       var row=el("div","row");row.style.borderBottom="0";var tg=el("button","link",openSec[s.id]?"Hide items":"Show "+s.count+" item"+(s.count===1?"":"s"));
       var ask=el("button","link","Ask about this");ask.onclick=function(){q.value="Tell me more about "+s.title+": ";goto("chat");q.focus()};

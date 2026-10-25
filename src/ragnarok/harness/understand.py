@@ -44,6 +44,7 @@ Examples:
 "tell Ravi on telegram that I am late" -> action
 "email bob@x.com asking for leave" -> action
 "remind me to call mom at 5" -> action
+"help me write an apology to a client" -> chat
 "what can you do" -> chat
 "what is the capital of France" -> chat
 "asdfgh" -> unclear
@@ -80,4 +81,7 @@ async def understand(gateway: Gateway, text: str, history: list[tuple[str, str]]
         return None
     clean = lambda k: str(d.get(k) or "").strip()[:60]  # noqa: E731
     src = clean("source").lower()
-    return Understanding(intent, clean("person"), src if src in ("gmail", "slack", "discord", "telegram", "calendar", "drive") else "", clean("topic"))
+    person = clean("person")
+    if person and person.lower() not in text.lower():
+        person = ""  # a name the user never wrote is the model carrying over the last question, not a person to look up
+    return Understanding(intent, person, src if src in ("gmail", "slack", "discord", "telegram", "calendar", "drive") else "", clean("topic"))

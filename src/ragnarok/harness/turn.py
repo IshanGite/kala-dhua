@@ -344,8 +344,15 @@ class Agent:
 
     async def _recall(self, request: str, u: Any, history: list[tuple[str, str]] | None, done: Any) -> TurnResult:
         assert self.answerer is not None
-        if u.person:
-            ans = await self.answerer.recall_person(u.person, u.topic)
+        person = u.person
+        if not person:  # the model gave no name: a capitalised word that matches a real sender or chat in memory is one
+            cid = self.reader.compartment_id(self.ctx.compartment)
+            for cand in re.findall(r"\b[A-Z][a-z]{2,}\b", request):
+                if cid and cand.lower() not in {"what", "who", "when", "where", "which", "how", "any", "anything", "and", "the", "did", "does", "tell", "show", "give", "catch", "summarize"} and self.reader.items_by_person(cid, cand, limit=1):
+                    person = cand
+                    break
+        if person:
+            ans = await self.answerer.recall_person(person, u.topic)
             if "person_empty" not in ans.notes:
                 return done("recall", ans, f"latest messages from {u.person}")
         ans = await self.answerer.answer(request, general=False, history=history, context_hint=self._hint(request, history))
@@ -392,7 +399,7 @@ class Agent:
         if self.answerer is not None and CAPABILITY_ASK.search(request) and not self._is_action_request(request.replace("can you", "")):
             dec = RouteDecision(tier="L1", intent_family="capabilities", skills=[], plan_needed=False, risk_floor=0, memory_types=[], confidence=1.0, latency_ms=0.0, backend="rule")
             return TurnResult("L1", dec, None, None, (time.perf_counter() - t0) * 1000, answer=Answered(CAPABILITIES))
-        u = await understand(self.gw, request, history) if (self.answerer is not None and trust in ("user_direct", "agent") and request.strip()) else None
+        u = await understand(self.gw, request, history) if (self.answerer is not None and trust in ("user_direct", "agent") and request.strip() and match_intent(request) is None) else None  # an unambiguous command (strong cue + target) goes straight to the router: faster, and it keeps route learning
         mark("understand", t0 + sum(tm.values()) / 1000) if u else None
         if u is not None and u.intent != "action":  # the model decided this is not a request to DO something: it can only be answered, never acted on
             res = await self._answer_intent(request, u, history, trust, t0, tm)

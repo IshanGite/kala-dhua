@@ -21,6 +21,7 @@ Ragnarok: an always-on personal AI agent that runs entirely on the machine. Loca
 - **Connectors**: Gmail, Calendar, Drive, Meet, Slack, Telegram, Discord (read); email send/reply/draft, calendar events, Drive documents, Telegram, Discord, Slack (writes, click-gated); Outlook coded, not yet run live.
 - **Window**: chat (suggestions, Explain my screen, picture questions), Digest (contexts, timeline), Inbox, Approvals, Memory (search, delete with preview and receipt, edit and export), Activity, Sources (per-app health, notification permission guide, briefing time, skills).
 - **Live ingestion**: one polling task per source (`daemon/runtime.py`, `DEFAULT_INTERVALS`), Telegram long poll, backoff. Test scripts must set `RAGNAROK_SKIP_SOURCES=telegram` so they never consume real Telegram updates.
+- **Understanding**: `harness/understand.py` (model decides the path; rules + fallbacks remain when the model is down). QA harnesses: `scripts/qa_chat.py`, `scripts/qa_edge.py` (real models, fake senders, nothing real is sent), `scripts/e2e_full.py` (real accounts; run with `RAGNAROK_SKIP_SOURCES=telegram`).
 - **Vision**: `harness/vision.py`, `platform/screen.py` (macOS `screencapture`; **Windows capture is yours**: implement `capture_screen()` for Windows and return PNG bytes), model `qwen3-vl:2b` (`ollama pull qwen3-vl:2b`).
 - **Tests**: 360+ unit and security tests, plus `node tests/ui/smoke.mjs` (16 browser-level checks; run `npm install` once in `tests/ui`).
 

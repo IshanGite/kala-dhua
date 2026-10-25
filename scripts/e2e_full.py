@@ -29,12 +29,13 @@ async def main():
     await warm_up(w)
     if hasattr(w.l1, "warmup"):
         await w.l1.warmup()
-    for name in ("gmail", "gcal", "gdrive", "discord", "telegram", "slack"):
+    for name in [n for n in ("gmail", "gcal", "gdrive", "discord", "telegram", "slack") if n in w.runtime.runners]:
         rep = await w.runtime.runners[name].cycle()
         print(f"sync {name}: ingested={rep.ingested} held={rep.held} failed={rep.failed}")
     for h in list(w.services.runtime.state.held_senders()):
         w.services.runtime.approve_sender(*h)
-        await w.runtime.runners[h[0]].drain()
+        if h[0] in w.runtime.runners:
+            await w.runtime.runners[h[0]].drain()
     from ragnarok.ingest.pipeline import ingest_text
     await ingest_text(w.mem, w.gateway, w.index, source="telegram", native_id="8046053759:1", compartment="work", trust="received", text="hello", title="Ishan Gite")  # the user's own chat, so the reply test can resolve its target
     print("items by source:", dict(w.reader._r.execute("SELECT source, count(*) FROM items GROUP BY source").fetchall()))
