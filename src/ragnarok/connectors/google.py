@@ -274,7 +274,8 @@ class Calendar:
         r = await request(write_auth.http, "POST", self.API, headers={"Authorization": f"Bearer {await write_auth.token()}"}, json=body)
         if r.status_code >= 300:
             raise ConnectorError(f"calendar insert {r.status_code} {tz}", code="E_GOOGLE")
-        return str(r.json().get("htmlLink", ""))
+        j = r.json()
+        return f"{j.get('id', '')}|{j.get('htmlLink', '')}"  # id and link, so the new event can be written straight into memory
 
     def actions(self) -> list[ActionSpec]:
         return [ActionSpec("calendar.write", "Create or change a calendar event", {"summary": "string", "start": "string", "end": "string"}, tier=2)]
@@ -349,7 +350,8 @@ class Drive:
                           headers={"Authorization": f"Bearer {await write_auth.token()}", "Content-Type": f"multipart/related; boundary={boundary}"}, content=body)
         if r.status_code >= 300:
             raise ConnectorError(f"drive create {r.status_code}", code="E_GOOGLE")
-        return str(r.json().get("webViewLink", ""))
+        j = r.json()
+        return f"{j.get('id', '')}|{j.get('webViewLink', '')}"
 
     def actions(self) -> list[ActionSpec]:
         return []

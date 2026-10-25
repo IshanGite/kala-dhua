@@ -225,3 +225,12 @@ async def test_two_independent_writes_in_one_request_need_one_click_each_only_wh
     cards = await asyncio.wait_for(approve_all(world, True), 8)
     turn = await asyncio.wait_for(task, 8)
     assert [c["skill"] for c in cards] == ["mail.send"] and turn.outcome.state == "succeeded" and SENT[-1][0] == "mail"
+
+
+async def test_things_the_agent_creates_are_in_its_memory_at_once(world):
+    await start(world)
+    task = asyncio.create_task(world.agent.handle("put a call with Priya on my calendar tomorrow at 3pm"))
+    await asyncio.wait_for(approve_all(world, True), 8)
+    await asyncio.wait_for(task, 8)
+    out = summarize(await world.agent.handle("what is on my calendar tomorrow"))
+    assert "call with Priya" in out["text"] and "15:00" in out["text"], "no waiting for the next poll"

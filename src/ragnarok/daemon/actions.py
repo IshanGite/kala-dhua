@@ -15,6 +15,7 @@ from ragnarok.connectors.telegram import Telegram
 from ragnarok.core.clock import get_clock
 from ragnarok.core.errors import RagnarokError
 from ragnarok.harness.executor import ExecContext, NativeHandler
+from ragnarok.ingest.pipeline import ingest_text
 from ragnarok.llm_gateway.client import Gateway
 from ragnarok.memory.commitments import Commitments
 from ragnarok.memory.models import EventIn
@@ -93,6 +94,16 @@ class Actions:
         self._m.write_event(EventIn(compartment=self._comp, kind="draft", actor="agent", content=json.dumps(draft), trust="agent"))
         return {"draft": draft}
 
+    async def _remember_write(self, source: str, native_id: str, text: str, title: str, kind: str, occurred_at: int | None, link: str) -> None:
+        """Things the agent creates are in its own memory at once, not after the next poll; a later poll of the same id just refreshes it."""
+        try:
+            await ingest_text(self._m, self._gw, self._i, source=source, native_id=native_id or title, compartment=self._comp, trust="user_file", text=text, title=title, kind=kind,
+                              occurred_at=occurred_at, deep_link=link if link.startswith("https://") else None)
+        except Exception as exc:  # noqa: BLE001 - the write already happened; failing to index it must not look like a failed write
+            from ragnarok.core.logging import log
+
+            log("write_through_failed", err=type(exc).__name__)
+
     def _write_auth(self) -> GoogleAuth | None:
         raw = self._vault.get(token_name("google", "write"))
         if raw is None:
@@ -110,11 +121,14 @@ class Actions:
         if dry_run:
             return {"would_add": {"title": p["title"], "when": shown, "minutes": p.get("minutes", 30)}}
         if self._senders and "calendar" in self._senders:
-            return {"added": True, "title": p["title"], "when": shown, "link": await self._senders["calendar"](p, due)}
+            link = await self._senders["calendar"](p, due)
+            await self._remember_write("gcal", f"test-{abs(hash((p['title'], due)))}", f"Event: {p['title']}\nWhen: {shown}", p["title"], "event", due, link)
+            return {"added": True, "title": p["title"], "when": shown, "link": link}
         auth = self._write_auth()
         if auth is None:
             raise ActionError("adding events needs the write sign-in: ragnarok connect google --write", code="E_NOT_CONNECTED")
-        link = await Calendar(auth).insert_event(auth, p["title"], datetime.fromtimestamp(due / 1000), int(p.get("minutes", 30)))
+        eid, _, link = (await Calendar(auth).insert_event(auth, p["title"], datetime.fromtimestamp(due / 1000), int(p.get("minutes", 30)))).partition("|")
+        await self._remember_write("gcal", eid, f"Event: {p['title']}\nWhen: {shown}", p["title"], "event", due, link)
         return {"added": True, "title": p["title"], "when": shown, "link": link}
 
     # ------------------------------------------------------------------ external writes (always behind an approval card)
@@ -178,11 +192,15 @@ class Actions:
         if dry_run:
             return {"would_create": {"title": p["title"], "chars": len(p["text"])}}
         if self._senders and "drive" in self._senders:
-            return {"created": True, "title": p["title"], "link": await self._senders["drive"](p)}
+            link = await self._senders["drive"](p)
+            await self._remember_write("gdrive", f"test-{abs(hash(p['title']))}", p["text"], p["title"], "file", None, link)
+            return {"created": True, "title": p["title"], "link": link}
         auth = self._write_auth()
         if auth is None:
             raise ActionError("creating documents needs the write sign-in: ragnarok connect google --write", code="E_NOT_CONNECTED")
-        return {"created": True, "title": p["title"], "link": await Drive(auth).create_doc(auth, p["title"], p["text"])}
+        did, _, link = (await Drive(auth).create_doc(auth, p["title"], p["text"])).partition("|")
+        await self._remember_write("gdrive", did, p["text"], p["title"], "file", None, link)
+        return {"created": True, "title": p["title"], "link": link}
 
     def natives(self) -> dict[str, NativeHandler]:
         return {"memory.search": self.memory_search, "calendar.agenda": self.calendar_agenda, "reminder.add": self.reminder_add, "reminder.list": self.reminder_list, "mail.draft": self.mail_draft,

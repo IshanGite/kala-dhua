@@ -35,6 +35,8 @@ async def main():
     for h in list(w.services.runtime.state.held_senders()):
         w.services.runtime.approve_sender(*h)
         await w.runtime.runners[h[0]].drain()
+    from ragnarok.ingest.pipeline import ingest_text
+    await ingest_text(w.mem, w.gateway, w.index, source="telegram", native_id="8046053759:1", compartment="work", trust="received", text="hello", title="Ishan Gite")  # the user's own chat, so the reply test can resolve its target
     print("items by source:", dict(w.reader._r.execute("SELECT source, count(*) FROM items GROUP BY source").fetchall()))
     cards, allow = [], set()
 
@@ -92,9 +94,9 @@ async def main():
         ("past: telegram", "what did I get on telegram", ""),
         ("past: discord", "what was said in the discord general channel", ""),
         ("past: slack", "what was said in slack", ""),
-        ("past: drive", "what does my Orion plan document say about the budget", "1.2"),
+        ("past: drive (written by the agent a minute ago)", "what does the Ragnarok test agent notes document say", "write"),
         ("past: my own reminders", "what reminders do I have", "stretch"),
-        ("calendar", "what is on my calendar tomorrow", "sync"),
+        ("calendar (event created a minute ago)", "what is on my calendar tomorrow", "sync"),
         ("conversation memory", "what did I ask you to do on telegram earlier in this chat", "telegram"),
         ("catch-up everything", "catch me up on everything from today", ""),
     ]:
@@ -103,7 +105,7 @@ async def main():
 
     print("\n===== PART 3: ROUTE LEARNING (same task, asked again and again) =====")
     seq = []
-    for q in ["remind me to water the plants tomorrow at 7am"] * 5 + ["remind me to call mom tomorrow at 8am", "remind me to book the flight tomorrow at 6pm"]:
+    for q in ["what reminders do I have open"] * 5 + ["what are my open reminders", "list my reminders"]:
         o, t = await ask(q)
         seq.append((t.tier, t.decision.backend, round(t.latency_ms), t.learned))
     print("\n   tier/backend/ms/learned per request:", seq)
