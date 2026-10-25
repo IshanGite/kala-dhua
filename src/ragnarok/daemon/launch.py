@@ -20,6 +20,8 @@ def make_api(world: World, port: int) -> FastAPI:
     @contextlib.asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         world.runtime.start()
+        if getattr(world.services, "demo", None) is not None:
+            world.services.demo.start()
         asyncio.get_running_loop().create_task(warm_up(world))
         yield
         await world.runtime.stop()

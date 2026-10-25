@@ -112,12 +112,12 @@ textarea#q{flex:1;resize:none;max-height:140px;min-height:38px;line-height:1.4}
 .drop.on{display:grid}
 .sk{height:64px;border-radius:12px;background:linear-gradient(90deg,var(--chip),var(--panel),var(--chip));background-size:200% 100%;animation:sh 1.3s infinite;margin-bottom:10px}
 @keyframes sh{to{background-position:-200% 0}}
-</style>
+.pop{position:absolute;left:12px;bottom:64px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px;box-shadow:0 8px 30px #0005;z-index:8;width:min(360px,calc(100% - 24px))}.pop .pt{font-weight:700;margin-bottom:6px}.pop .pb{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.pop select{width:100%;margin:4px 0;padding:6px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}</style>
 </head>
 <body>
 <header>
   <span class="logo">R</span>
-  <h1>Ragnarok</h1>
+  <h1>Ragnarok</h1><span id="demopill" class="pill" style="display:none;background:var(--warn2);color:var(--warn);font-weight:700" title="Synthetic data, every send is a local fake. Nothing touches your real accounts.">DEMO</span>
   <span class="grow small"><span id="dot" class="dot" title="status" style="display:inline-block;margin-right:6px"></span><span id="state">connecting</span><span id="live"></span></span>
   <button id="themeb" class="ib" title="Switch light / dark" aria-label="Switch theme"><svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
   <button id="syncb" class="btn" title="Check every connected app right now">Sync now</button>
@@ -140,8 +140,17 @@ textarea#q{flex:1;resize:none;max-height:140px;min-height:38px;line-height:1.4}
       <div class="sugs" id="sugs"></div>
     </div>
     <button id="jump" class="btn jump" type="button">Latest</button>
+    <div id="scrpop" class="pop" style="display:none" role="dialog" aria-label="Look at my screen">
+      <div class="pt">Look at my screen</div>
+      <div id="scrdisp" class="small"></div>
+      <div class="pb"><button type="button" class="btn pri" id="sc_all">Explain the whole screen</button><button type="button" class="btn" id="sc_reg">Select a part...</button><button type="button" class="btn" id="sc_win">Pick a window...</button></div>
+      <div class="small" style="margin-top:8px">How to look</div>
+      <div class="seg" id="sc_eng"><button type="button" data-e="auto" aria-pressed="true" title="Reads the text first (about 3 s); looks at the picture when there is little text">Smart</button><button type="button" data-e="read" title="The system reads the text, a language model explains it (fastest)">Read text</button><button type="button" data-e="deep" title="The visual model looks at the picture (slower, sees images and layout)">Deep look</button></div>
+      <div id="scrstat" class="small" style="margin-top:8px"></div>
+      <div class="small" style="margin-top:6px">Tip: type a question first (for example "what is the total?") and it answers that instead.</div>
+    </div>
     <div class="qa" id="qa" style="display:none"></div>
-    <form id="f"><button type="button" class="ib" id="attb" title="Ask about a picture (or paste / drop one)" aria-label="Attach picture"><svg viewBox="0 0 24 24"><path d="M21 12l-8.5 8.5a5 5 0 0 1-7-7L14 5a3.5 3.5 0 0 1 5 5l-8.5 8.5a2 2 0 0 1-3-3L15 8"/></svg></button><button type="button" class="ib" id="shotb" title="Explain what is on my screen (3 second countdown)" aria-label="Explain my screen"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg></button><input type="file" id="file" accept="image/png,image/jpeg,image/webp" style="display:none"><textarea id="q" rows="1" autocomplete="off" placeholder="Message Ragnarok   (Enter to send, Shift+Enter for a new line)" aria-label="Message" maxlength="4000"></textarea><button class="ib go" type="submit" id="sendb" title="Send" aria-label="Send"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></form>
+    <form id="f"><button type="button" class="ib" id="attb" title="Ask about a picture (or paste / drop one)" aria-label="Attach picture"><svg viewBox="0 0 24 24"><path d="M21 12l-8.5 8.5a5 5 0 0 1-7-7L14 5a3.5 3.5 0 0 1 5 5l-8.5 8.5a2 2 0 0 1-3-3L15 8"/></svg></button><button type="button" class="ib" id="shotb" title="Look at my screen: whole screen, a part, or a window" aria-label="Explain my screen"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg></button><input type="file" id="file" accept="image/png,image/jpeg,image/webp" style="display:none"><textarea id="q" rows="1" autocomplete="off" placeholder="Message Ragnarok   (Enter to send, Shift+Enter for a new line)" aria-label="Message" maxlength="4000"></textarea><button class="ib go" type="submit" id="sendb" title="Send" aria-label="Send"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></form>
   </section>
   <section id="dig">
     <div class="bar">
@@ -168,7 +177,8 @@ textarea#q{flex:1;resize:none;max-height:140px;min-height:38px;line-height:1.4}
   var tok=(location.hash.match(/token=([\w-]+)/)||[])[1]||"";
   try{history.replaceState(null,"",location.pathname)}catch(e){}
   var H={"x-ragnarok-token":tok,"content-type":"application/json"};
-  function api(p,body){return fetch(p,body===undefined?{headers:H}:{method:"POST",headers:H,body:JSON.stringify(body)}).then(function(r){return r.json()})}
+  var dead=false;
+  function api(p,body){if(dead)return new Promise(function(){});return fetch(p,body===undefined?{headers:H}:{method:"POST",headers:H,body:JSON.stringify(body)}).then(function(r){return r.json().then(function(d){if(d&&d.error==="E_AUTH"){dead=true;var b=document.createElement("div");b.style.cssText="position:fixed;inset:0;background:var(--bg);display:grid;place-items:center;text-align:center;padding:24px;z-index:99";b.textContent="This window's session has ended (the app was restarted). Close this window and open Ragnarok again.";document.body.appendChild(b)}return d})})}
   function el(t,c,x){var e=document.createElement(t);if(c)e.className=c;if(x!==undefined)e.textContent=x;return e}
   function $(i){return document.getElementById(i)}
   function ago(ts){if(!ts)return"never";var s=Math.max(0,(Date.now()-ts)/1000|0);return s<5?"just now":s<60?s+"s ago":s<3600?(s/60|0)+"m ago":s<86400?(s/3600|0)+"h ago":(s/86400|0)+"d ago"}
@@ -213,7 +223,7 @@ textarea#q{flex:1;resize:none;max-height:140px;min-height:38px;line-height:1.4}
       if(d.why&&d.why.length){var wl=el("a","","Why?");wl.href="#";var pre=el("div","small",d.why.join("\n"));pre.style.cssText="white-space:pre-wrap;display:none;margin-top:4px;border-left:2px solid var(--line);padding-left:8px";wl.onclick=function(ev){ev.preventDefault();pre.style.display=pre.style.display==="none"?"block":"none"};meta.appendChild(wl);m._bub.appendChild(meta);m._bub.appendChild(pre)}else m._bub.appendChild(meta)}
     else m._bub.appendChild(meta);
     var cp=el("button","","Copy");cp.onclick=function(){try{navigator.clipboard.writeText(t);cp.textContent="Copied";setTimeout(function(){cp.textContent="Copy"},1200)}catch(e){}};meta.appendChild(cp);
-    if(d.error==="E_SCREEN"){var ob=el("button","btn","Open Screen Recording settings");ob.style.marginTop="8px";ob.onclick=function(){api("/system/open?pane=screen",{})};m._bub.appendChild(ob)}
+    if(d.error==="E_SCREEN_CANCEL"){}else if(d.error==="E_SCREEN"){var ob=el("button","btn","Open Screen Recording settings");ob.style.marginTop="8px";ob.onclick=function(){api("/system/open?pane=screen",{})};m._bub.appendChild(ob)}
     if(document.hidden&&d.ok!==false)toast("Ragnarok replied",function(){goto("chat")})}
   function waitText(t){t=String(t||"").replace(/Waiting for your OK[^.]*\.?/g,"").trim();return (t?t+" ":"")+"Waiting for your OK: tap \u2713 below, or open the Approvals tab."}
   function poll(w,n){api("/chat/"+w.job).then(function(d){if(d.pending&&n<900){w.set(waitText(d.text));setTimeout(function(){poll(w,n+1)},n<30?500:1000)}else finish(w,d)}).catch(function(){w.remove();setBusy(null);addBot("Lost contact with the agent.")})}
@@ -226,17 +236,29 @@ textarea#q{flex:1;resize:none;max-height:140px;min-height:38px;line-height:1.4}
   q.addEventListener("keydown",function(e){if(e.key==="Enter"&&!e.shiftKey&&!e.isComposing){e.preventDefault();$("f").dispatchEvent(new Event("submit",{cancelable:true,bubbles:true}))}
     else if(e.key==="ArrowUp"&&!q.value&&sent.length){e.preventDefault();sentI=Math.max(0,sentI-1);q.value=sent[sentI]||"";grow()}});
   $("f").onsubmit=function(e){e.preventDefault();if(busy)return;var t=q.value;q.value="";grow();send(t)};
-  function explainScreen(){var t=q.value.trim();q.value="";grow();go("/vision",{question:t||null,delay_s:3},t?("Explain my screen: "+t):"Explain my screen","Switch to the window you want explained: looking in 3 seconds")}
+  var scrEngine="auto",scrDisplay=1;
+  function explainScreen(mode){mode=mode||"screen";$("scrpop").style.display="none";var t=q.value.trim();q.value="";grow();
+    var lab={screen:"Explain my screen",region:"Explain a part of my screen",window:"Explain a window"}[mode]+(t?": "+t:"");
+    var wl=mode==="screen"?"Switch to the window you want explained: looking in 3 seconds":mode==="region"?"Drag a rectangle over the part you want explained (Esc cancels)":"Click the window you want explained (Esc cancels)";
+    go("/vision",{question:t||null,delay_s:3,mode:mode,display:scrDisplay,engine:scrEngine},lab,wl)}
+  function openScreenMenu(){var pop=$("scrpop");if(pop.style.display!=="none"){pop.style.display="none";return}pop.style.display="block";var st=$("scrstat");st.textContent="Checking screen access...";st.className="small";
+    api("/screens?check=true").then(function(d){var ds=d.displays||[],box=$("scrdisp");box.textContent="";
+      if(ds.length>1){box.appendChild(document.createTextNode("Which screen?"));var sel=el("select");ds.forEach(function(x){var o=el("option","",x.name+(x.size?" ("+x.size+")":"")+(x.main?" - main":""));o.value=x.index;sel.appendChild(o)});sel.value=scrDisplay;sel.onchange=function(){scrDisplay=+sel.value};box.appendChild(sel)}else scrDisplay=1;
+      if(d.permission===true){st.textContent="Screen access: allowed";st.className="small ok"}
+      else if(d.permission===false){st.textContent="Screen access is OFF: pictures come back black. ";st.className="small err";var b=el("button","link","Open the setting");b.onclick=function(){api("/system/open?pane=screen",{})};st.appendChild(b);st.appendChild(document.createTextNode(", turn on Terminal (or the app that started Ragnarok), then restart it."))}
+      else st.textContent=""}).catch(function(){st.textContent=""})}
   function askPicture(dataUrl){var t=q.value.trim();q.value="";grow();go("/vision",{question:t||null,image_b64:String(dataUrl).split(",")[1]},t||"What is in this picture?","Looking at the picture",String(dataUrl))}
   function attach(f){if(!f)return;if(f.size>10*1024*1024){addBot("That picture is larger than 10 MB.");return}var rd=new FileReader();rd.onload=function(){askPicture(rd.result)};rd.readAsDataURL(f)}
-  $("shotb").onclick=explainScreen;$("attb").onclick=function(){$("file").click()};
+  $("shotb").onclick=openScreenMenu;$("sc_all").onclick=function(){explainScreen("screen")};$("sc_reg").onclick=function(){explainScreen("region")};$("sc_win").onclick=function(){explainScreen("window")};
+  $("sc_eng").querySelectorAll("button").forEach(function(b){b.onclick=function(){$("sc_eng").querySelectorAll("button").forEach(function(o){o.setAttribute("aria-pressed",o===b)});scrEngine=b.dataset.e}});
+  document.addEventListener("click",function(e){var pop=$("scrpop");if(pop.style.display!=="none"&&!pop.contains(e.target)&&e.target.closest("#shotb")===null)pop.style.display="none"});$("attb").onclick=function(){$("file").click()};
   $("file").onchange=function(){var f=this.files[0];this.value="";attach(f)};
   q.addEventListener("paste",function(ev){var its=(ev.clipboardData||{}).items||[];for(var i=0;i<its.length;i++){if(its[i].type.indexOf("image/")===0){ev.preventDefault();attach(its[i].getAsFile());return}}});
   var chatEl=$("chat");["dragenter","dragover"].forEach(function(n){chatEl.addEventListener(n,function(e){if(e.dataTransfer&&[].indexOf.call(e.dataTransfer.types||[],"Files")>=0){e.preventDefault();$("drop").classList.add("on")}})});
   ["dragleave","drop"].forEach(function(n){chatEl.addEventListener(n,function(e){if(n==="drop"||e.target===$("drop")){$("drop").classList.remove("on")}})});
   chatEl.addEventListener("drop",function(e){e.preventDefault();var f=(e.dataTransfer.files||[])[0];if(f&&f.type.indexOf("image/")===0)attach(f)});
   var QA=["Catch me up","What needs my attention?","Today's agenda","Summarize my emails","Explain my screen"];
-  QA.forEach(function(x){[ $("sugs"),$("qa") ].forEach(function(host){var b=el("button","sug",x);b.type="button";b.onclick=function(){if(x==="Explain my screen")explainScreen();else send(x==="Today's agenda"?"What is on my calendar today":x)};host.appendChild(b)})});
+  QA.forEach(function(x){[ $("sugs"),$("qa") ].forEach(function(host){var b=el("button","sug",x);b.type="button";b.onclick=function(){if(x==="Explain my screen")explainScreen("screen");else send(x==="Today's agenda"?"What is on my calendar today":x)};host.appendChild(b)})});
   /* approvals shown right in the chat: a tick or a cross, no tab hopping */
   var inline={};
   function renderInline(items){var ids={};items.forEach(function(c){ids[c.id]=1;if(inline[c.id])return;var box=el("div","ap");box.appendChild(el("h4","",c.headline||c.skill));
@@ -260,9 +282,15 @@ textarea#q{flex:1;resize:none;max-height:140px;min-height:38px;line-height:1.4}
   var lastNew=0;
   function srcState(s){return s.ok===null||s.ok===undefined?["waiting","live"]:s.ok?["live","live good"]:["problem: "+(s.code||"error"),"live bad"]}
   function renderSources(rt){var box=$("srcbox");var keep=box.scrollTop;box.textContent="";
+    if(window.__demo){box.appendChild(el("h2","","Demo mode"));var dc=el("div","card");dc.appendChild(el("div","","This is a demo copy with made-up data for every app. Every send is a local fake and nothing reaches a real account."));
+      var dr=el("div","row");dr.style.borderBottom="0";var inb=el("button","btn pri","Send me a message now"),au=el("button","btn","Auto messages: on");
+      inb.onclick=function(){inb.disabled=true;api("/demo/incoming",{}).then(function(r){inb.disabled=false;if(r.ok)toast("New "+r.source+" message from "+(r.from||r.title),function(){goto("dig")})})};
+      au.onclick=function(){var on=au.textContent.indexOf("on")>0;api("/demo/auto?enabled="+(!on),{}).then(function(r){au.textContent="Auto messages: "+(r.auto?"on":"off")})};
+      dr.appendChild(inb);dr.appendChild(au);dc.appendChild(dr);box.appendChild(dc)}
     box.appendChild(el("h2","","Connected apps (checked continuously)"));
     var names=Object.keys(rt.sources||{});
-    if(!names.length)box.appendChild(el("p","small","No sources connected yet. Run: ragnarok connect <name>"));
+    if(!names.length&&!window.__demo)box.appendChild(el("p","small","No sources connected yet. Run: ragnarok connect <name>"));
+    if(window.__demo)["gmail","slack","discord","telegram","gcal","gdrive","gmeet","notifications"].forEach(function(n){var r=el("div","row"),g=el("div","grow"),t=el("div","");t.appendChild(el("span","live good"));t.appendChild(document.createTextNode(n));g.appendChild(t);g.appendChild(el("div","small","demo data loaded"));r.appendChild(g);box.appendChild(r)});
     names.forEach(function(n){var s=rt.sources[n],st=srcState(s),r=el("div","row"),g=el("div","grow");var t=el("div","");t.appendChild(el("span",st[1]));t.appendChild(document.createTextNode(n));g.appendChild(t);
       var ln=s.last_new?("last new "+ago(s.last_new)):"nothing new yet";
       g.appendChild(el("div","small "+(s.ok===false?"err":""),s.ok===null||s.ok===undefined?"waiting for the first check":s.ok?("checked "+ago(s.at)+" - "+ln+" - every "+(s.interval<1?"moment":s.interval+"s")):("problem: "+(s.code||"error")+" - retrying")));
@@ -287,16 +315,19 @@ textarea#q{flex:1;resize:none;max-height:140px;min-height:38px;line-height:1.4}
       var sv=el("button","btn","Save apps");sv.style.marginTop="6px";sv.onclick=function(){api("/notifications",{apps:ta.value.split("\n")}).then(function(){sv.textContent="Saved";setTimeout(function(){sv.textContent="Save apps"},1200)})};c.appendChild(sv)}).catch(function(){})}
   function refresh(){
     api("/status").then(function(d){
+      window.__demo=!!d.demo;$("demopill").style.display=d.demo?"inline-block":"none";if(d.demo&&!d.demo_ready)$("state").textContent="loading demo data";
       var rt=d.runtime||{},on=!!rt.enabled;sw.setAttribute("aria-checked",on);
-      $("dot").className="dot "+(on?"on":"off");$("state").textContent=on?"reading continuously":"paused";
+      $("dot").className="dot "+(on?"on":"off");if(!(d.demo&&!d.demo_ready))$("state").textContent=on?"reading continuously":"paused";
       var srcs=rt.sources||{},names=Object.keys(srcs),bad=names.filter(function(n){return srcs[n].ok===false}),newest=0;names.forEach(function(n){if((srcs[n].last_new||0)>newest)newest=srcs[n].last_new});lastNew=newest;
       $("live").textContent=names.length?(" - "+(names.length-bad.length)+"/"+names.length+" apps healthy"+(newest?" - newest item "+ago(newest):"")):"";
       if(cur==="src")renderSources(rt);
       renderFeed(rt.held||[]);
     }).catch(function(){$("state").textContent="offline"});
+    if(window.__demo)api("/demo/outbox").then(function(d){window.__outbox=d.items||[]}).catch(function(){});
     api("/activity").then(function(d){window.__items=d.items||[];renderFeed(window.__held||[])}).catch(function(){});
   }
   function renderFeed(held){window.__held=held;var f=$("feed");f.textContent="";
+    if(window.__demo&&window.__outbox&&window.__outbox.length){f.appendChild(el("h2","","Demo outbox: what would have been sent"));window.__outbox.slice(0,8).forEach(function(o){var r=el("div","row"),g=el("div","grow");g.appendChild(el("div","",o.kind+" to "+o.to));g.appendChild(el("div","small",o.text.slice(0,160)+" - "+ago(o.ts)));r.appendChild(g);f.appendChild(r)})}
     if(held.length){f.appendChild(el("h2","","Waiting for you"));held.forEach(function(h){var c=el("div","card");c.appendChild(el("div","",h.platform+": new sender "+h.handle));c.appendChild(el("div","small","Unknown senders are held until you approve them."));
       var row=el("div","row");var a=el("button","btn pri","Approve"),bl=el("button","btn","Block");
       a.onclick=function(){api("/pairing",{platform:h.platform,handle:h.handle,action:"approve"}).then(refresh)};bl.onclick=function(){api("/pairing",{platform:h.platform,handle:h.handle,action:"block"}).then(refresh)};

@@ -194,6 +194,7 @@ def run(
     port: int = typer.Option(8765, help="Local port (127.0.0.1 only)"),
     interval: float = typer.Option(None, help="Seconds between polls for every source; leave empty for the live defaults (Telegram instant, chats 5 s, Gmail 8 s)"),
     folder: list[str] = typer.Option([], "--folder", help="A local folder to watch (repeatable)"),  # noqa: B008
+    demo: bool = typer.Option(False, "--demo", help="Demo mode: synthetic data for every app, every send is a local fake."),
 ) -> None:
     """Start the always-on agent without a window: continuous ingestion plus the local API."""
     from ragnarok.daemon.api import serve
@@ -201,7 +202,12 @@ def run(
     from ragnarok.daemon.runtime import DEFAULT_INTERVALS
     from ragnarok.daemon.wiring import build_world
 
-    world = build_world(interval_s=interval or 60.0, files=list(folder) or None, intervals=None if interval else DEFAULT_INTERVALS, live_telegram_s=0 if interval else 25)
+    if demo:
+        from ragnarok.daemon.demo import build_demo_world
+
+        world = build_demo_world()
+    else:
+        world = build_world(interval_s=interval or 60.0, files=list(folder) or None, intervals=None if interval else DEFAULT_INTERVALS, live_telegram_s=0 if interval else 25)
     typer.echo(f"ragnarok: running on 127.0.0.1:{port}; sources: {', '.join(world.runtime.runners) or 'none connected'}; session token file: {world.token_file}")
     serve(make_api(world, port), port)
 
@@ -212,13 +218,19 @@ def window(
     interval: float = typer.Option(None, help="Seconds between polls for every source; leave empty for the live defaults (Telegram instant, chats 5 s, Gmail 8 s)"),
     folder: list[str] = typer.Option([], "--folder", help="A local folder to watch (repeatable)"),  # noqa: B008
     no_top: bool = typer.Option(False, "--no-top", help="Do not keep the window above other windows"),
+    demo: bool = typer.Option(False, "--demo", help="Demo mode: synthetic data for every app, every send is a local fake. Never touches your real accounts or memory."),
 ) -> None:
     """The always-on window: a small always-on-top chat and activity panel with an on/off switch."""
     from ragnarok.daemon.launch import make_api, open_window, start_in_thread
     from ragnarok.daemon.runtime import DEFAULT_INTERVALS
     from ragnarok.daemon.wiring import build_world
 
-    world = build_world(interval_s=interval or 60.0, files=list(folder) or None, intervals=None if interval else DEFAULT_INTERVALS, live_telegram_s=0 if interval else 25)
+    if demo:
+        from ragnarok.daemon.demo import build_demo_world
+
+        world = build_demo_world()
+    else:
+        world = build_world(interval_s=interval or 60.0, files=list(folder) or None, intervals=None if interval else DEFAULT_INTERVALS, live_telegram_s=0 if interval else 25)
     server, _thread = start_in_thread(make_api(world, port), port)
     try:
         open_window(port, world.guard.token, on_top=not no_top)

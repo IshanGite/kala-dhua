@@ -162,7 +162,7 @@ class ChatService:
             job.task.cancel()
         return {"ok": True}
 
-    async def submit_vision(self, question: str | None, image: bytes | None, delay_s: float = 0.0) -> dict[str, Any]:
+    async def submit_vision(self, question: str | None, image: bytes | None, delay_s: float = 0.0, *, mode: str = "screen", display: int = 1, engine: str = "auto") -> dict[str, Any]:
         """Explain the screen (no image) or answer about a picture. A job like any other, so it shows progress and can be stopped."""
         vision = getattr(self._agent, "vision", None)
         job = Job(new_id()[:10], question or ("a picture" if image else "my screen"))
@@ -174,12 +174,12 @@ class ChatService:
                     job.reply, job.state = {"text": "Vision is not set up on this machine.", "citations": []}, "error"
                     return
                 if image is not None:
-                    text = await vision.ask(image, question)
+                    text = await vision.ask(image, question, engine=engine)
                 else:
-                    if delay_s:
+                    if delay_s and mode == "screen":
                         await asyncio.sleep(delay_s)  # time to switch to the window that should be explained
-                    text = await vision.explain_screen(question)
-                job.reply, job.state = {"text": text, "citations": [], "tier": "L1", "backend": "vision", "why": ["You asked about " + ("a picture" if image else "your screen") + ": one local vision-model call, nothing stored"]}, "done"
+                    text = await vision.explain_screen(question, mode=mode, display=display, engine=engine)
+                job.reply, job.state = {"text": text, "citations": [], "tier": "L1", "backend": "vision", "why": ["You asked about " + ("a picture" if image else {"screen": "your screen", "region": "a part of your screen", "window": "a window"}.get(mode, "your screen")) + f" (engine: {engine}): read and explained on this computer, nothing stored"]}, "done"
             except asyncio.CancelledError:
                 job.reply, job.state = {"text": "Stopped.", "citations": [], "cancelled": True}, "cancelled"
             except Exception as exc:  # noqa: BLE001

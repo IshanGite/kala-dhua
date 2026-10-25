@@ -319,7 +319,7 @@ class Agent:
             if trust != "user_direct":
                 return done("vision", Answered("I only look at your screen when you ask me to in the chat."), "refused for an automatic run")
             try:
-                text = await self.vision.explain_screen(request)
+                text = await self.vision.explain_screen(request, engine="auto")
             except Exception as exc:  # noqa: BLE001
                 text = str(exc) if getattr(exc, "code", "").startswith("E_") else "I could not look at the screen."
             return done("vision", Answered(text, notes=["vision"]), "one capture, only to the local vision model, never stored")
@@ -411,7 +411,7 @@ class Agent:
             if trust != "user_direct":  # a schedule or another autonomous run may never look at the screen
                 return TurnResult("L1", dec, None, None, 0.0, answer=Answered("I only look at your screen when you ask me to in the chat."), timings=tm)
             try:
-                text = await self.vision.explain_screen(request)
+                text = await self.vision.explain_screen(request, engine="auto")
             except Exception as exc:  # noqa: BLE001
                 text = str(exc) if getattr(exc, "code", "").startswith("E_") else "I could not look at the screen."
             return TurnResult("L1", dec, None, None, (time.perf_counter() - t0) * 1000, answer=Answered(text, grounded=False, notes=["vision"]), timings=tm)

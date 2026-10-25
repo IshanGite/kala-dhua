@@ -186,6 +186,8 @@ class OllamaGateway:
             "options": {"num_ctx": ctx, "num_predict": max_tokens, "temperature": temperature, "seed": seed or 0},
         }
         body["think"] = role == "vision"  # qwen3-class text models reason silently and spend the whole token cap before answering (spike 2), so thinking is off; qwen3-vl needs it on explicitly (reasoning then goes to its own field, not the answer)
+        if role == "vision":  # the sampling the model's authors recommend; greedy decoding makes this model loop in its reasoning
+            body["options"].update({"temperature": max(temperature, 0.7), "top_p": 0.8, "top_k": 20, "presence_penalty": 1.5})
         if schema is not None:
             body["format"] = schema
         started = get_clock().monotonic()

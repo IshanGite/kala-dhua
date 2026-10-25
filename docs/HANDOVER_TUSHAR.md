@@ -22,6 +22,9 @@ Ragnarok: an always-on personal AI agent that runs entirely on the machine. Loca
 - **Window**: chat (suggestions, Explain my screen, picture questions), Digest (contexts, timeline), Inbox, Approvals, Memory (search, delete with preview and receipt, edit and export), Activity, Sources (per-app health, notification permission guide, briefing time, skills).
 - **Live ingestion**: one polling task per source (`daemon/runtime.py`, `DEFAULT_INTERVALS`), Telegram long poll, backoff. Test scripts must set `RAGNAROK_SKIP_SOURCES=telegram` so they never consume real Telegram updates.
 - **Understanding**: `harness/understand.py` (model decides the path; rules + fallbacks remain when the model is down). QA harnesses: `scripts/qa_chat.py`, `scripts/qa_edge.py` (real models, fake senders, nothing real is sent), `scripts/e2e_full.py` (real accounts; run with `RAGNAROK_SKIP_SOURCES=telegram`).
+- **Demo mode**: `ragnarok window --demo` (`daemon/demo.py`): synthetic data for every app, fake senders, outbox, live incoming feed. Safe: no credentials.
+- **Screen**: `platform/screen.py` (modes screen/region/window, displays), `platform/ocr.py` (macOS Vision framework via a cached Swift binary; **Windows OCR and capture are yours**: Windows.Media.Ocr + Windows.Graphics.Capture), `harness/vision.py` (Smart/Read/Deep).
+- **If `ragnarok` says `No module named 'ragnarok'` on macOS**: the editable-install .pth files get marked hidden and Python skips them; a `sitecustomize.py` in the venv works around it (see git history), or run `uv pip install -e .` again.
 - **Vision**: `harness/vision.py`, `platform/screen.py` (macOS `screencapture`; **Windows capture is yours**: implement `capture_screen()` for Windows and return PNG bytes), model `qwen3-vl:2b` (`ollama pull qwen3-vl:2b`).
 - **Tests**: 360+ unit and security tests, plus `node tests/ui/smoke.mjs` (16 browser-level checks; run `npm install` once in `tests/ui`).
 

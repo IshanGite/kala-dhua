@@ -233,6 +233,10 @@ kala-dhua/
 
 ---
 
+## Demo mode (a safe fallback for any demo)
+
+`ragnarok window --demo` starts a complete copy of the app in a throwaway folder with made-up data for every connected app (Gmail, Slack, Discord, Telegram, Calendar, Drive, Meet, notifications), including a hostile email for the injection demo. Every send is a local fake that only appears in the Activity tab's "Demo outbox"; it holds no real credentials and cannot reach a real account. A DEMO badge is shown the whole time. Sources > "Send me a message now" (and an automatic feed every 50 s) makes new messages arrive live, so the Digest, Inbox and proactive heads-ups can be shown without any real traffic. Close the real window first (both use port 8765, or pass `--port`).
+
 ## Status
 
 Under active construction for a hackathon deadline of **09:00 IST, 26 October 2026**.

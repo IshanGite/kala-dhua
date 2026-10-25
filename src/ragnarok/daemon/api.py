@@ -37,6 +37,7 @@ class Services:
     skills: Any = None  # SkillsAdmin
     digest: Any = None  # the digest engine
     vision: Any = None  # explain the screen / ask about an image
+    demo: Any = None  # demo mode state (synthetic data, fake sends), or None
 
 
 class ChatIn(BaseModel):
@@ -78,6 +79,9 @@ class VisionIn(BaseModel):
     question: str | None = Field(default=None, max_length=500)
     image_b64: str | None = Field(default=None, max_length=17_000_000)  # a picture the user attached; empty means: look at the screen
     delay_s: float = Field(default=0.0, ge=0, le=10)
+    mode: str = Field(default="screen", pattern="^(screen|region|window)$")  # a whole display, a part you drag out, or a window you click
+    display: int = Field(default=1, ge=1, le=8)
+    engine: str = Field(default="auto", pattern="^(auto|read|deep)$")  # read = OS text reader + language model (fast), deep = visual model, auto = read first
 
 
 class DecideIn(BaseModel):
@@ -110,7 +114,7 @@ def create_app(guard: TokenGuard | None = None, port: int = DEFAULT_PORT, servic
 
     @app.get("/status")
     async def status() -> dict[str, Any]:
-        out: dict[str, Any] = {"ok": True, "version": __version__, "degraded": []}
+        out: dict[str, Any] = {"ok": True, "version": __version__, "degraded": [], "demo": svc.demo is not None, "demo_ready": bool(svc.demo and svc.demo.ready)}
         if svc.runtime:
             out["runtime"] = svc.runtime.status()
         return out
@@ -311,6 +315,36 @@ def create_app(guard: TokenGuard | None = None, port: int = DEFAULT_PORT, servic
         subprocess.run(["open", f"x-apple.systempreferences:com.apple.preference.security?{panes[pane]}"], check=False, timeout=10)  # noqa: S603, S607
         return {"ok": True}
 
+    @app.get("/demo/outbox")
+    async def demo_outbox() -> dict[str, Any]:
+        return {"demo": svc.demo is not None, "items": list(svc.demo.outbox) if svc.demo else [], "auto": bool(svc.demo and svc.demo.auto)}
+
+    @app.post("/demo/incoming")
+    async def demo_incoming() -> dict[str, Any]:
+        if svc.demo is None:
+            return {"ok": False, "error": "E_NOT_DEMO"}
+        return {"ok": True, **await svc.demo.incoming()}
+
+    @app.post("/demo/auto")
+    async def demo_auto(enabled: bool) -> dict[str, Any]:
+        if svc.demo is None:
+            return {"ok": False, "error": "E_NOT_DEMO"}
+        svc.demo.auto = enabled
+        return {"ok": True, "auto": enabled}
+
+    @app.get("/screens")
+    async def screens(check: bool = False) -> dict[str, Any]:
+        """The connected displays, and (with check=true) whether macOS lets this app see the screen."""
+        import asyncio as _a
+
+        from ragnarok.platform import ocr as _ocr
+        from ragnarok.platform.screen import list_displays, permission_ok
+
+        out: dict[str, Any] = {"displays": await _a.to_thread(list_displays), "text_reader": _ocr.available()}
+        if check:
+            out["permission"] = await _a.to_thread(permission_ok)
+        return out
+
     @app.post("/vision")
     async def vision(body: VisionIn) -> dict[str, Any]:
         """Typed or clicked by the user only. The picture is used once and never stored; the answer is words, and nothing is executed from it. A job, so it can be stopped."""
@@ -324,7 +358,7 @@ def create_app(guard: TokenGuard | None = None, port: int = DEFAULT_PORT, servic
                 image = _b.b64decode(body.image_b64.split(",")[-1], validate=False)
             except ValueError:
                 return {"ok": False, "error": "E_IMAGE_TYPE", "detail": "that is not a readable image"}
-        return await svc.chat.submit_vision(body.question, image, body.delay_s)
+        return await svc.chat.submit_vision(body.question, image, body.delay_s, mode=body.mode, display=body.display, engine=body.engine)
 
     @app.post("/chat/{job_id}/cancel")
     async def chat_cancel(job_id: str) -> dict[str, Any]:
