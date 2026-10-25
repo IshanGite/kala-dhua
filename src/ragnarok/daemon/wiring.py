@@ -59,7 +59,7 @@ from ragnarok.store.vectors import VectorIndex
 COMPARTMENT = "work"
 REPO = Path(__file__).resolve().parents[3]
 FAMILY_SKILLS = {"mail": ["mail.draft", "mail.send", "mail.reply"], "chat": ["chat.reply"], "notes": ["reminder.add", "reminder.list"], "memory": ["memory.search"],
-                 "files": ["fs.read", "fs.search", "fs.write", "drive.create"], "code": ["python.run"], "calendar": ["calendar.add"], "system": []}
+                 "files": ["fs.read", "fs.search", "fs.write", "drive.create"], "code": ["python.run"], "calendar": ["calendar.add", "calendar.agenda"], "system": []}
 
 
 @dataclass

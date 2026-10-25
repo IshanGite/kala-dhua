@@ -29,6 +29,7 @@ from ragnarok.harness.answer import (
     source_recall,
 )
 from ragnarok.harness.calc import try_calc
+from ragnarok.harness.decompose import decompose, is_compound
 from ragnarok.harness.executor import ExecContext, Executor, TaskOutcome
 from ragnarok.harness.plan import Plan, PlanNode, validate_plan
 from ragnarok.harness.planner import Planner
@@ -53,7 +54,7 @@ FREE = "{free}"  # a free-text parameter in a stored route: refilled from the ne
 CRITERIA: dict[str, list[dict]] = {
     "reminder.add": [{"kind": "field_present", "path": "reminder_id"}], "reminder.list": [{"kind": "ok"}],
     "mail.draft": [{"kind": "field_present", "path": "draft"}], "mail.send": [{"kind": "equals", "path": "sent", "value": True}],
-    "chat.reply": [{"kind": "equals", "path": "posted", "value": True}], "calendar.add": [{"kind": "equals", "path": "added", "value": True}], "mail.reply": [{"kind": "equals", "path": "sent", "value": True}], "drive.create": [{"kind": "equals", "path": "created", "value": True}], "memory.search": [{"kind": "ok"}],
+    "chat.reply": [{"kind": "equals", "path": "posted", "value": True}], "calendar.add": [{"kind": "equals", "path": "added", "value": True}], "mail.reply": [{"kind": "equals", "path": "sent", "value": True}], "drive.create": [{"kind": "equals", "path": "created", "value": True}], "memory.search": [{"kind": "ok"}], "calendar.agenda": [{"kind": "ok"}],
 }
 
 
@@ -319,6 +320,15 @@ class Agent:
             if said:
                 dec = RouteDecision(tier="L1", intent_family="memory_cmd", skills=[], plan_needed=False, risk_floor=0, memory_types=["semantic", "episodic"], confidence=1.0, latency_ms=0.0, backend="rule")
                 return TurnResult("L1", dec, None, None, (time.perf_counter() - t0) * 1000, answer=Answered(said, grounded=True), timings=tm)
+        decomposer_note = ""
+        if trust in ("user_direct", "agent") and is_compound(request):  # FR3.1: several steps in one request become a small execution graph, by code
+            d = decompose(request)
+            if d.plan is not None and validate_plan(d.plan, self._manifest).ok:
+                dec = RouteDecision(tier="L1", intent_family="compound", skills=[n.skill for n in d.plan.nodes], plan_needed=True, risk_floor=0, memory_types=memory_types_hint(request),
+                                    confidence=1.0, latency_ms=0.0, backend="decomposer",
+                                    trace=[f"Split into {len(d.clauses)} steps by code: " + " then ".join(f"{n.skill}" for n in d.plan.nodes) + "; later steps use earlier results, so anything derived from outside content asks for your click"])
+                return await self._run_plan(request, dec, d.plan, "C", [], t0, tm)
+            decomposer_note = f"The step splitter could not handle it ({d.reason}), so the planner model tries"  # falls through to the cascade and the LLM planner
         if self.answerer is not None and is_catchup(request):  # a briefing is read-only and needs no routing
             ans = await self.answerer.catch_up(request)
             dec = RouteDecision(tier="L1", intent_family="catchup", skills=[], plan_needed=False, risk_floor=0, memory_types=[], confidence=1.0, latency_ms=0.0, backend="catchup")
@@ -359,6 +369,8 @@ class Agent:
         decision = await self.cascade.route(request, compartment=self.ctx.compartment, caller_trust=trust, now_ms=now)
         mark("route", t_route)
         decision.memory_types = memory_types_hint(request)
+        if decomposer_note:
+            decision.trace.append(decomposer_note)
         if decision.intent_family == "unavailable" and self.answerer is not None:  # degrade: keyword search over memory, plain honesty otherwise
             ans = await self._say(request, history=history, general=False) if not self._is_action_request(request) else Answered("The model server is not running, so I cannot work out that request right now. Reminders, agenda and time questions still work.")
             return TurnResult("L3", decision, None, None, (time.perf_counter() - t0) * 1000, answer=ans, timings=tm)
@@ -414,7 +426,11 @@ class Agent:
         if self.answerer is not None and [n.skill for n in plan.nodes] == ["memory.search"]:  # a lookup is answered in words, with citations
             ans = await self.answerer.answer(request)
             return TurnResult(decision.tier, decision, None, None, (time.perf_counter() - t0) * 1000, answer=ans)
-        mark("plan", t0 + (tm["log"] + tm["route"]) / 1000)
+        return await self._run_plan(request, decision, plan, plan_source, snippets, t0, tm)
+
+    async def _run_plan(self, request: str, decision: RouteDecision, plan: Plan, plan_source: str, snippets: list[str], t0: float, tm: dict[str, int]) -> TurnResult:
+        mark = lambda name, since: tm.__setitem__(name, round((time.perf_counter() - since) * 1000))  # noqa: E731
+        mark("plan", t0 + (tm.get("log", 0) + tm.get("route", 0)) / 1000)
         t_exec = time.perf_counter()
         tid = self.executor.start_task(request, plan, self.ctx, plan_meta={"tier": decision.tier, "route_id": decision.route_id})
         outcome = await self.executor.run_task(tid, self.ctx)

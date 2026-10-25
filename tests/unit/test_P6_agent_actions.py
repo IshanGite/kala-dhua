@@ -206,3 +206,22 @@ async def test_every_reply_can_explain_why_that_tool_was_chosen(world):
     assert "built-in rule for reminder.add" in why and "Step n1: reminder.add" in why and "Result:" in why and "Time:" in why
     ans = summarize(await world.agent.handle("what is on my calendar tomorrow"))
     assert ans["why"] is not None
+
+
+async def test_a_multi_step_request_runs_as_a_graph_and_the_dependent_write_asks_for_a_click(world):
+    await start(world)
+    task = asyncio.create_task(world.agent.handle("look up what the standup is about and remind me about it tomorrow at 9am"))
+    cards = await asyncio.wait_for(approve_all(world, True), 8)
+    turn = await asyncio.wait_for(task, 8)
+    out = summarize(turn)
+    assert turn.decision.backend == "decomposer" and [n for n in turn.outcome.node_states] == ["n1", "n2"] and turn.outcome.state == "succeeded"
+    assert cards[0]["skill"] == "reminder.add" and any("outside" in w.lower() or "untrusted" in w.lower() for w in cards[0]["warnings"]), "built from outside content, so it needs a click"
+    assert "Reminder set" in out["text"] and "Split into 2 steps" in " ".join(out["why"])
+
+
+async def test_two_independent_writes_in_one_request_need_one_click_each_only_where_they_leave_the_machine(world):
+    await start(world)
+    task = asyncio.create_task(world.agent.handle("remind me to call mom tomorrow at 8am and send an email to a@b.com saying I called"))
+    cards = await asyncio.wait_for(approve_all(world, True), 8)
+    turn = await asyncio.wait_for(task, 8)
+    assert [c["skill"] for c in cards] == ["mail.send"] and turn.outcome.state == "succeeded" and SENT[-1][0] == "mail"

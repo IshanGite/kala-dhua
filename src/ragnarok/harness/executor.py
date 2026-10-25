@@ -33,6 +33,7 @@ from ragnarok.skills.runner import RunContext, run_skill
 RETRYABLE = {"E_NET", "E_UPSTREAM", "E_MODEL_TIMEOUT", "E_MODEL_DEADLINE", "E_SANDBOX_TIMEOUT", "E_NATIVE_TIMEOUTERROR"}
 MAX_RETRIES = 2
 BACKOFF_S = 0.4
+TAINTED_RESULTS = {"memory.search", "calendar.agenda"}  # these return text that came from outside (mail, chat, invitations): whatever is built from it is treated as received
 READ_SOURCES = {"mail.read": "received", "chat.read": "received", "drive.read": "received", "fs.read": "user_file"}
 MAX_CONCURRENCY = 2
 
@@ -283,6 +284,8 @@ class Executor:
 
     @staticmethod
     def _result_trust(manifest: Any) -> str:
+        if manifest.name in TAINTED_RESULTS:
+            return "received"
         for p in manifest.permission_names:
             if p in READ_SOURCES and READ_SOURCES[p] == "received":
                 return "received"

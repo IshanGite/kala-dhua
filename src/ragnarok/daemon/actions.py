@@ -53,7 +53,16 @@ class Actions:
     async def memory_search(self, p: dict[str, Any], ctx: ExecContext, *, dry_run: bool) -> dict[str, Any]:
         res = await retrieve(p["query"], compartment=self._comp, reader=self._r, index=self._i, gateway=self._gw, now_ms=get_clock().now_ms(),
                              deadline=get_clock().monotonic() + 3, k=5, token_budget=700)
-        return {"hits": [{"text": h.text[:300], "citation": h.citation, "trust": h.trust} for h in res.hits]}
+        hits = [{"text": h.text[:300], "citation": h.citation, "trust": h.trust} for h in res.hits]
+        return {"hits": hits, "first": hits[0]["text"][:200] if hits else "", "summary": " | ".join(h["text"][:160] for h in hits[:4])}
+
+    async def calendar_agenda(self, p: dict[str, Any], ctx: ExecContext, *, dry_run: bool) -> dict[str, Any]:
+        from ragnarok.router.when import agenda_range
+
+        a0, a1 = agenda_range(p.get("when", "") or "today", datetime.fromtimestamp(get_clock().now_ms() / 1000))
+        rows = self._r.items_between(("gcal", "outlook_cal"), int(a0.timestamp() * 1000), int(a1.timestamp() * 1000))
+        lines = [f"{datetime.fromtimestamp((r['ts'] or 0) / 1000).strftime('%H:%M')} {r['title'] or '(no title)'}" for r in rows]
+        return {"events": lines, "first": lines[0] if lines else "", "summary": ("Calendar for " + a0.strftime("%a %d %b") + ": " + "; ".join(lines)) if lines else f"Nothing on the calendar for {a0.strftime('%a %d %b')}."}
 
     async def reminder_add(self, p: dict[str, Any], ctx: ExecContext, *, dry_run: bool) -> dict[str, Any]:
         due = parse_due(p.get("when", ""), p["text"])
@@ -176,5 +185,5 @@ class Actions:
         return {"created": True, "title": p["title"], "link": await Drive(auth).create_doc(auth, p["title"], p["text"])}
 
     def natives(self) -> dict[str, NativeHandler]:
-        return {"memory.search": self.memory_search, "reminder.add": self.reminder_add, "reminder.list": self.reminder_list, "mail.draft": self.mail_draft,
+        return {"memory.search": self.memory_search, "calendar.agenda": self.calendar_agenda, "reminder.add": self.reminder_add, "reminder.list": self.reminder_list, "mail.draft": self.mail_draft,
                 "mail.send": self.mail_send, "chat.reply": self.chat_reply, "calendar.add": self.calendar_add, "mail.reply": self.mail_reply, "drive.create": self.drive_create}

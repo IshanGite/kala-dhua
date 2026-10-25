@@ -1,0 +1,53 @@
+{
+  "name": "calendar.agenda",
+  "version": "0.1.0",
+  "description": "Use when the user asks what is on their calendar or agenda for a day or week.",
+  "entrypoint": {
+    "type": "native",
+    "action": "calendar.agenda"
+  },
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "when": {
+        "type": "string",
+        "maxLength": 80,
+        "description": "the day as the user said it, e.g. 'tomorrow', 'friday', 'this week', '27 oct'"
+      }
+    },
+    "required": [],
+    "additionalProperties": false
+  },
+  "permissions": [
+    {
+      "permission": "calendar.read"
+    }
+  ],
+  "side_effects": "none",
+  "dry_run": false,
+  "param_roles": {
+    "free": [
+      "when"
+    ]
+  },
+  "examples": [
+    {
+      "params": {
+        "when": "tomorrow"
+      },
+      "note": "what is on my calendar tomorrow"
+    },
+    {
+      "params": {
+        "when": "tomorrow"
+      },
+      "note": "show my agenda for friday"
+    },
+    {
+      "params": {
+        "when": "tomorrow"
+      },
+      "note": "do I have meetings this week"
+    }
+  ]
+}

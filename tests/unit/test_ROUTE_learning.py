@@ -166,7 +166,7 @@ async def test_ROUTE_learning_curve_descends_from_L3_to_L0_and_gets_faster(world
         tiers.append(r.tier)
         lats.append(r.latency_ms)
         learned.append(r.learned)
-    assert tiers == ["L3", "L3", "L3", "L0", "L0", "L0", "L0", "L0"], tiers
+    assert tiers == ["L3", "L3", "L3", "L0", "L0", "L0", "L0", "L0"], (tiers, learned, r.decision.trace, r.decision.notes)
     assert learned[0] == "candidate_created" and learned[1] == "shadow_agree" and learned[2] == "promoted"
     l3 = sorted(lats[:3])[1]
     l0 = sorted(lats[3:])[len(lats[3:]) // 2]
