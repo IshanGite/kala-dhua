@@ -44,6 +44,9 @@ Examples:
 "what happened on slack today" -> none
 "summarize my emails" -> none
 "set a timer for 10 minutes" -> reminder.add, body "timer", when "in 10 minutes"
+"schedule lunch with Priya on friday at 1pm" -> calendar.add, title "lunch with Priya", when "friday at 1 pm"
+"put dentist friday 5pm on my calendar" -> calendar.add, title "dentist", when "friday at 5 pm"
+"block tomorrow 2pm for deep work" -> calendar.add, title "deep work", when "tomorrow at 2 pm"
 "how are you" -> none
 "tell me a joke" -> none
 "what is on my calendar tomorrow" -> none
@@ -96,6 +99,8 @@ Examples:
 "can u text Tushar on tg that im omw" -> steps: [chat.reply platform telegram target Tushar body "im omw"]
 "remind me tmrw 8am to call mom" -> steps: [reminder.add body "call mom" when "tomorrow at 8 am"]
 "yo remind me in half an hour to stretch" -> steps: [reminder.add body "stretch" when "in 30 minutes"]
+"schedule lunch with Priya on friday at 1pm" -> steps: [calendar.add title "lunch with Priya" when "friday at 1 pm"]
+"block tomorrow 2pm for deep work" -> steps: [calendar.add title "deep work" when "tomorrow at 2 pm"]
 "how are you" -> steps: []
 "who sent me the contract request" -> steps: []
 "summarize my emails" -> steps: []

@@ -1,0 +1,32 @@
+{
+ "n": 99,
+ "correct": 94,
+ "note": "author-written labelled messages, one labeller; a regression guard, not a benchmark",
+ "misses": [
+  {
+   "text": "who won the match yesterday",
+   "expected": "chat",
+   "got": "recall"
+  },
+  {
+   "text": "what happened while I was away",
+   "expected": "catchup",
+   "got": "recall"
+  },
+  {
+   "text": "resume mis correos",
+   "expected": "catchup",
+   "got": "screen"
+  },
+  {
+   "text": "recap discord",
+   "expected": "catchup",
+   "got": "recall"
+  },
+  {
+   "text": "run python to print 1 to 10",
+   "expected": "action",
+   "got": null
+  }
+ ]
+}

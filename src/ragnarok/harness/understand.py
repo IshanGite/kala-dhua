@@ -48,6 +48,15 @@ Examples:
 "email bob@x.com asking for leave" -> action
 "remind me to call mom at 5" -> action
 "help me write an apology to a client" -> chat
+"who made you" -> chat
+"who won the match yesterday" -> chat
+"what was the plan for friday" -> recall
+"where is the pitch deck" -> recall, topic pitch deck
+"am I free on friday" -> agenda
+"kal subah 9 baje gym yaad dilana" -> action
+"do something" -> unclear
+"berlin time" -> chat
+"what is the weather in paris" -> chat
 "what can you do" -> chat
 "what is the capital of France" -> chat
 "asdfgh" -> unclear
@@ -88,3 +97,16 @@ async def understand(gateway: Gateway, text: str, history: list[tuple[str, str]]
     if person and person.lower() not in text.lower():
         person = ""  # a name the user never wrote is the model carrying over the last question, not a person to look up
     return Understanding(intent, person, src if src in ("gmail", "slack", "discord", "telegram", "calendar", "drive") else "", clean("topic"))
+
+
+_CUES = {
+    "screen": r"screen|display|monitor|window|page|tab\b|desktop|picture|image|photo|looking at|showing|see\b|visible|open right now|this app",
+    "catchup": r"catch|summar|overview|recap|brief|miss|new\b|happen|urgent|attention|reply|respond|unread|inbox|e-?mails?|mails?|messages?|slack|discord|telegram|gmail|today|yesterday|week|anything|everything|digest|resum|correos|nachrichten|important|going on|update|pending|unanswered|waiting",
+    "agenda": r"calendar|schedule|agenda|meeting|appointment|event|today|tomorrow|tonight|week|free|busy|day\b|monday|tuesday|wednesday|thursday|friday|saturday|sunday|next|plans?\b|available|booked|calendario|reunion|reuni",
+}
+
+
+def plausible(intent: str, request: str) -> bool:
+    """A cheap check that the words support what the model decided. Only the intents that would show something large or look at the screen need one."""
+    pat = _CUES.get(intent)
+    return True if pat is None else bool(re.search(pat, request, re.I))

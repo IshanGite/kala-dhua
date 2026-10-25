@@ -37,7 +37,7 @@ from ragnarok.harness.decompose import decompose, is_compound
 from ragnarok.harness.executor import ExecContext, Executor, TaskOutcome
 from ragnarok.harness.plan import Plan, PlanNode, validate_plan
 from ragnarok.harness.planner import Planner
-from ragnarok.harness.understand import understand
+from ragnarok.harness.understand import Understanding, plausible, understand
 from ragnarok.harness.verify import evaluate
 from ragnarok.harness.vision import SCREEN_ASK
 from ragnarok.llm_gateway.client import Gateway, Priority
@@ -365,6 +365,15 @@ class Agent:
 
     async def _plan_from_steps(self, text: str, steps: list[Any]) -> Plan | None:
         """One to four ordered actions. Written text is composed here; a later step may use an earlier document's link through {ref:}. Every field is validated; every send still needs a click."""
+        from ragnarok.router.when import split_event, split_reminder
+
+        for p in steps:  # a small model sometimes puts the sentence in `compose` for a reminder or event and forgets the time: those never compose text, and the time is read from the sentence by code
+            if p.skill in ("reminder.add", "calendar.add"):
+                p.fields.pop("compose", None)
+                if not p.fields.get("when"):
+                    p.fields["when"] = (split_event(text)[1] if p.skill == "calendar.add" else split_reminder(text)[1]) or ""
+                    if not p.fields["when"]:
+                        p.fields.pop("when")
         if len(steps) == 1 and not steps[0].fields.get("compose"):
             return await self._plan_from_parsed(text, steps[0])
         if not steps or len(steps) > 4:
@@ -498,6 +507,8 @@ class Agent:
     async def _answer_intent(self, request: str, u: Any, history: list[tuple[str, str]] | None, trust: str, t0: float, tm: dict[str, int]) -> TurnResult | None:
         """Read-only paths chosen by the understanding model. None means 'not for me': the keyword paths below take over."""
         assert self.answerer is not None
+        if not plausible(u.intent, request):  # the model read it as something the words do not support ('berlin time' as a summary request): treat it as conversation instead of showing the wrong thing
+            u = Understanding("chat", u.person, u.source, u.topic)
         done = lambda fam, ans, trace: TurnResult("L1", RouteDecision(tier="L1", intent_family=fam, skills=[], plan_needed=False, risk_floor=0, memory_types=[], confidence=1.0, latency_ms=0.0,  # noqa: E731
                                                                       backend="understand", trace=[f"The language model read your message as '{u.intent}'" + (f" about {u.person}" if u.person else "") + (f" ({u.topic})" if u.topic else "") + ": " + trace]),
                                                   None, None, (time.perf_counter() - t0) * 1000, answer=ans, timings=tm)
@@ -572,6 +583,14 @@ class Agent:
         if (calc := try_calc(request)) is not None:  # arithmetic is done by code, never by the model
             dec = RouteDecision(tier="L1", intent_family="calc", skills=[], plan_needed=False, risk_floor=0, memory_types=[], confidence=1.0, latency_ms=0.0, backend="rule", trace=["Arithmetic evaluated by code (a model is not trusted with sums)"])
             return TurnResult("L1", dec, None, None, (time.perf_counter() - t0) * 1000, answer=Answered(calc if " " in calc else f"= {calc}", grounded=True), timings=tm)
+        if self.answerer is not None and trust in ("user_direct", "agent") and not re.match(r"^\s*(remind|schedule|set|add|put|book|block)\b", request, re.I):
+            from datetime import datetime as _dt0
+
+            from ragnarok.harness.utility import utility_answer
+
+            if (util := utility_answer(request, _dt0.fromtimestamp(get_clock().now_ms() / 1000))) is not None:  # time anywhere, date arithmetic, unit conversion: exact, by code
+                dec = RouteDecision(tier="L1", intent_family="utility", skills=[], plan_needed=False, risk_floor=0, memory_types=[], confidence=1.0, latency_ms=0.0, backend="rule", trace=["Computed by code from the system clock, the timezone database or arithmetic: a model is never asked for a time, a date or a conversion"])
+                return TurnResult("L1", dec, None, None, (time.perf_counter() - t0) * 1000, answer=Answered(util, grounded=True, notes=["computed"]), timings=tm)
         if self.answerer is not None and TIME_ASK.search(request) and not self._is_action_request(request):
             from datetime import datetime as _dt
 
@@ -592,7 +611,7 @@ class Agent:
         # the two readings must agree it is a request to DO something: a message the understanding reads as a question, a summary, the calendar or the screen is never turned into an action
         if len(steps) == 1 and is_compound(request) and (dd := decompose(request)).plan is not None and len(dd.plan.nodes) >= 2 and validate_plan(dd.plan, self._manifest).ok:
             steps = []  # the model saw one step in what is plainly several: the code splitter handles it below
-        accept = bool(steps) and (strong is not None or (u is None and not self._is_question(request)) or (u is not None and (u.intent == "action" or (u.intent in ("chat", "unclear") and not self._is_question(request)))))
+        accept = bool(steps) and (strong is not None or (u is None and not self._is_question(request)) or (u is not None and (u.intent == "action" or (u.intent in ("chat", "unclear") and not self._is_question(request)) or (not self._is_question(request) and all(s.skill in ("reminder.add", "calendar.add") for s in steps)))))
         if accept and (plan_llm := await self._plan_from_steps(request, steps)) is not None:
             dec = RouteDecision(tier="L2", intent_family="action", skills=[n.skill for n in plan_llm.nodes], plan_needed=len(plan_llm.nodes) > 1, risk_floor=0, memory_types=memory_types_hint(request), confidence=0.9, latency_ms=0.0,
                                 backend="language-model", trace=["The language model read who, what and when from your own words; code checked every field; anything that sends or changes something still needs your click"])
