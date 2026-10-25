@@ -34,6 +34,6 @@ doc.dispatchEvent(new window.MouseEvent("mouseup", { bubbles: true }));
 check("a drag moves the raven and does NOT restore the window", calls.some((c) => c[0] === "/shell/mascot/move") && calls.some((c) => c[0] === "/shell/mascot/dropped") && !calls.some((c) => c[0] === "/shell/restore"));
 await sleep(1200);
 check("the bolt sits at the left edge and the bubble opens into the screen", /left/.test(doc.getElementById("row").className));
-check("the window is asked to grow so the words are not cut off", calls.length >= 0 && allCalls.some((c) => c[0] === "/shell/mascot/size" && c[2] && c[2].w > 56));
+check("the window is asked to grow so the words are not cut off", calls.length >= 0 && allCalls.some((c) => c[0] === "/shell/mascot/size" && c[2] && c[2].w > 72));
 window.close();
 process.exit(ok ? 0 : 1);

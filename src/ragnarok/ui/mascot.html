@@ -6,40 +6,71 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; img-src data:">
 <title>Muninn</title>
 <style>
-/* A small bolt of lightning that waits where Ragnarok is pinned: calm and dim when nothing is happening, flaring with a message when something needs you. */
+/* A small bolt of lightning that waits where Ragnarok is pinned. Nothing here uses a CSS filter or a box: the glow is painted inside the picture and fades to nothing before the window edge, so no frame ever shows. */
 html,body{margin:0;height:100%;background:transparent;overflow:hidden;user-select:none;-webkit-user-select:none;cursor:pointer;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
-#row{position:absolute;inset:0;display:flex;align-items:center;gap:8px;padding:0 2px}
+#row{position:absolute;inset:0;display:flex;align-items:center;gap:4px}
 #row.right{flex-direction:row-reverse}
-#bolt{width:52px;height:80px;flex:none;position:relative;filter:drop-shadow(0 0 5px #38d6b0aa) drop-shadow(0 0 12px #38d6b055);animation:breathe 3.2s ease-in-out infinite;transform-origin:50% 60%}
-svg{width:100%;height:100%;overflow:visible}
-.core{fill:url(#g)}
-.rim{fill:none;stroke:#e8fffb;stroke-width:1.1;stroke-linejoin:round;opacity:.9}
-.arc{fill:none;stroke:#bffcf0;stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round;opacity:0}
-@keyframes breathe{0%,100%{filter:drop-shadow(0 0 4px #38d6b099) drop-shadow(0 0 9px #38d6b044);scale:1}50%{filter:drop-shadow(0 0 7px #38d6b0cc) drop-shadow(0 0 16px #38d6b077);scale:1.025}}
-@keyframes flick{0%,100%{opacity:1}6%{opacity:.55}9%{opacity:1}52%{opacity:1}54%{opacity:.7}57%{opacity:1}}
-#bolt .core{animation:flick 6.5s steps(1) infinite}
-.zap .arc{animation:arc .42s steps(2) 1}
-@keyframes arc{0%{opacity:0}20%{opacity:1}55%{opacity:.25}75%{opacity:1}100%{opacity:0}}
-.sleep #bolt{animation:ember 4.5s ease-in-out infinite;filter:drop-shadow(0 0 3px #38d6b055)}
-@keyframes ember{0%,100%{opacity:.5}50%{opacity:.78}}
-.alert #bolt{animation:flare .9s ease-out 3;filter:drop-shadow(0 0 9px #8ffff0) drop-shadow(0 0 22px #38d6b0)}
+#bolt{width:72px;height:92px;flex:none;position:relative;transform-origin:50% 55%;transition:transform .25s cubic-bezier(.3,1.5,.5,1)}
+#row:hover #bolt{transform:scale(1.1) rotate(-3deg)}
+svg{width:100%;height:100%;overflow:visible;display:block}
+#halo{transform-origin:36px 46px;animation:halo 3.4s ease-in-out infinite}
+@keyframes halo{0%,100%{opacity:.62;transform:scale(.94)}50%{opacity:1;transform:scale(1.06)}}
+#flow{stroke-dasharray:7 52;animation:flow 2.6s linear infinite}
+@keyframes flow{to{stroke-dashoffset:-118}}
+#hot{animation:hot 2.2s ease-in-out infinite}
+@keyframes hot{0%,100%{opacity:.8}50%{opacity:1}}
+.spark{fill:#dffff8;opacity:0;transform-box:fill-box;transform-origin:center}
+.s1{animation:sp 3.1s ease-out infinite .1s;--dx:-14px;--dy:-18px}.s2{animation:sp 3.1s ease-out infinite 1.1s;--dx:15px;--dy:-10px}.s3{animation:sp 3.1s ease-out infinite 2s;--dx:-12px;--dy:14px}
+.s4{animation:sp 3.1s ease-out infinite .6s;--dx:16px;--dy:16px}.s5{animation:sp 3.1s ease-out infinite 1.6s;--dx:2px;--dy:-22px}
+@keyframes sp{0%{opacity:0;transform:translate(0,0) scale(.4)}12%{opacity:1}100%{opacity:0;transform:translate(var(--dx),var(--dy)) scale(1)}}
+.arc{fill:none;stroke:#cffff4;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;opacity:0}
+.zap .arc{animation:arc .5s steps(2) 1}
+@keyframes arc{0%{opacity:0}20%{opacity:1}50%{opacity:.2}75%{opacity:1}100%{opacity:0}}
+.zap #body{animation:flash .5s ease-out 1}
+@keyframes flash{0%{filter:none}30%{filter:brightness(1.35)}100%{filter:none}}
+.sleep #bolt{opacity:.55;animation:ember 5s ease-in-out infinite}
+.sleep #halo,.sleep #flow{animation-duration:8s}
+@keyframes ember{0%,100%{opacity:.45}50%{opacity:.7}}
+.alert #bolt{animation:flare .8s cubic-bezier(.3,1.6,.5,1) 3}
+.alert #halo{animation:halo .5s ease-in-out infinite}
 .alert .arc{animation:arc .3s steps(2) 6}
-@keyframes flare{0%{scale:1}15%{scale:1.22}30%{scale:.96}45%{scale:1.14}100%{scale:1}}
-#row:hover #bolt{filter:drop-shadow(0 0 8px #8ffff0) drop-shadow(0 0 18px #38d6b0)}
-#bubble{max-width:188px;background:#eefdf9;color:#10231f;font:600 12.5px/1.3 system-ui,sans-serif;border-radius:12px;padding:8px 11px;box-shadow:0 3px 14px #0008;opacity:0;transform:scale(.9);transform-origin:center;transition:opacity .2s,transform .2s;display:none;word-break:break-word;border:1px solid #38d6b0}
-#bubble.on{opacity:1;transform:scale(1)}
-#dot{position:absolute;right:-2px;top:-2px;min-width:17px;height:17px;border-radius:9px;background:#ff6b5e;color:#fff;font:700 10.5px/17px system-ui;text-align:center;display:none;padding:0 4px;box-shadow:0 1px 4px #0007}
+.alert #ring{animation:ring .9s ease-out 3}
+@keyframes flare{0%{transform:scale(1)}20%{transform:scale(1.28) rotate(-5deg)}45%{transform:scale(.97) rotate(3deg)}70%{transform:scale(1.15)}100%{transform:scale(1)}}
+#ring{fill:none;stroke:#7ff5df;stroke-width:1.6;opacity:0;transform-box:fill-box;transform-origin:center}
+@keyframes ring{0%{opacity:.9;transform:scale(.5)}100%{opacity:0;transform:scale(2.4)}}
+#bubble{max-width:188px;background:linear-gradient(180deg,#f3fffc,#e3f8f2);color:#10231f;font:600 12.5px/1.3 system-ui,sans-serif;border-radius:13px;padding:8px 11px;box-shadow:0 3px 14px #0008;opacity:0;transform:translateX(var(--bx,8px)) scale(.92);transform-origin:center;transition:opacity .22s,transform .25s cubic-bezier(.3,1.5,.5,1);display:none;word-break:break-word;border:1px solid #38d6b0}
+#row.right #bubble{--bx:10px}#row.left #bubble{--bx:-10px}
+#bubble.on{opacity:1;transform:translateX(0) scale(1)}
+#dot{position:absolute;right:6px;top:2px;min-width:17px;height:17px;border-radius:9px;background:#ff6b5e;color:#fff;font:700 10.5px/17px system-ui;text-align:center;display:none;padding:0 4px;box-shadow:0 1px 4px #0007;animation:pop .3s cubic-bezier(.3,1.8,.5,1)}
+@keyframes pop{from{transform:scale(0)}to{transform:scale(1)}}
+@media (prefers-reduced-motion:reduce){*{animation-duration:0s!important;animation-iteration-count:1!important}}
 </style>
 </head>
 <body>
 <div id="row" class="right" title="Click to bring Ragnarok back">
   <div id="bolt">
     <div id="dot"></div>
-    <svg viewBox="0 0 60 100" aria-label="A small bolt of lightning">
-      <defs><linearGradient id="g" x1="0" y1="0" x2="0.35" y2="1"><stop offset="0" stop-color="#f4fffd"/><stop offset=".45" stop-color="#7ff5df"/><stop offset="1" stop-color="#18a98d"/></linearGradient></defs>
-      <path class="arc" d="M6 30 L14 34 L9 42 L19 46"/><path class="arc" d="M54 62 L46 66 L51 74 L41 78"/><path class="arc" d="M10 78 L18 76 L15 86"/><path class="arc" d="M50 20 L43 25 L47 31"/>
-      <path class="core" d="M41 0 L5 55 L25 55 L9 100 L56 36 L34 36 L52 0 Z"/>
-      <path class="rim" d="M41 0 L5 55 L25 55 L9 100 L56 36 L34 36 L52 0 Z"/>
+    <svg viewBox="0 0 72 92" aria-label="A small bolt of lightning">
+      <defs>
+        <radialGradient id="rg" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#58f0d2" stop-opacity=".55"/><stop offset=".55" stop-color="#2cc7a8" stop-opacity=".18"/><stop offset="1" stop-color="#2cc7a8" stop-opacity="0"/></radialGradient>
+        <linearGradient id="g" x1="0.2" y1="0" x2="0.65" y2="1"><stop offset="0" stop-color="#f2fffc"/><stop offset=".3" stop-color="#9ff8e6"/><stop offset=".62" stop-color="#34d6b4"/><stop offset="1" stop-color="#0d8f78"/></linearGradient>
+        <linearGradient id="hl" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".95"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+      </defs>
+      <circle id="halo" cx="36" cy="46" r="35" fill="url(#rg)"/>
+      <circle id="ring" cx="36" cy="46" r="20"/>
+      <g id="body">
+        <path d="M41 5 L12 52 L31 52 L17 88 L60 38 L39 38 L54 5 Z" fill="none" stroke="#08392f" stroke-width="3.4" stroke-linejoin="round"/>
+        <path d="M41 5 L12 52 L31 52 L17 88 L60 38 L39 38 L54 5 Z" fill="url(#g)"/>
+        <path id="hot" d="M38.3 27.1 L25 48.8 L33.7 48.8 L27.2 65.4 L47 42.3 L37.4 42.3 L44.3 27.1 Z" fill="#ffffff" opacity=".8"/>
+        <path d="M41 5 L26 29 L32 29 L45 8 Z" fill="url(#hl)" opacity=".7"/>
+        <path d="M41 5 L12 52 L31 52 L17 88 L60 38 L39 38 L54 5 Z" fill="none" stroke="#e9fffb" stroke-width="1" stroke-linejoin="round" opacity=".9"/>
+        <path id="flow" d="M41 5 L12 52 L31 52 L17 88 L60 38 L39 38 L54 5 Z" fill="none" stroke="#ffffff" stroke-width="1.7" stroke-linecap="round" opacity=".85" stroke-linejoin="round"/>
+      </g>
+      <path class="arc" d="M8 30 L16 34 L11 42 L21 46 L16 53"><animate attributeName="d" dur=".6s" repeatCount="indefinite" values="M8 30 L16 34 L11 42 L21 46 L16 53;M9 28 L15 36 L12 41 L20 48 L17 52;M8 30 L16 34 L11 42 L21 46 L16 53"/></path>
+      <path class="arc" d="M64 62 L55 66 L60 75 L49 79"><animate attributeName="d" dur=".7s" repeatCount="indefinite" values="M64 62 L55 66 L60 75 L49 79;M65 64 L56 65 L59 77 L50 78;M64 62 L55 66 L60 75 L49 79"/></path>
+      <path class="arc" d="M10 76 L19 74 L16 85"><animate attributeName="d" dur=".5s" repeatCount="indefinite" values="M10 76 L19 74 L16 85;M11 78 L18 76 L17 84;M10 76 L19 74 L16 85"/></path>
+      <path class="arc" d="M58 18 L50 23 L55 30"><animate attributeName="d" dur=".55s" repeatCount="indefinite" values="M58 18 L50 23 L55 30;M59 20 L51 22 L54 31;M58 18 L50 23 L55 30"/></path>
+      <circle class="spark s1" cx="36" cy="46" r="1.5"/><circle class="spark s2" cx="40" cy="40" r="1.3"/><circle class="spark s3" cx="30" cy="56" r="1.4"/><circle class="spark s4" cx="38" cy="58" r="1.2"/><circle class="spark s5" cx="42" cy="22" r="1.3"/>
     </svg>
   </div>
   <div id="bubble"></div>
@@ -50,14 +81,14 @@ svg{width:100%;height:100%;overflow:visible}
   try{history.replaceState(null,"",location.pathname+location.search)}catch(e){}
   function api(p,b){return fetch(p,b===undefined?{headers:H}:{method:"POST",headers:H,body:JSON.stringify(b)}).then(function(r){return r.json()})}
   var row=document.getElementById("row"),bub=document.getElementById("bubble"),dot=document.getElementById("dot");
-  var edge="right",sleeping=false,last=Date.now(),queue=[],talking=false,seen={};
+  var W=72,Hh=92,edge="right",sleeping=false,last=Date.now(),queue=[],talking=false,seen={};
   function side(e){edge=e||"right";row.className=(edge==="left"?"left":"right")+(sleeping?" sleep":"")}
   side("right");
   // keep the bolt at the screen edge: the bubble opens toward the middle of the screen
   setInterval(function(){api("/shell/poll").then(function(d){if(d&&d.edge&&d.edge!==edge)side(d.edge)}).catch(function(){})},1000);
   // life: a crackle now and then; it dims after a while with nothing to say, and wakes when something happens or the mouse comes near
-  function zap(){if(sleeping)return;row.classList.add("zap");setTimeout(function(){row.classList.remove("zap")},500)}
-  setInterval(function(){if(Math.random()<.45)zap()},3800);
+  function zap(){if(sleeping)return;row.classList.add("zap");setTimeout(function(){row.classList.remove("zap")},520)}
+  setInterval(function(){if(Math.random()<.5)zap()},3600);
   setInterval(function(){if(!sleeping&&!talking&&Date.now()-last>90000){sleeping=true;row.classList.add("sleep")}},5000);
   function wake(){last=Date.now();if(sleeping){sleeping=false;row.classList.remove("sleep")}}
   document.addEventListener("mouseover",function(){wake();zap()});
@@ -65,10 +96,10 @@ svg{width:100%;height:100%;overflow:visible}
   function say(t,ms){queue.push([String(t).slice(0,110),ms||6000]);next()}
   function next(){if(talking||!queue.length)return;talking=true;var m=queue.shift();wake();
     bub.textContent=m[0];bub.style.display="block";bub.className="";
-    var w=Math.min(260,56+10+Math.min(188,Math.max(90,m[0].length*7+26))),h=Math.max(84,bub.offsetHeight+14);
+    var w=Math.min(272,W+6+Math.min(190,Math.max(96,m[0].length*7+26))),h=Math.max(Hh,bub.offsetHeight+14);
     api("/shell/mascot/size",{w:w,h:h}).catch(function(){});
-    setTimeout(function(){bub.className="on";row.classList.add("alert")},120);
-    setTimeout(function(){bub.className="";row.classList.remove("alert");setTimeout(function(){bub.style.display="none";api("/shell/mascot/size",{w:56,h:84}).catch(function(){});setTimeout(function(){talking=false;next()},300)},220)},m[1])}
+    setTimeout(function(){bub.className="on";row.classList.add("alert")},140);
+    setTimeout(function(){bub.className="";row.classList.remove("alert");setTimeout(function(){bub.style.display="none";api("/shell/mascot/size",{w:W,h:Hh}).catch(function(){});setTimeout(function(){talking=false;next()},300)},240)},m[1])}
   function poll(){api("/approvals").then(function(d){var n=(d.items||[]).length;dot.style.display=n?"block":"none";dot.textContent=n;
       (d.items||[]).forEach(function(c){if(!seen["a"+c.id]){seen["a"+c.id]=1;say("Waiting for your OK: "+(c.headline||c.skill),6500)}})}).catch(function(){});
     api("/inbox").then(function(d){var first=Object.keys(seen).length===0;(d.items||[]).slice(0,4).forEach(function(m){if(!seen["i"+m.id]&&(m.kind==="reminder"||m.kind==="attention"||m.kind==="alert"||m.kind==="heads_up")){seen["i"+m.id]=1;if(!first)say(m.title,6500)}else seen["i"+m.id]=1})}).catch(function(){})}

@@ -14,7 +14,7 @@ from typing import Any
 
 from ragnarok.core.logging import log
 
-MASCOT_W, MASCOT_H = 56, 84  # the idle size: a small bolt; the window grows only while it is speaking
+MASCOT_W, MASCOT_H = 72, 92  # the idle size: a small bolt; the window grows only while it is speaking
 EDGE_NEAR = 28  # how close to an edge (points) a dragged window must come before the options appear
 EDGES = ("left", "right", "top", "bottom")
 
