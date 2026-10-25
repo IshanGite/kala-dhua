@@ -162,3 +162,12 @@ def test_notification_apps_are_set_through_the_api_and_start_empty(world):
     assert r["available"] is False and "Full Disk Access" in r["detail"] and r["apps"] == []
     assert c.post("/notifications", json={"apps": ["ru.keepcoder.Telegram", " ", "ru.keepcoder.Telegram"]}).json()["apps"] == ["ru.keepcoder.Telegram"]
     assert c.get("/notifications").json()["apps"] == ["ru.keepcoder.Telegram"]
+
+
+def test_messages_endpoint_lists_what_was_read_newest_first_with_search(world):
+    mem, keys, rt, reader, gw, idx = world
+    c = TestClient(create_app(TokenGuard("tok"), 8765, Services(rt, Answerer(reader, idx, gw), reader=reader)), base_url="http://127.0.0.1:8765", headers={HEADER: "tok"})
+    c.post("/tick")
+    items = c.get("/messages").json()["items"]
+    assert items and items[0]["source"] == "feed" and "Orion" in items[0]["preview"]
+    assert c.get("/messages?q=Orion").json()["items"] and c.get("/messages?q=zebra").json()["items"] == []

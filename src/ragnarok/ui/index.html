@@ -47,6 +47,8 @@ h2{font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:var(--mute)
 </header>
 <nav role="tablist">
   <button role="tab" aria-selected="true" data-t="chat">Chat</button>
+  <button role="tab" aria-selected="false" data-t="msg">Messages</button>
+  <button role="tab" aria-selected="false" data-t="appr">Approvals <span id="badge" class="small"></span></button>
   <button role="tab" aria-selected="false" data-t="act">Activity</button>
   <button role="tab" aria-selected="false" data-t="src">Sources</button>
 </nav>
@@ -55,6 +57,8 @@ h2{font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:var(--mute)
     <div id="log" aria-live="polite"><p class="sys">Ask about anything it has read. It answers only from your memory and cites where.</p></div>
     <form id="f"><input id="q" type="text" autocomplete="off" placeholder="Ask your memory" aria-label="Message" maxlength="4000"><button class="btn pri" type="submit">Send</button></form>
   </section>
+  <section id="msg"><div style="padding:10px 14px 0"><input id="mq" type="text" placeholder="Search what has been read" aria-label="Search messages" maxlength="200" style="width:100%;padding:8px 10px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--ink)"></div><div id="msgs" style="flex:1;overflow:auto;padding:8px 14px"></div></section>
+  <section id="appr"><div id="cards" style="flex:1;overflow:auto;padding:12px 14px"></div></section>
   <section id="act"><div id="feed"></div></section>
   <section id="src"><div id="srcbox"></div></section>
 </main>
@@ -69,8 +73,11 @@ h2{font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:var(--mute)
   tabs.forEach(function(b){b.onclick=function(){tabs.forEach(function(o){o.setAttribute("aria-selected",o===b)});document.querySelectorAll("section").forEach(function(s){s.classList.toggle("show",s.id===b.dataset.t)})}});
   var log=document.getElementById("log"),q=document.getElementById("q");
   function add(cls,text,cites){var m=el("div","msg "+cls,text);if(cites&&cites.length){var c=el("div","cites");cites.forEach(function(x){c.appendChild(el("span","chip","["+x.n+"] "+(x.citation||x.kind||"memory")))});m.appendChild(c)}log.appendChild(m);log.scrollTop=log.scrollHeight;return m}
-  document.getElementById("f").onsubmit=function(e){e.preventDefault();var t=q.value.trim();if(!t)return;q.value="";add("me",t);var w=add("bot","Looking through memory...");
-    api("/chat",{text:t}).then(function(d){w.remove();add("bot",d.ok?d.answer:"The agent is not ready ("+(d.error||"error")+").",d.citations)}).catch(function(){w.remove();add("bot","Could not reach the agent.")})};
+  function show(w,d){w.remove();var t=d.ok===false?"The agent is not ready ("+(d.error||"error")+").":d.text;var m=add("bot",t,d.citations);
+    if(d.ok!==false&&d.tier){m.appendChild(el("div","small",d.tier+" via "+d.backend+(d.ms?" - "+d.ms+" ms":"")+(d.learned==="promoted"?" - learned a route":d.learned==="route_used"?" - stored route":"")))}}
+  function poll(w,job,n){api("/chat/"+job).then(function(d){if(d.pending&&n<400){setTimeout(function(){poll(w,job,n+1)},1000)}else show(w,d)}).catch(function(){w.remove();add("bot","Lost contact with the agent.")})}
+  document.getElementById("f").onsubmit=function(e){e.preventDefault();var t=q.value.trim();if(!t)return;q.value="";add("me",t);var w=add("bot","Working on it...");
+    api("/chat",{text:t}).then(function(d){if(d.pending){w.firstChild.textContent="Waiting - if it needs your OK, check the Approvals tab...";poll(w,d.job,0)}else show(w,d)}).catch(function(){w.remove();add("bot","Could not reach the agent.")})};
   var sw=document.getElementById("sw");
   sw.onclick=function(){var on=sw.getAttribute("aria-checked")!=="true";api("/toggle",{enabled:on}).then(refresh)};
   function ago(ts){var s=Math.max(0,(Date.now()-ts)/1000|0);return s<60?s+"s ago":s<3600?(s/60|0)+"m ago":(s/3600|0)+"h ago"}
@@ -95,9 +102,26 @@ h2{font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:var(--mute)
       a.onclick=function(){api("/pairing",{platform:h.platform,handle:h.handle,action:"approve"}).then(refresh)};bl.onclick=function(){api("/pairing",{platform:h.platform,handle:h.handle,action:"block"}).then(refresh)};
       row.appendChild(a);row.appendChild(bl);c.appendChild(row);f.appendChild(c)})}
     f.appendChild(el("h2","","Recent activity"));var items=window.__items||[];if(!items.length)f.appendChild(el("p","small","Nothing yet."));
-    items.forEach(function(i){var r=el("div","row"),g=el("div","grow");var line=i.kind==="ingested"?("Read "+i.ingested+" new from "+i.source+(i.held?(", "+i.held+" held"):"")):i.kind==="error"?(i.source+": "+i.code):i.kind==="toggle"?("Switched "+i.code):i.kind==="paired"?(i.source+" sender "+i.code):(i.source+" "+i.code);
+    items.forEach(function(i){var r=el("div","row"),g=el("div","grow");var line=i.kind==="reminder"?("Reminder: "+i.text):i.kind==="ingested"?("Read "+i.ingested+" new from "+i.source+(i.held?(", "+i.held+" held"):"")):i.kind==="error"?(i.source+": "+i.code):i.kind==="toggle"?("Switched "+i.code):i.kind==="paired"?(i.source+" sender "+i.code):(i.source+" "+i.code);
       g.appendChild(el("div",i.kind==="error"?"err":"",line));g.appendChild(el("div","small",ago(i.ts)));r.appendChild(g);f.appendChild(r)})}
-  refresh();setInterval(refresh,4000);
+  function renderCards(items){var box=document.getElementById("cards");box.textContent="";document.getElementById("badge").textContent=items.length?("("+items.length+")"):"";
+    if(!items.length){box.appendChild(el("p","small","Nothing waiting. Anything that sends, posts or changes something outside this computer appears here first, and only goes after you click Approve."));return}
+    items.forEach(function(c){var d=el("div","card");d.appendChild(el("div","",c.headline||c.skill));
+      (c.fields||[]).forEach(function(f){var r=el("div","small",f.name+": "+String(f.value).slice(0,400));r.style.whiteSpace="pre-wrap";d.appendChild(r)});
+      if(c.tainted)d.appendChild(el("div","small err","Based on content received from outside - check it carefully."));
+      (c.warnings||[]).forEach(function(w){d.appendChild(el("div","small err",w))});
+      var typed=null;if(c.stepup){d.appendChild(el("div","small","Type "+c.stepup.phrase+" to confirm."));typed=el("input");typed.type="text";typed.style.cssText="width:100%;margin-top:6px;padding:6px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)";d.appendChild(typed)}
+      var row=el("div","row"),a=el("button","btn pri","Approve"),n=el("button","btn","Deny");
+      a.onclick=function(){a.disabled=n.disabled=true;api("/approvals/"+c.id,{action:"approve",phrase:typed?typed.value:null}).then(function(r){if(r.ok===false){d.appendChild(el("div","small err","Not approved: "+(r.error||"refused")));a.disabled=n.disabled=false}else pullCards()})};
+      n.onclick=function(){a.disabled=n.disabled=true;api("/approvals/"+c.id,{action:"deny"}).then(pullCards)};
+      row.appendChild(a);row.appendChild(n);d.appendChild(row);box.appendChild(d)})}
+  function pullCards(){api("/approvals").then(function(d){renderCards(d.items||[])}).catch(function(){})}
+  function loadMsgs(){var q=document.getElementById("mq").value.trim();api("/messages?limit=60"+(q?"&q="+encodeURIComponent(q):"")).then(function(d){var b=document.getElementById("msgs");b.textContent="";var it=d.items||[];
+      if(!it.length)b.appendChild(el("p","small",q?"Nothing matches.":"Nothing has been read yet. Connected sources are polled every minute."));
+      it.forEach(function(m){var r=el("div","row"),g=el("div","grow");g.appendChild(el("div","small",m.source+" - "+(m.title||m.kind)+" - "+ago(m.ts)+(m.trust==="received"?" - from outside":"")));g.appendChild(el("div","",m.preview||""));r.appendChild(g);b.appendChild(r)})}).catch(function(){})}
+  var mt;document.getElementById("mq").oninput=function(){clearTimeout(mt);mt=setTimeout(loadMsgs,300)};
+  tabs.forEach(function(b){b.addEventListener("click",function(){if(b.dataset.t==="msg")loadMsgs()})});setInterval(function(){if(document.getElementById("msg").classList.contains("show")&&!document.getElementById("mq").value)loadMsgs()},5000);
+  refresh();pullCards();setInterval(refresh,4000);setInterval(pullCards,1500);
 })();
 </script>
 </body>

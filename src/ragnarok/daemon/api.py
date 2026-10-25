@@ -17,6 +17,7 @@ from ragnarok.daemon.auth import LocalOnlyMiddleware, TokenGuard
 from ragnarok.daemon.chat import ChatService
 from ragnarok.daemon.runtime import Runtime
 from ragnarok.harness.answer import Answerer
+from ragnarok.memory.reader import MemoryReader
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8765
@@ -28,6 +29,7 @@ class Services:
     answerer: Answerer | None = None
     notifications: Notifications | None = None
     chat: ChatService | None = None
+    reader: MemoryReader | None = None
     hub: ApprovalHub | None = None
 
 
@@ -124,6 +126,13 @@ def create_app(guard: TokenGuard | None = None, port: int = DEFAULT_PORT, servic
         apps = sorted({a.strip() for a in body.apps if a.strip() and len(a) < 120})
         svc.runtime.state.set("notif_apps", _json.dumps(apps))
         return {"ok": True, "apps": apps}
+
+    @app.get("/messages")
+    async def messages(limit: int = 40, source: str | None = None, q: str | None = None) -> dict[str, Any]:
+        if svc.reader is None:
+            return {"items": []}
+        rows = svc.reader.recent_items(limit=limit, source=source, query=q)
+        return {"items": [{**r, "preview": (r["preview"] or "")[:240]} for r in rows]}
 
     @app.get("/approvals")
     async def approvals() -> dict[str, Any]:

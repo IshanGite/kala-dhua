@@ -106,6 +106,22 @@ class MemoryReader:
     def facts_by_state(self, comp_id: str, state: str) -> list[dict[str, Any]]:
         return [dict(r) for r in self._r.execute("SELECT * FROM facts WHERE compartment_id=? AND state=?", (comp_id, state))]
 
+    def recent_items(self, *, limit: int = 40, source: str | None = None, query: str | None = None) -> list[dict[str, Any]]:
+        """What has been read, newest first, with a short preview. For the user's own window only; never logged."""
+        sql = ("SELECT i.id, i.source, i.title, i.kind, i.trust, i.visibility, coalesce(i.occurred_at, i.ingested_at) AS ts, "
+               "(SELECT text FROM chunks c WHERE c.item_id = i.id ORDER BY ordinal LIMIT 1) AS preview FROM items i")
+        where, args = [], []
+        if source:
+            where.append("i.source = ?")
+            args.append(source)
+        if query and (q := fts_query(query)):
+            where.append("i.id IN (SELECT c.item_id FROM chunks c WHERE c.rowid IN (SELECT rowid FROM chunks_fts WHERE chunks_fts MATCH ?))")
+            args.append(q)
+        if where:
+            sql += " WHERE " + " AND ".join(where)
+        sql += " ORDER BY ts DESC LIMIT ?"
+        return [dict(x) for x in self._r.execute(sql, [*args, max(1, min(limit, 200))])]
+
     def find_conversation(self, source: str, name: str) -> dict[str, Any] | None:
         """The most recent conversation on a platform whose title matches a name: native_id is 'chat:message' for chat sources."""
         row = self._r.execute("SELECT native_id, title FROM items WHERE source=? AND title LIKE ? ORDER BY coalesce(occurred_at,0) DESC LIMIT 1", (source, f"%{name}%")).fetchone()

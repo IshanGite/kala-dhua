@@ -141,7 +141,7 @@ def build_world(*, use_laya: bool = True, sandbox: bool = True, embed_rungs: boo
         token_file.chmod(0o600)
     except OSError:
         pass  # Windows: the per-user data directory ACL applies
-    services = Services(runtime, answerer, notif, ChatService(agent), hub)
+    services = Services(runtime, answerer, notif, ChatService(agent), reader, hub)
     w = World(mem, reader, index, gw, runtime, services, guard, token_file, agent, selector, l1)
     w.registry = registry  # type: ignore[attr-defined]
     return w

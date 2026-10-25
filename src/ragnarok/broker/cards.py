@@ -25,6 +25,7 @@ def render_card(*, skill_id: str, params: dict[str, Any], tier: int, warnings: l
     headline = {
         "mail.send": "Send this email",
         "chat.post": "Post this message",
+        "chat.reply": "Send this chat message",
         "calendar.write": "Create or change this calendar event",
         "fs.delete": "Delete these files (moved to trash)",
         "python.run": "Run this code",
