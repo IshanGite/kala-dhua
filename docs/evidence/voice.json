@@ -1,0 +1,33 @@
+{
+ "note": "synthetic speech from macOS `say` voices (not human recordings): language detection correct on 4 of 4; accuracy on accented synthetic speech is limited with the base model",
+ "rows": [
+  {
+   "file": "de.wav",
+   "seconds": 0.16,
+   "language": "de",
+   "engine": "whisper",
+   "text": "die Stadt ist es heute Abend."
+  },
+  {
+   "file": "en.wav",
+   "seconds": 0.17,
+   "language": "en",
+   "engine": "whisper",
+   "text": "Remind me to call mom tomorrow at 9 in the morning."
+  },
+  {
+   "file": "es.wav",
+   "seconds": 0.19,
+   "language": "es",
+   "engine": "whisper",
+   "text": "recuerda me llamar al barco mañana a la stico de la tarde."
+  },
+  {
+   "file": "fr.wav",
+   "seconds": 0.21,
+   "language": "fr",
+   "engine": "whisper",
+   "text": "en voie, mais ça j'arabis sur telle gremme, je suis en retard."
+  }
+ ]
+}

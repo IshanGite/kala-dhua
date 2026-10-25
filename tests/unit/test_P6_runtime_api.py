@@ -264,3 +264,30 @@ def test_test_scripts_can_exclude_telegram_so_they_never_consume_the_real_queue(
     v.set(token_name("slack", "read"), "xoxb-x")
     monkeypatch.setenv("RAGNAROK_SKIP_SOURCES", "telegram")
     assert connected(v) == ["slack"]
+
+
+def test_reminders_panel_lists_marks_done_and_snoozes(world):
+    from ragnarok.memory.commitments import Commitments
+
+    mem, keys, rt, reader, *_ = world
+    rt.commitments = Commitments(mem)
+    rid = rt.commitments.add("work", "call the bank", 4_102_444_800_000)
+    c = client(world)
+    assert [r["what"] for r in c.get("/reminders").json()["items"]] == ["call the bank"]
+    assert c.post(f"/reminders/{rid}/snooze?minutes=10").json()["ok"]
+    items = c.get("/reminders").json()["items"]
+    assert len(items) == 1 and items[0]["due_at"] == 4_102_444_800_000 + 10 * 60_000 and items[0]["id"] != rid
+    assert c.post(f"/reminders/{items[0]['id']}/done").json()["ok"]
+    assert c.get("/reminders").json()["items"] == []
+
+
+def test_os_notifications_are_off_unless_the_user_turns_them_on(world):
+    from ragnarok.daemon.proactive import Proactive
+
+    mem, keys, rt, reader, *_ = world
+    pro = Proactive(rt.state, reader, run_command=None, agenda=None)  # type: ignore[arg-type]
+    assert pro.settings()["os_notify"] is False
+
+
+def test_speak_rejects_empty_text(world):
+    assert client(world).post("/speak", json={"text": ""}).status_code == 422

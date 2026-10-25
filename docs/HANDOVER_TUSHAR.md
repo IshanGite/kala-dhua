@@ -25,6 +25,9 @@ Ragnarok: an always-on personal AI agent that runs entirely on the machine. Loca
 - **Demo mode**: `ragnarok window --demo` (`daemon/demo.py`): synthetic data for every app, fake senders, outbox, live incoming feed. Safe: no credentials.
 - **Screen**: `platform/screen.py` (modes screen/region/window, displays), `platform/ocr.py` (macOS Vision framework via a cached Swift binary; **Windows OCR and capture are yours**: Windows.Media.Ocr + Windows.Graphics.Capture), `harness/vision.py` (Smart/Read/Deep).
 - **If `ragnarok` says `No module named 'ragnarok'` on macOS**: the editable-install .pth files get marked hidden and Python skips them; a `sitecustomize.py` in the venv works around it (see git history), or run `uv pip install -e .` again.
+- **Voice**: `platform/voice.py` (Whisper base offline via transformers; microphone recording through a cached Swift tool on macOS: **Windows microphone recording is yours**, the Whisper part is portable and only needs a 16 kHz mono WAV). ADR 004.
+- **Window shell**: `daemon/shell.py` (pin to an edge, snap to half, desktops) and `ui/mascot.html` (the raven). pywebview move/hide/show work on Windows; the macOS-only parts are `_mac_all_desktops` and `_mac_next_desktop` (Windows: virtual desktops need the VirtualDesktop COM API). Tests: `tests/unit/test_shell.py`, `node tests/ui/mascot.mjs`.
+- **Understanding**: `harness/actionparse.py` (who/what/when from any wording), `harness/understand.py` (intent). `scripts/qa_nl.py` is the multilingual set.
 - **Vision**: `harness/vision.py`, `platform/screen.py` (macOS `screencapture`; **Windows capture is yours**: implement `capture_screen()` for Windows and return PNG bytes), model `qwen3-vl:2b` (`ollama pull qwen3-vl:2b`).
 - **Tests**: 360+ unit and security tests, plus `node tests/ui/smoke.mjs` (16 browser-level checks; run `npm install` once in `tests/ui`).
 

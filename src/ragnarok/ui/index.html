@@ -120,7 +120,7 @@ textarea#q{flex:1;resize:none;max-height:140px;min-height:38px;line-height:1.4}
   <span class="logo">R</span>
   <h1>Ragnarok</h1><span id="demopill" class="pill" style="display:none;background:var(--warn2);color:var(--warn);font-weight:700" title="Synthetic data, every send is a local fake. Nothing touches your real accounts.">DEMO</span>
   <span class="grow small"><span id="dot" class="dot" title="status" style="display:inline-block;margin-right:6px"></span><span id="state">connecting</span><span id="live"></span></span>
-  <button id="pinb" class="ib" title="Pin to a screen edge, split screen, desktops" aria-label="Window options"><svg viewBox="0 0 24 24"><path d="M12 17v5M9 3h6l-1 6 3 4H7l3-4z"/></svg></button><button id="themeb" class="ib" title="Switch light / dark" aria-label="Switch theme"><svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+  <button id="moreb" class="ib" title="More: clear chat, copy chat, speak replies, shortcuts" aria-label="More"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg></button><button id="pinb" class="ib" title="Pin to a screen edge, split screen, desktops" aria-label="Window options"><svg viewBox="0 0 24 24"><path d="M12 17v5M9 3h6l-1 6 3 4H7l3-4z"/></svg></button><button id="themeb" class="ib" title="Switch light / dark" aria-label="Switch theme"><svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
   <button id="syncb" class="btn" title="Check every connected app right now">Sync now</button>
   <button id="sw" class="sw" role="switch" aria-checked="true" aria-label="Always-on ingestion"></button>
 </header>
@@ -162,7 +162,7 @@ textarea#q{flex:1;resize:none;max-height:140px;min-height:38px;line-height:1.4}
     <div class="bar" id="srcf"></div>
     <div class="pad" id="digbox"></div>
   </section>
-  <section id="inb"><div class="bar"><span class="small grow">What I noticed on my own: meetings, things that need you, your briefing, your triggers.</span><button class="btn" id="idis">Clear all</button></div><div class="pad" id="ibox"></div></section>
+  <section id="inb"><div class="bar"><span class="small grow">What I noticed on my own: meetings, things that need you, your briefing, your triggers.</span><button class="btn" id="idis">Clear all</button></div><div class="pad"><h2 style="margin-top:0">Your reminders</h2><div id="remlist"></div><h2>What I noticed</h2><div id="ibox"></div></div></section>
   <section id="appr"><div class="pad" id="cards"></div></section>
   <section id="msg">
     <div class="bar"><input id="mq" type="text" placeholder="Search everything that has been read" aria-label="Search messages" maxlength="200"></div>
@@ -172,6 +172,13 @@ textarea#q{flex:1;resize:none;max-height:140px;min-height:38px;line-height:1.4}
   <section id="act"><div class="pad" id="feed"></div></section>
   <section id="src"><div class="pad" id="srcbox"></div></section>
 </main>
+<div id="moremenu" class="pop" style="display:none;position:fixed;right:12px;top:52px;bottom:auto;left:auto;width:min(280px,calc(100% - 24px))" role="menu">
+  <div class="pb" style="flex-direction:column;align-items:stretch;margin-top:0">
+    <button class="btn" id="mm_clear" type="button">Clear this conversation</button>
+    <button class="btn" id="mm_copy" type="button">Copy the conversation</button>
+    <button class="btn" id="mm_speak" type="button">Speak replies aloud: off</button>
+    <button class="btn" id="mm_keys" type="button">Keyboard shortcuts</button>
+  </div><div class="small" id="mm_msg" style="margin-top:6px"></div></div>
 <div id="edgemenu" class="pop" style="display:none;position:fixed;left:50%;top:56px;bottom:auto;transform:translateX(-50%);width:min(340px,calc(100% - 24px))" role="dialog" aria-label="Window options">
   <div class="pt" id="em_t">Window options</div><div class="small" id="em_s"></div>
   <div class="pb" style="flex-direction:column;align-items:stretch">
@@ -195,7 +202,7 @@ textarea#q{flex:1;resize:none;max-height:140px;min-height:38px;line-height:1.4}
   var cur="chat";
   var tabs=document.querySelectorAll("nav button");
   function goto(t){cur=t;tabs.forEach(function(o){o.setAttribute("aria-selected",o.dataset.t===t)});document.querySelectorAll("section").forEach(function(s){s.classList.toggle("show",s.id===t)});
-    if(t==="dig")loadDigest();if(t==="inb")loadInbox();if(t==="msg"){loadMsgs();loadFacts()}if(t==="appr")pullCards();if(t==="src")refresh()}
+    if(t==="dig")loadDigest();if(t==="inb"){loadInbox();loadReminders()}if(t==="msg"){loadMsgs();loadFacts()}if(t==="appr")pullCards();if(t==="src")refresh()}
   tabs.forEach(function(b){b.onclick=function(){goto(b.dataset.t)}});
 
   /* ---------------- chat ---------------- */
@@ -232,6 +239,7 @@ textarea#q{flex:1;resize:none;max-height:140px;min-height:38px;line-height:1.4}
     if(d.ok!==false&&d.tier){meta.appendChild(el("span","",d.tier+" via "+d.backend+(d.ms?" - "+d.ms+" ms":"")+(d.learned==="promoted"?" - learned a route":d.learned==="route_used"?" - stored route":"")));
       if(d.why&&d.why.length){var wl=el("a","","Why?");wl.href="#";var pre=el("div","small",d.why.join("\n"));pre.style.cssText="white-space:pre-wrap;display:none;margin-top:4px;border-left:2px solid var(--line);padding-left:8px";wl.onclick=function(ev){ev.preventDefault();pre.style.display=pre.style.display==="none"?"block":"none"};meta.appendChild(wl);m._bub.appendChild(meta);m._bub.appendChild(pre)}else m._bub.appendChild(meta)}
     else m._bub.appendChild(meta);
+    addListen(meta,t);addFollowUps(m,d.follow_ups);if(speakAll&&d.ok!==false&&d.tier)speak(t);
     var cp=el("button","","Copy");cp.onclick=function(){try{navigator.clipboard.writeText(t);cp.textContent="Copied";setTimeout(function(){cp.textContent="Copy"},1200)}catch(e){}};meta.appendChild(cp);
     if(d.error==="E_SCREEN_CANCEL"){}else if(d.error==="E_SCREEN"){var ob=el("button","btn","Open Screen Recording settings");ob.style.marginTop="8px";ob.onclick=function(){api("/system/open?pane=screen",{})};m._bub.appendChild(ob)}
     if(document.hidden&&d.ok!==false)toast("Ragnarok replied",function(){goto("chat")})}
@@ -297,6 +305,23 @@ textarea#q{flex:1;resize:none;max-height:140px;min-height:38px;line-height:1.4}
         if(!r.text){toast("I did not hear anything. Try again a little closer.");return}
         var lang=(r.language||"").split("-")[0],nm=LANG[lang]||"";if(nm&&lang!=="en")toast("Heard "+nm);
         q.value=r.text;grow();q.focus();if(autoSend)setTimeout(function(){if(q.value===r.text){var t=q.value;q.value="";grow();send(t)}},700)}).catch(function(){tmp.remove()})}};
+  /* ---------------- small helpers: follow-ups, listen, clear/copy, shortcuts, reminders ---------------- */
+  var speakAll=store("speak")==="1";
+  function speak(t){if(!t)return;api("/speak",{text:String(t).replace(/\*\*/g,"").slice(0,1200)})}
+  function setSpeakLabel(){$("mm_speak").textContent="Speak replies aloud: "+(speakAll?"on":"off")}setSpeakLabel();
+  $("moreb").onclick=function(e){e.stopPropagation();var m=$("moremenu");m.style.display=m.style.display==="none"?"block":"none";$("mm_msg").textContent=""};
+  document.addEventListener("click",function(e){var m=$("moremenu");if(m.style.display!=="none"&&!m.contains(e.target)&&e.target.closest("#moreb")===null)m.style.display="none"});
+  $("mm_clear").onclick=function(){$("moremenu").style.display="none";[].slice.call(log.querySelectorAll(".m,.ap")).forEach(function(n){n.remove()});api("/speak/stop",{});toast("Conversation cleared")};
+  $("mm_copy").onclick=function(){var t=[].slice.call(log.querySelectorAll(".m")).map(function(m){return (m.classList.contains("u")?"You: ":"Ragnarok: ")+m.querySelector(".bub").innerText}).join("\n\n");try{navigator.clipboard.writeText(t);$("mm_msg").textContent="Copied."}catch(e){$("mm_msg").textContent="Could not copy."}};
+  $("mm_speak").onclick=function(){speakAll=!speakAll;store("speak",speakAll?"1":"0");setSpeakLabel();if(!speakAll)api("/speak/stop",{})};
+  $("mm_keys").onclick=function(){$("moremenu").style.display="none";addBot("Keyboard shortcuts\n- Enter: send, Shift+Enter: new line\n- Up arrow (empty box): bring back your last message\n- Esc: stop the current reply\n- / : jump to the message box\n- The microphone button: speak, click again to stop\n- Drop or paste a picture to ask about it")};
+  function addFollowUps(m,list){if(!list||!list.length)return;var row=el("div","cites");row.style.marginTop="8px";list.forEach(function(t){var b=el("button","sug",t);b.type="button";b.style.fontSize="12px";b.onclick=function(){row.remove();send(t)};row.appendChild(b)});m._bub.appendChild(row)}
+  function addListen(meta,t){var b=el("button","","Listen");b.onclick=function(){speak(t)};meta.appendChild(b)}
+  var REM_BOX=null;
+  function loadReminders(){api("/reminders").then(function(d){var b=$("remlist");if(!b)return;b.textContent="";var it=d.items||[];if(!it.length){b.appendChild(el("p","small","No open reminders. Try: remind me to call the bank tomorrow at 5pm."));return}
+      it.forEach(function(r){var row=el("div","row"),g=el("div","grow");g.appendChild(el("div","",r.what));g.appendChild(el("div","small",r.due_at?new Date(r.due_at).toLocaleString([], {weekday:"short",day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}):"no time"));row.appendChild(g);
+        var dn=el("button","btn","Done");dn.onclick=function(){api("/reminders/"+r.id+"/done",{}).then(loadReminders)};var sn=el("button","btn","+10 min");sn.onclick=function(){api("/reminders/"+r.id+"/snooze?minutes=10",{}).then(loadReminders)};var tm=el("button","btn","Tomorrow");tm.onclick=function(){api("/reminders/"+r.id+"/snooze?minutes=1440",{}).then(loadReminders)};
+        row.appendChild(dn);row.appendChild(sn);row.appendChild(tm);b.appendChild(row)})}).catch(function(){})}
   /* ---------------- window shell: pin to an edge (the raven waits there), split screen, desktops ---------------- */
   var emEdge="right",emAll=false;
   function emClose(){$("edgemenu").style.display="none"}
@@ -449,7 +474,7 @@ textarea#q{flex:1;resize:none;max-height:140px;min-height:38px;line-height:1.4}
 
   /* ---------------- inbox ---------------- */
   var KIND={attention:"Needs you",heads_up:"Heads-up",briefing:"Briefing",alert:"Alert",reminder:"Reminder",scheduled:"Scheduled"};
-  function loadInbox(){api("/inbox").then(function(d){var it=d.items||[],b=$("ibox");$("ibadge").textContent=it.length?String(it.length):"";if(cur!=="inb")return;b.textContent="";
+  function loadInbox(){api("/inbox").then(function(d){var it=d.items||[],b=$("ibox");$("ibadge").textContent=it.length?String(it.length):"";if(cur!=="inb")return;loadReminders();b.textContent="";
       if(!it.length)b.appendChild(el("p","small","Nothing new. Try: every day at 8am catch me up on my emails, or: when I get an email from Dev, tell me."));
       it.forEach(function(m){var c=el("div","card"+(m.kind==="attention"||m.kind==="alert"?" need":""));c.appendChild(el("div","small",(KIND[m.kind]||m.kind)+" - "+ago(m.ts)+(m.source?" - "+m.source:"")));c.appendChild(el("div","",m.title));var bd=el("div","small",m.body);bd.style.whiteSpace="pre-wrap";c.appendChild(bd);
         var row=el("div","row");row.style.borderBottom="0";if(m.link){var l=el("a","small","Open");l.href=m.link;l.target="_blank";l.rel="noopener noreferrer";row.appendChild(l)}var x=el("button","btn","Dismiss");x.onclick=function(){api("/inbox/dismiss?item_id="+encodeURIComponent(m.id),{}).then(loadInbox)};row.appendChild(x);c.appendChild(row);b.appendChild(c)})}).catch(function(){})}

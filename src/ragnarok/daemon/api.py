@@ -52,6 +52,10 @@ class MascotMove(BaseModel):
     dy: int = Field(ge=-400, le=400)
 
 
+class SpeakIn(BaseModel):
+    text: str = Field(min_length=1, max_length=4000)
+
+
 class ToggleIn(BaseModel):
     enabled: bool
 
@@ -326,6 +330,55 @@ def create_app(guard: TokenGuard | None = None, port: int = DEFAULT_PORT, servic
         if pane not in panes or _sys.platform != "darwin":
             return {"ok": False, "error": "E_UNSUPPORTED"}
         subprocess.run(["open", f"x-apple.systempreferences:com.apple.preference.security?{panes[pane]}"], check=False, timeout=10)  # noqa: S603, S607
+        return {"ok": True}
+
+    @app.get("/reminders")
+    async def reminders_list() -> dict[str, Any]:
+        return {"items": svc.runtime.commitments.list_open() if svc.runtime and svc.runtime.commitments else []}
+
+    @app.post("/reminders/{rid}/done")
+    async def reminder_done(rid: str) -> dict[str, Any]:
+        if not svc.runtime or not svc.runtime.commitments:
+            return {"ok": False, "error": "E_NO_RUNTIME"}
+        svc.runtime.commitments.remove(rid)
+        return {"ok": True}
+
+    @app.post("/reminders/{rid}/snooze")
+    async def reminder_snooze(rid: str, minutes: int = 10) -> dict[str, Any]:
+        """Moves the reminder later: the old one is removed and an identical one is created for the new time."""
+        if not svc.runtime or not svc.runtime.commitments:
+            return {"ok": False, "error": "E_NO_RUNTIME"}
+        from ragnarok.core.clock import get_clock as _clock
+
+        row = next((r for r in svc.runtime.commitments.list_open() if r["id"] == rid), None)
+        if row is None:
+            return {"ok": False, "error": "E_NO_REMINDER"}
+        base = max(row["due_at"] or 0, _clock().now_ms())
+        svc.runtime.commitments.remove(rid)
+        svc.runtime.commitments.add("work", row["what"], base + max(1, min(minutes, 60 * 24 * 7)) * 60_000)
+        return {"ok": True}
+
+    @app.post("/speak")
+    async def speak(body: SpeakIn) -> dict[str, Any]:
+        """Reads a reply aloud with the system voice (macOS `say`), on this computer. One voice at a time."""
+        import sys as _sys
+
+        if _sys.platform != "darwin":
+            return {"ok": False, "error": "E_UNSUPPORTED"}
+        import subprocess as _sp
+
+        prev = getattr(app.state, "say", None)
+        if prev is not None and prev.poll() is None:
+            prev.terminate()
+        clean = "".join(ch for ch in body.text if ch.isprintable() or ch in "\n ")[:1200]
+        app.state.say = _sp.Popen(["say", "--", clean], stdout=_sp.DEVNULL, stderr=_sp.DEVNULL)  # noqa: S603, S607
+        return {"ok": True}
+
+    @app.post("/speak/stop")
+    async def speak_stop() -> dict[str, Any]:
+        prev = getattr(app.state, "say", None)
+        if prev is not None and prev.poll() is None:
+            prev.terminate()
         return {"ok": True}
 
     @app.get("/shell/state")

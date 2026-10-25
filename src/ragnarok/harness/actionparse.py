@@ -43,6 +43,7 @@ Examples:
 "what was said on discord" -> none
 "what happened on slack today" -> none
 "summarize my emails" -> none
+"set a timer for 10 minutes" -> reminder.add, body "timer", when "in 10 minutes"
 "how are you" -> none
 "tell me a joke" -> none
 "what is on my calendar tomorrow" -> none

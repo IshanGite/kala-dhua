@@ -70,18 +70,37 @@ def node_line(st: str, res: dict[str, Any], err: str) -> str:
     return FRIENDLY.get(err or "unknown", f"Could not finish ({st}): {err or 'unknown'}.")
 
 
+FOLLOW_UPS = {
+    "catchup": ["What needs my attention?", "What is on my calendar today?", "Summarize only my emails"],
+    "recall": ["Remind me about this tomorrow at 9am", "Catch me up", "What is on my calendar today?"],
+    "question": ["Remind me about this tomorrow at 9am", "Catch me up"],
+    "agenda": ["Remind me an hour before the first one", "What needs my attention?"],
+    "chat": [],
+    "action": ["Show my reminders", "Catch me up"],
+    "vision": ["Summarize it in one line", "What should I do about it?"],
+}
+
+
+def follow_ups(family: str, text: str) -> list[str]:
+    """A few next things worth asking, by what was just answered. Only suggestions: tapping one sends it as the user's own message."""
+    if "waiting for your OK" in text.lower():
+        return []
+    return FOLLOW_UPS.get(family, [])[:3]
+
+
 def summarize(turn: TurnResult) -> dict[str, Any]:
     """A plain-words reply from what the turn did. Never includes more than the user's own request and the action results."""
     meta = {"why": turn.decision.trace + [f"Time: {turn.latency_ms:.0f} ms" + (f" ({', '.join(f'{k} {v}' for k, v in turn.timings.items())})" if turn.timings else "")], "timings": turn.timings, "tier": turn.tier, "backend": turn.decision.backend, "ms": round(turn.latency_ms), "learned": turn.learned, "route_id": turn.decision.route_id}
+    fam = turn.decision.intent_family
     if turn.answer is not None:
-        return {"text": turn.answer.text, "citations": turn.answer.citations, "grounded": turn.answer.grounded, **meta}
+        return {"text": turn.answer.text, "citations": turn.answer.citations, "grounded": turn.answer.grounded, "follow_ups": follow_ups(fam, turn.answer.text), **meta}
     if turn.clarification:
         return {"text": turn.clarification, "citations": [], **meta}
     o = turn.outcome
     if o is None:
         return {"text": "I could not work out what to do with that.", "citations": [], **meta}
     lines = [node_line(st, o.results.get(nid) or {}, o.errors.get(nid, "")) for nid, st in o.node_states.items()]
-    return {"text": " ".join(lines) or f"Task {o.state}.", "citations": [], "state": o.state, **meta}
+    return {"text": " ".join(lines) or f"Task {o.state}.", "citations": [], "state": o.state, "follow_ups": follow_ups("action", "") if o.state == "succeeded" else [], **meta}
 
 
 CONFIRM = re.compile(r"^\s*(?:ok(?:ay)?[, ]*)?(?:do it|go ahead|yes|yep|yeah|sure|confirm|approve|approved|send it|proceed|please do|run it)\b[\s!.]*$", re.I)
