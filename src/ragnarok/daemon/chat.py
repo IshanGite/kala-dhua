@@ -34,7 +34,7 @@ FRIENDLY = {
 
 def summarize(turn: TurnResult) -> dict[str, Any]:
     """A plain-words reply from what the turn did. Never includes more than the user's own request and the action results."""
-    meta = {"timings": turn.timings, "tier": turn.tier, "backend": turn.decision.backend, "ms": round(turn.latency_ms), "learned": turn.learned, "route_id": turn.decision.route_id}
+    meta = {"why": turn.decision.trace + [f"Time: {turn.latency_ms:.0f} ms" + (f" ({', '.join(f'{k} {v}' for k, v in turn.timings.items())})" if turn.timings else "")], "timings": turn.timings, "tier": turn.tier, "backend": turn.decision.backend, "ms": round(turn.latency_ms), "learned": turn.learned, "route_id": turn.decision.route_id}
     if turn.answer is not None:
         return {"text": turn.answer.text, "citations": turn.answer.citations, "grounded": turn.answer.grounded, **meta}
     if turn.clarification:
@@ -99,6 +99,10 @@ class ChatService:
         cid = self._agent.reader.compartment_id(self._agent.ctx.compartment)
         self.history = self._agent.reader.conversation_tail(cid, 12) if cid else []
         return len(self.history)
+
+    def recent_trace(self, limit: int = 20) -> list[dict[str, Any]]:
+        """The last decisions with the reasons the agent gave itself, newest first (NFR4.1)."""
+        return [{"job": j.id, "text": j.text[:120], "state": j.state, "why": j.reply.get("why", []), "tier": j.reply.get("tier"), "backend": j.reply.get("backend")} for j in list(self.jobs.values())[-max(1, min(limit, 100)):][::-1]]
 
     async def _run(self, job: Job) -> None:
         try:

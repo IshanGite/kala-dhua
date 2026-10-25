@@ -75,11 +75,13 @@ class Cascade:
                 m0 = self._lib.match(qv[1], compartment, caller_trust, text, now_ms, states=("active",))
                 if m0 is not None:  # a learned route beats the rule: it skips even the skill selection
                     return RouteDecision(tier="L0", intent_family="learned", skills=m0.skills, plan_needed=len(m0.skills) > 1, risk_floor=0, memory_types=[], confidence=m0.similarity,
-                                         latency_ms=(time.perf_counter() - t0) * 1000, backend="route_library", route_id=m0.route_id, route_nodes=m0.nodes, injection_flag=injection)
+                                         latency_ms=(time.perf_counter() - t0) * 1000, backend="route_library", route_id=m0.route_id, route_nodes=m0.nodes, injection_flag=injection,
+                                         trace=[f"Stored route {m0.route_id[:8]} matched (similarity {m0.similarity:.2f}): no model was needed to choose {', '.join(m0.skills)}"])
                 sm0 = self._lib.match(qv[1], compartment, caller_trust, text, now_ms, states=("shadow",))
                 shadow0 = sm0.route_id if sm0 else None
             return RouteDecision(tier="L1", intent_family="rule", skills=[rule_hit], plan_needed=False, risk_floor=0, memory_types=[], confidence=1.0, latency_ms=(time.perf_counter() - t0) * 1000,
-                                 backend="rule", injection_flag=injection, notes=[f"rule_{rule_hit}"], shadow_route_id=shadow0)
+                                 backend="rule", injection_flag=injection, notes=[f"rule_{rule_hit}"], shadow_route_id=shadow0,
+                                 trace=[f"Command wording matched the built-in rule for {rule_hit} (no model used)"] + (["A shadow route is being verified for this task"] if shadow0 else []))
         l1_task = self._guard(self._l1.decide(text, [Q_FAMILY, Q_PLAN, Q_INJECT, Q_RISK], deadline=clock_deadline), self._budget_s) if self._l1 else None
         sig_text = signature(text, detect(text, now_ms))  # route matching is value-neutral: '...to 4pm' and '...to 5pm' look the same
         embed_task = self._gw.embed([text, sig_text], deadline=clock_deadline + 5, priority=Priority.INTERACTIVE)
@@ -90,12 +92,24 @@ class Cascade:
         top_sim = scored[0][1] if scored else 0.0
         margin = (scored[0][1] - scored[1][1]) if len(scored) > 1 else top_sim
 
+        trace: list[str] = []
+
         def done(tier: str, family: str, skills: list[str], plan_needed: bool, conf: float, backend: str, **kw: Any) -> RouteDecision:
-            return RouteDecision(tier=tier, intent_family=family, skills=skills, plan_needed=plan_needed,  # type: ignore[arg-type]
+            if backend == "laya":
+                trace.append(f"Laya classified the request as '{family}' ({conf:.0%}), above its calibrated threshold")
+            elif backend == "embedding" and family == "embedding":
+                trace.append(f"The request is very close ({top_sim:.2f}) to the description of {', '.join(skills)}")
+            elif backend == "embedding":
+                trace.append(f"Nothing matched the request ({top_sim:.2f}): treated as plain conversation, no tool")
+            elif backend not in ("route_library", "rule"):
+                trace.append(f"The small model chose {', '.join(skills) or 'no tool'} ({conf:.0%})")
+            return RouteDecision(trace=trace, tier=tier, intent_family=family, skills=skills, plan_needed=plan_needed,  # type: ignore[arg-type]
                                  risk_floor=risk_floor, memory_types=[], confidence=conf, latency_ms=(time.perf_counter() - t0) * 1000, backend=backend,
                                  injection_flag=injection, shortlist=shortlist, notes=notes, **kw)
 
         a1 = self._by_id(l1_answers)
+        if a1:
+            trace.append("Laya answered: " + "; ".join(f"{k}={v.value} ({v.probability:.0%})" for k, v in a1.items()))
         risk_floor = 0
         if "risk_precheck" in a1 and a1["risk_precheck"].probability >= 0.5:
             risk_floor = RISK_FLOOR.get(str(a1["risk_precheck"].value), 0)  # can only RAISE the tier floor

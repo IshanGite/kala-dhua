@@ -32,6 +32,8 @@ class Services:
     reader: MemoryReader | None = None
     hub: ApprovalHub | None = None
     proactive: Any = None
+    mem: Any = None  # MemoryService, for delete
+    reindex: Any = None  # callable: rebuild the in-memory vector index after a delete
 
 
 class ChatIn(BaseModel):
@@ -51,6 +53,17 @@ class ProSettingsIn(BaseModel):
     briefing_off: bool = False
     os_notify: bool | None = None
     enabled: bool | None = None
+
+
+class DeleteIn(BaseModel):
+    item_ids: list[str] = Field(default_factory=list, max_length=200)
+    fact_ids: list[str] = Field(default_factory=list, max_length=200)
+    source: str | None = Field(default=None, max_length=40)
+    token: str | None = Field(default=None, max_length=200)
+
+
+class FactEditIn(BaseModel):
+    value: str = Field(min_length=1, max_length=2000)
 
 
 class DecideIn(BaseModel):
@@ -164,6 +177,65 @@ def create_app(guard: TokenGuard | None = None, port: int = DEFAULT_PORT, servic
             return {"ok": False, "error": "E_NO_RUNTIME"}
         svc.proactive.configure(briefing_at=None if body.briefing_off else (body.briefing_at if body.briefing_at else False), os_notify=body.os_notify, enabled=body.enabled)
         return {"ok": True, "settings": svc.proactive.settings()}
+
+    @app.get("/memory/facts")
+    async def memory_facts() -> dict[str, Any]:
+        if svc.reader is None:
+            return {"items": []}
+        cid = svc.reader.compartment_id("work")
+        rows = svc.reader.facts(cid) if cid else []
+        return {"items": [{"id": f["id"], "kind": f["kind"], "subject": f["subject"], "predicate": f["predicate"], "value": f["value"], "trust": f["trust"], "learned_at": f["learned_at"],
+                           "pinned": bool(f["pinned"]), "evidence": len(svc.reader.provenance_of("fact", f["id"]))} for f in rows[:200]]}
+
+    @app.post("/memory/facts/{fact_id}")
+    async def memory_fact_edit(fact_id: str, body: FactEditIn) -> dict[str, Any]:
+        if svc.mem is None:
+            return {"ok": False, "error": "E_NO_AGENT"}
+        svc.mem.edit_fact(fact_id, body.value)  # pinned and attributed to the user: forgetting never overrides a user edit
+        return {"ok": True}
+
+    @app.post("/memory/delete/preview")
+    async def memory_delete_preview(body: DeleteIn) -> dict[str, Any]:
+        from ragnarok.memory.delete import Deleter, DeleteSelector
+
+        if svc.mem is None:
+            return {"ok": False, "error": "E_NO_AGENT"}
+        p = Deleter(svc.mem).preview(DeleteSelector(item_ids=tuple(body.item_ids), fact_ids=tuple(body.fact_ids), source=body.source))
+        return {"ok": True, "counts": p.counts, "summary": p.summary, "token": p.confirm_token}
+
+    @app.post("/memory/delete")
+    async def memory_delete(body: DeleteIn) -> dict[str, Any]:
+        from ragnarok.memory.delete import ConfirmRequired, Deleter, DeleteSelector
+
+        if svc.mem is None:
+            return {"ok": False, "error": "E_NO_AGENT"}
+        try:
+            r = Deleter(svc.mem).delete(DeleteSelector(item_ids=tuple(body.item_ids), fact_ids=tuple(body.fact_ids), source=body.source), body.token or "")
+        except ConfirmRequired:
+            return {"ok": False, "error": "E_CONFIRM_REQUIRED"}
+        if svc.reindex:
+            svc.reindex()
+        return {"ok": True, "counts": r.counts, "verified": r.verified, "residual": r.residual}
+
+    @app.post("/memory/export")
+    async def memory_export(fmt: str = "json") -> dict[str, Any]:
+        from datetime import datetime
+        from pathlib import Path
+
+        from ragnarok.memory.export import dumps, export_all, to_markdown
+
+        if svc.reader is None:
+            return {"ok": False, "error": "E_NO_AGENT"}
+        data = export_all(svc.reader)
+        out_dir = Path.home() / "Downloads"
+        out_dir = out_dir if out_dir.is_dir() else Path.home()
+        path = out_dir / f"ragnarok-export-{datetime.now().strftime('%Y%m%d-%H%M%S')}.{'md' if fmt == 'md' else 'json'}"
+        path.write_text(to_markdown(data) if fmt == "md" else dumps(data), encoding="utf-8")
+        return {"ok": True, "path": str(path), "items": len(data["items"]), "facts": len(data["facts"]), "events": len(data["events"])}
+
+    @app.get("/trace")
+    async def trace(limit: int = 20) -> dict[str, Any]:
+        return {"items": svc.chat.recent_trace(limit) if svc.chat else []}
 
     @app.get("/approvals")
     async def approvals() -> dict[str, Any]:

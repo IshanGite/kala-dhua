@@ -80,8 +80,7 @@ def _load_index(mem: MemoryService, reader: MemoryReader, index: VectorIndex) ->
         cid = reader.compartment_id(name)
         if cid:
             ids, mat = reader.load_embeddings(cid)
-            if ids:
-                index.load(name, ids, mat)
+            index.load(name, ids, mat) if ids else index.load(name, [], __import__("numpy").zeros((0, 0), dtype="float32"))  # also clears a compartment whose vectors were all deleted
 
 
 def build_world(*, use_laya: bool = True, sandbox: bool = True, embed_rungs: bool = True, rules: bool = True, senders: dict | None = None, vault: SecretStore | None = None, gateway: Gateway | None = None, lock_path: Path | None = None, interval_s: float = 60.0,
@@ -156,7 +155,10 @@ def build_world(*, use_laya: bool = True, sandbox: bool = True, embed_rungs: boo
         pass  # Windows: the per-user data directory ACL applies
     chat = ChatService(agent, hub, proactive.triggers)
     chat.restore()
-    services = Services(runtime, answerer, notif, chat, reader, hub, proactive)
+    def reindex() -> None:
+        _load_index(mem, reader, index)
+
+    services = Services(runtime, answerer, notif, chat, reader, hub, proactive, mem, reindex)
     w = World(mem, reader, index, gw, runtime, services, guard, token_file, agent, selector, l1)
     w.registry = registry  # type: ignore[attr-defined]
     return w

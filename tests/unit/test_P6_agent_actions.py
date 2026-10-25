@@ -197,3 +197,12 @@ async def test_a_model_that_claims_it_sent_something_is_overruled(world):
     assert "Message sent" not in ans.text and "did not do anything" in ans.text.lower() and SENT == []
     out = summarize(await world.agent.handle("tushar.singh@example.com"))
     assert SENT == [] and "Message sent to" not in out["text"]
+
+
+async def test_every_reply_can_explain_why_that_tool_was_chosen(world):
+    await start(world)
+    out = summarize(await world.agent.handle("remind me to call the bank tomorrow at 5pm"))
+    why = " | ".join(out["why"])
+    assert "built-in rule for reminder.add" in why and "Step n1: reminder.add" in why and "Result:" in why and "Time:" in why
+    ans = summarize(await world.agent.handle("what is on my calendar tomorrow"))
+    assert ans["why"] is not None

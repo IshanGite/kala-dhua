@@ -386,6 +386,12 @@ class Agent:
         tid = self.executor.start_task(request, plan, self.ctx, plan_meta={"tier": decision.tier, "route_id": decision.route_id})
         outcome = await self.executor.run_task(tid, self.ctx)
         mark("run", t_exec)
+        for n in plan.nodes:
+            m = self._manifest(n.skill)
+            if m is not None:
+                shown = ", ".join(f"{k}={str(v)[:50]}" for k, v in n.params.items())
+                decision.trace.append(f"Step {n.id}: {n.skill} (risk tier {int(m.tier)}{', needs your click' if m.external_write or int(m.tier) >= 2 else ''}) with {shown}")
+        decision.trace.append("Result: " + ", ".join(f"{k}={v}" for k, v in outcome.node_states.items()))
         t_learn = time.perf_counter()
         learned = await self._learn(request, decision, plan, plan_source, outcome)
         mark("learn", t_learn)

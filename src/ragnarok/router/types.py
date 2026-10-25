@@ -43,3 +43,4 @@ class RouteDecision:
     shadow_route_id: str | None = None
     shortlist: list[str] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
+    trace: list[str] = field(default_factory=list)  # human-readable reasons, for the 'Why?' panel (NFR4.1)
