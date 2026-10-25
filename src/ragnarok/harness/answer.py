@@ -254,6 +254,13 @@ class Answerer:
         from ragnarok.router.when import agenda_range
 
         now = get_clock().now_ms()
+        if re.search(r"\bnext\b.{0,20}\b(meeting|event|appointment|call)\b", request, re.I) and not re.search(r"next (week|month)", request, re.I):  # 'when is my next meeting': the first upcoming event, not a day
+            rows = [r for r in self._r.items_between(("gcal", "outlook_cal"), now, now + 21 * 86_400_000, limit=1)]
+            if not rows:
+                return Answered("You have no upcoming events in the next three weeks.", notes=["agenda_empty"])
+            r = rows[0]
+            when = datetime.fromtimestamp((r["ts"] or 0) / 1000).strftime("%A %d %B at %H:%M")
+            return Answered(f"Your next event is {r['title'] or '(no title)'} on {when}.", [{"n": 1, "citation": f"{r['source']}: {r['title']}", "link": r.get("deep_link")}], True)
         a0, a1 = agenda_range(request, datetime.fromtimestamp(now / 1000))
         rng = (int(a0.timestamp() * 1000), int(a1.timestamp() * 1000))
         rows = self._r.items_between(("gcal", "outlook_cal"), rng[0], rng[1])

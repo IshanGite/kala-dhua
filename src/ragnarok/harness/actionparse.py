@@ -78,7 +78,7 @@ STEP_FIELDS = {"skill": {"type": "string", "enum": list(SKILLS)}, "platform": {"
                "body": {"type": "string"}, "when": {"type": "string"}, "title": {"type": "string"},
                "compose": {"type": "string"}, "include": {"type": "string", "enum": ["", "link", "text", "link_and_text"]}}
 STEPS_SCHEMA = {"type": "object", "properties": {"steps": {"type": "array", "maxItems": 4, "items": {"type": "object", "properties": STEP_FIELDS, "required": ["skill"]}}}, "required": ["steps"]}
-STEPS_SYSTEM = SYSTEM.split("Examples:")[0] + """A request can have several steps in order (at most 4). RULE: when the user asks you to write, compose or make up text, put that in compose and leave body empty; body holds ONLY words the user dictated. Never write a web address anywhere; links are added by the assistant. For text the assistant must WRITE (a poem, a summary, a short note), put what to write in compose (for example "a poem about a father"); the user's own words go in body.
+STEPS_SYSTEM = SYSTEM.split("Examples:")[0] + """Keep body, title and message text in the user's OWN language and words (never translate them); only `when` is written in English. The platform (telegram, discord or slack) must be one the user named or abbreviated (tg = telegram); if they named none, leave platform empty. A request can have several steps in order (at most 4). RULE: when the user asks you to write, compose or make up text, put that in compose and leave body empty; body holds ONLY words the user dictated. Never write a web address anywhere; links are added by the assistant. For text the assistant must WRITE (a poem, a summary, a short note), put what to write in compose (for example "a poem about a father"); the user's own words go in body.
 include (for an email or message that follows a document step): link = include the document's link, text = include the written text, link_and_text = both. Leave it empty when the step has nothing to do with an earlier step.
 Examples:
 "make a doc on my drive named papa with a poem about a father and mail it to tushar@x.com" -> steps: [drive.create title "papa" compose "a poem about a father"], [mail.send to tushar@x.com subject "papa" include link_and_text]
@@ -89,6 +89,13 @@ Examples:
 "create a doc called Trip plan with a three day itinerary for Goa and send the link to Tushar on telegram" -> steps: [drive.create title "Trip plan" compose "a three day itinerary for Goa"], [chat.reply platform telegram target Tushar include link]
 "remind me tomorrow at 9am to call mom and tell Ravi on telegram I will be late" -> steps: [reminder.add body "call mom" when "tomorrow at 9 am"], [chat.reply platform telegram target Ravi body "I will be late"]
 "tell Ravi on discord I am late" -> steps: [chat.reply platform discord target Ravi body "I am late"]
+"recuerdame llamar al banco manana a las 5" -> steps: [reminder.add body "llamar al banco" when "tomorrow at 5 pm"]
+"envoie un message a Ravi sur telegram: je suis en retard" -> steps: [chat.reply platform telegram target Ravi body "je suis en retard"]
+"kal subah 9 baje mujhe gym ki yaad dilana" -> steps: [reminder.add body "gym" when "tomorrow at 9 am"]
+"कल सुबह 9 बजे मुझे जिम जाने की याद दिलाओ" -> steps: [reminder.add body "जिम जाने" when "tomorrow at 9 am"]
+"can u text Tushar on tg that im omw" -> steps: [chat.reply platform telegram target Tushar body "im omw"]
+"remind me tmrw 8am to call mom" -> steps: [reminder.add body "call mom" when "tomorrow at 8 am"]
+"yo remind me in half an hour to stretch" -> steps: [reminder.add body "stretch" when "in 30 minutes"]
 "how are you" -> steps: []
 "who sent me the contract request" -> steps: []
 "summarize my emails" -> steps: []

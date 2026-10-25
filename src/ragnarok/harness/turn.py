@@ -79,6 +79,7 @@ class TurnResult:
     timings: dict[str, int] = field(default_factory=dict)  # milliseconds per stage: where a turn's time went
 
 
+GENERIC = {"things", "thing", "stuff", "something", "anything", "it", "that", "this", "me", "you"}  # not a reminder: 'can you remind me things?' asks what the assistant can do
 LLM_PARSED = {"reminder.add", "calendar.add", "mail.send", "mail.draft", "mail.reply", "chat.reply", "drive.create"}
 
 
@@ -194,6 +195,9 @@ class Agent:
             from ragnarok.router.when import split_reminder
 
             what, when = split_reminder(text)
+            if what.lower().strip(" .?!") in GENERIC:
+                self._clarify = "What should I remind you about, and when? For example: remind me to call the bank tomorrow at 5pm."
+                return None
             nodes = [PlanNode(id="n1", goal=text[:200], skill=skill, params={"text": what, "when": when}, criteria=CRITERIA[skill])]
             if when and self._mirror is not None and self._mirror() and self._manifest("calendar.add") is not None:
                 nodes.append(PlanNode(id="n2", goal="put it on the calendar", skill="calendar.add", params={"title": what, "when": when}, criteria=CRITERIA["calendar.add"]))  # needs its own click
@@ -273,6 +277,14 @@ class Agent:
             return None
         return await self._plan_from_parsed(text, p, skill)
 
+    ABBREV = {"telegram": ("telegram", "tg", "tele"), "discord": ("discord", "dc", "disc"), "slack": ("slack",)}
+
+    @classmethod
+    def _platform_named(cls, platform: str, request: str) -> bool:
+        """The app must be one the user actually named (or abbreviated): a model that guesses an app is not allowed to pick where a message goes."""
+        low = request.lower()
+        return any(re.search(rf"\b{a}\b", low) for a in cls.ABBREV.get(platform, (platform,)))
+
     @staticmethod
     def _faithful(body: str, request: str) -> bool:
         """The words to send or remember must come from what the user said: most of their significant words appear in the request (a model must not invent message text)."""
@@ -301,11 +313,15 @@ class Agent:
         if skill in ("reminder.add", "calendar.add"):
             what = f.get("body") or f.get("title") or ""
             when = f.get("when", "")
-            if not what or not self._faithful(what, text):
+            if not what or not self._faithful(what, text) or what.lower().strip(" .?!") in GENERIC:
                 return None
             if when and parse_when(when, now) is None:
-                self._clarify = "I could not tell what time that is. Say it like 'tomorrow at 3pm'."
-                return None
+                from ragnarok.router.when import localize_when
+
+                when = localize_when(when) or localize_when(text)
+                if not when or parse_when(when, now) is None:
+                    self._clarify = "I could not tell what time that is. Say it like 'tomorrow at 3pm'."
+                    return None
             if skill == "reminder.add":
                 nodes = [PlanNode(id="n1", goal=text[:200], skill=skill, params={"text": what, "when": when}, criteria=CRITERIA[skill])]
                 if when and self._mirror is not None and self._mirror() and self._manifest("calendar.add") is not None:
@@ -314,7 +330,7 @@ class Agent:
             return node({"title": f.get("title") or what, "when": when}) if when else None
         if skill == "chat.reply":
             platform, target, body = f.get("platform", "").lower(), f.get("target", ""), f.get("body", "")
-            if platform not in ("telegram", "discord", "slack") or not body or not self._faithful(body, text) or (target and target.lower() not in text.lower()):
+            if platform not in ("telegram", "discord", "slack") or not self._platform_named(platform, text) or not body or not self._faithful(body, text) or (target and target.lower() not in text.lower()):
                 return None  # a name the user never wrote is the model echoing an example, not a person to message
             if not target:
                 recent = self.reader.recent_items(limit=1, source=platform)
@@ -527,6 +543,8 @@ class Agent:
                 return done("recall", ans, f"latest messages from {u.person}")
         ans = await self.answerer.answer(request, general=False, history=history, context_hint=self._hint(request, history))
         if not ans.grounded:
+            if re.search(r"\b(my|me|mine|i|i'm|i've|we|our)\b", request, re.I):  # a question about the user's own things must never be answered from general knowledge: say there is nothing, do not invent
+                return done("recall", Answered("I do not have anything about that in your messages, calendar or files yet.", notes=["nothing_found"]), "nothing in memory matched; I did not guess")
             ans = await self.answerer._general(request, history)
         return done("recall", ans, "answered from your memory with citations")
 

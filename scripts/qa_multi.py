@@ -51,7 +51,7 @@ CASES = [
 async def main():
     flt = sys.argv[1] if len(sys.argv) > 1 else ""
     vault = MemoryStore(); vault.set(token_name("google", "write"), json.dumps({"client_id": "a", "client_secret": "b", "refresh_token": "c"}))
-    senders = {k: sender(k) for k in ("email", "mail", "calendar", "doc", "drive", "telegram", "discord", "slack", "chat", "reply")}
+    senders = {k: sender(k) for k in ("email", "mail", "calendar", "doc", "drive", "telegram", "discord", "slack", "chat", "reply", "mail_reply")}
     w = build_world(vault=vault, sandbox=True, senders=senders, max_cpu=101)
     await warm_up(w)
     if hasattr(w.l1, "warmup"): await w.l1.warmup()

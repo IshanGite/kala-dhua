@@ -34,6 +34,29 @@ def _safe_date(now: datetime, d: int, mo: int, yr: str | None):  # noqa: ANN202
         return None
 
 
+def localize_when(text: str) -> str:
+    """A time phrase in Hindi, Marathi or Hinglish ('कल सुबह 9 बजे', 'kal shaam 6 baje') as plain English ('tomorrow at 9 am'); empty when it cannot be read. Only a fallback for when the model did not write it in English."""
+    t = (text or "").lower()
+    if re.search(r"परसों|parso", t):
+        day = "day after tomorrow"
+    elif re.search(r"कल|\bkal\b|उद्या", t):
+        day = "tomorrow"
+    elif re.search(r"आज|\baaj\b|आता", t):
+        day = "today"
+    else:
+        day = ""
+    m = re.search(r"(\d{1,2})(?::(\d{2}))?", t)
+    if not m:
+        return ""
+    pm = bool(re.search(r"शाम|shaam|दोपहर|dopahar|रात|raat|संध्याकाळ|evening|night|afternoon", t))
+    am = bool(re.search(r"सुबह|subah|सकाळ|morning", t))
+    hh = int(m.group(1))
+    if hh > 23:
+        return ""
+    clock = f"{hh}{':' + m.group(2) if m.group(2) else ''} {'pm' if pm and not am and hh < 12 else 'am'}"
+    return f"{day} at {clock}".strip()
+
+
 def parse_when(text: str, now: datetime) -> datetime | None:
     low = (text or "").lower()
     if not low.strip():
@@ -43,6 +66,15 @@ def parse_when(text: str, now: datetime) -> datetime | None:
         return iso.replace(tzinfo=None)  # the wall-clock time as written: a small model cannot know the user's zone, so any offset it invents is ignored
     except ValueError:
         pass
+    rel = re.search(r"\bin\s+(?:(half an hour)|(?:an?|one)\s+(hour|minute|min|day)\b|(?:a\s+)?(?:couple|few)\s+(?:of\s+)?(hour|minute|min)s?\b)", low)  # 'in an hour', 'in half an hour', 'in a couple of hours'
+    if rel:
+        if rel.group(1):
+            return (now + timedelta(minutes=30)).replace(second=0, microsecond=0)
+        unit = rel.group(2) or rel.group(3)
+        n = 1 if rel.group(2) else (2 if "couple" in rel.group(0) else 3)
+        return (now + {"hour": timedelta(hours=n), "minute": timedelta(minutes=n), "min": timedelta(minutes=n), "day": timedelta(days=n)}[unit]).replace(second=0, microsecond=0)
+    if re.search(r"\bmidnight\b", low):
+        return (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0) if now.hour or now.minute else now.replace(second=0, microsecond=0)
     m = _IN.search(low)
     if m:
         n, unit = int(m.group(1)), m.group(2)
