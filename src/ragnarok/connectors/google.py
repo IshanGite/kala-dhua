@@ -11,6 +11,7 @@ The refresh token is the read token; sending mail or writing events uses a diffe
 from __future__ import annotations
 
 import base64
+import json
 import re
 import tempfile
 from datetime import UTC, datetime, timedelta
@@ -113,6 +114,7 @@ def parse_gmail(msg: dict[str, Any]) -> dict[str, Any]:
     name, addr = parseaddr(headers.get("From", ""))
     return {"text": text, "hidden": hidden, "subject": " ".join(headers.get("Subject", "").split()), "from": addr.lower(), "from_name": name,
             "auth_ok": authentication_passed(headers), "automatic": is_automatic(headers), "attachments": atts[0], "thread": msg.get("threadId"),
+            "message_id": headers.get("Message-ID", headers.get("Message-Id", "")).strip(), "references": headers.get("References", "").strip(),
             "date": int(msg["internalDate"]) if msg.get("internalDate") else None}
 
 
@@ -123,13 +125,16 @@ def valid_address(addr: str) -> bool:
     return bool(_ADDR.match(addr or "")) and not any(c in addr for c in "\r\n")
 
 
-def build_raw(to: str, subject: str, body: str, *, auto: bool = True) -> str:
+def build_raw(to: str, subject: str, body: str, *, auto: bool = True, in_reply_to: str = "", references: str = "") -> str:
     """A plain-text email as the base64url string Gmail wants. Header values lose line breaks, so a subject can never inject a header."""
     if not valid_address(to):
         raise ValueError("not a valid recipient address")
     m = EmailMessage()
     m["To"] = to
     m["Subject"] = " ".join(subject.split())[:200] or "(no subject)"
+    if in_reply_to and "\n" not in in_reply_to and "\r" not in in_reply_to:
+        m["In-Reply-To"] = in_reply_to
+        m["References"] = " ".join((references + " " + in_reply_to).split())[-900:]
     if auto:  # our own mail says so, so other robots (and our own reader) will not answer it
         m["Auto-Submitted"] = "auto-generated"
     m.set_content(body)
@@ -168,13 +173,16 @@ class Gmail:
         p = parse_gmail(msg)
         if p["automatic"] or not p["text"]:
             return None
-        flags = {"auth_ok": p["auth_ok"], "from": p["from"], "attachments": p["attachments"]}
+        flags = {"auth_ok": p["auth_ok"], "from": p["from"], "attachments": p["attachments"], "message_id": p["message_id"], "references": p["references"][-250:], "thread": p["thread"] or ""}
         return RawItem(source=self.name, native_id=ref.native_id, text=p["text"], trust="received", title=p["subject"] or None, kind="message", visibility="private",
                        thread_id=p["thread"], occurred_at=p["date"], html_hidden=p["hidden"], strip_quotes=True, author=p["from_name"] or p["from"], flags=flags,
                        deep_link=f"https://mail.google.com/mail/u/0/#all/{ref.native_id}")
 
-    async def send(self, write_auth: GoogleAuth, to: str, subject: str, body: str) -> str:
-        r = await request(write_auth.http, "POST", f"{self.API}/messages/send", headers={"Authorization": f"Bearer {await write_auth.token()}"}, json={"raw": build_raw(to, subject, body)})
+    async def send(self, write_auth: GoogleAuth, to: str, subject: str, body: str, *, thread_id: str = "", in_reply_to: str = "", references: str = "") -> str:
+        payload: dict[str, Any] = {"raw": build_raw(to, subject, body, in_reply_to=in_reply_to, references=references)}
+        if thread_id:
+            payload["threadId"] = thread_id  # keeps the reply inside the original conversation
+        r = await request(write_auth.http, "POST", f"{self.API}/messages/send", headers={"Authorization": f"Bearer {await write_auth.token()}"}, json=payload)
         if r.status_code >= 300:
             raise ConnectorError(f"gmail send {r.status_code}", code="E_GOOGLE")
         return str(r.json().get("id", ""))
@@ -331,6 +339,17 @@ class Drive:
                 text = parse_file(p)["text"]
         occurred = int(datetime.fromisoformat(f["modifiedTime"].replace("Z", "+00:00")).timestamp() * 1000) if f.get("modifiedTime") else None
         return RawItem(source=self.name, native_id=ref.native_id, text=text, trust="user_file", title=f.get("name"), kind="file", occurred_at=occurred, deep_link=f.get("webViewLink"))
+
+    async def create_doc(self, write_auth: GoogleAuth, title: str, text: str) -> str:
+        """A real Google Doc (drive.file scope: the app can only touch files it made). Returns its link."""
+        boundary = "ragnarok_boundary_7f3a"
+        meta = json.dumps({"name": title[:200], "mimeType": "application/vnd.google-apps.document"})
+        body = (f"--{boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n{meta}\r\n--{boundary}\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n{text}\r\n--{boundary}--").encode()
+        r = await request(write_auth.http, "POST", "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink",
+                          headers={"Authorization": f"Bearer {await write_auth.token()}", "Content-Type": f"multipart/related; boundary={boundary}"}, content=body)
+        if r.status_code >= 300:
+            raise ConnectorError(f"drive create {r.status_code}", code="E_GOOGLE")
+        return str(r.json().get("webViewLink", ""))
 
     def actions(self) -> list[ActionSpec]:
         return []

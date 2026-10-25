@@ -87,3 +87,37 @@ def split_event(request: str) -> tuple[str, str]:
     title = re.sub(r"\s{2,}", " ", _TIMEWORDS.sub("", body)).strip(" ,.;:-")
     title = re.sub(r"\b(?:at|on|by|for|to)\s*$", "", title, flags=re.I).strip(" ,.;:-")
     return (title or body.strip()), when
+
+
+_REPLY_LEAD = re.compile(r"^\s*(?:please\s+)?(?:can you\s+)?(?:reply|respond|answer|write back)\s+(?:to\s+)?(?:the\s+)?(?:email|mail|message)?\s*(?:from\s+)?", re.I)
+_SAYING = re.compile(r"\b(?:saying|and say|and tell (?:them|him|her)|that|with|:)\s+(.+)$", re.I | re.S)
+_PLATFORMS = ("telegram", "discord", "slack")
+
+
+def split_reply(request: str) -> tuple[str, str]:
+    """('Dev', 'I will send the contract on Thursday') from \"reply to Dev's email saying I will send the contract on Thursday\". Empty body means: ask the user."""
+    m = _SAYING.search(request)
+    body = m.group(1).strip().rstrip(".") if m else ""
+    head = request[: m.start()] if m else request
+    head = _REPLY_LEAD.sub("", head, count=1)
+    target = re.sub(r"['’]s\s+(?:email|mail|message).*$|\s+(?:email|mail|message)\b.*$", "", head, flags=re.I).strip(" ,.;:-\"'")
+    target = re.sub(r"^(?:the|an?)\s+", "", target, flags=re.I)
+    return target, (body + "." if body and body[-1] not in ".!?" else body)
+
+
+def split_chat(request: str) -> tuple[str, str, str]:
+    """(platform, target, text) from 'tell Ravi on telegram that I will be late' / 'post in the discord general channel that ...'; blanks when not found."""
+    low = request.lower()
+    platform = next((p for p in _PLATFORMS if p in low), "")
+    m = _SAYING.search(request)
+    text = m.group(1).strip() if m else ""
+    head = request[: m.start()] if m else request
+    target = ""
+    t1 = re.search(r"\b(?:tell|message|text|ping|dm|reply to|respond to)\s+(.+?)(?:\s+(?:on|in|via)\s+(?:telegram|discord|slack))?\s*$", head, re.I)
+    if t1:
+        target = t1.group(1)
+    t2 = re.search(r"\b(?:in|on|to)\s+(?:the\s+)?(?:discord|slack|telegram)?\s*([\w#-]+)\s+channel\b", head, re.I)
+    if t2:
+        target = t2.group(1)
+    target = re.sub(r"\s+(?:on|in|via)\s+(?:telegram|discord|slack)\b.*$", "", target, flags=re.I).strip(" ,.;:-\"'#")
+    return platform, target, text

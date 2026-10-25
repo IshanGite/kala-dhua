@@ -14,7 +14,7 @@ import jsonschema
 import numpy as np
 
 from ragnarok.core.clock import get_clock
-from ragnarok.harness.answer import Answered, Answerer, is_catchup
+from ragnarok.harness.answer import Answered, Answerer, is_agenda, is_catchup, is_smalltalk
 from ragnarok.harness.executor import ExecContext, Executor, TaskOutcome
 from ragnarok.harness.plan import Plan, PlanNode, validate_plan
 from ragnarok.harness.planner import Planner
@@ -38,7 +38,7 @@ FREE = "{free}"  # a free-text parameter in a stored route: refilled from the ne
 CRITERIA: dict[str, list[dict]] = {
     "reminder.add": [{"kind": "field_present", "path": "reminder_id"}], "reminder.list": [{"kind": "field_present", "path": "reminders"}],
     "mail.draft": [{"kind": "field_present", "path": "draft"}], "mail.send": [{"kind": "equals", "path": "sent", "value": True}],
-    "chat.reply": [{"kind": "equals", "path": "posted", "value": True}], "calendar.add": [{"kind": "equals", "path": "added", "value": True}], "memory.search": [{"kind": "field_present", "path": "hits"}],
+    "chat.reply": [{"kind": "equals", "path": "posted", "value": True}], "calendar.add": [{"kind": "equals", "path": "added", "value": True}], "mail.reply": [{"kind": "equals", "path": "sent", "value": True}], "drive.create": [{"kind": "equals", "path": "created", "value": True}], "memory.search": [{"kind": "field_present", "path": "hits"}],
 }
 
 
@@ -81,11 +81,13 @@ class Agent:
 
     ACTION_WORDS = {
         "chat.reply": r"\b(tell|message|text|reply|respond|ping|post|dm|send)\b", "mail.send": r"\b(send|email|mail|reply|forward|write back)\b",
-        "mail.draft": r"\b(draft|write|compose|prepare|reply|email)\b", "calendar.add": r"\b(calendar|schedule|book|block|meeting|appointment|put|add)\b",
+        "mail.draft": r"\b(draft|write|compose|prepare|reply|email)\b", "calendar.add": r"\b(calendar|schedule|book|block|meeting|appointment|put|add)\b", "mail.reply": r"\b(reply|respond|answer|write back)\b", "drive.create": r"\b(create|write|save|make|draft)\b.*\b(doc|document|drive|note|notes|file)\b",
         "reminder.add": r"\b(remind|reminder|to-?do|note|remember)\b",
     }
     QUESTIONLIKE = re.compile(r"^\s*(what|when|where|who|whom|whose|which|why|how|is|are|was|were|do|does|did|can|could|will|would|should|any|has|have)\b|\?\s*$", re.I)
     HISTORYLIKE = re.compile(r"\b(i just (asked|said|told)|you (just )?(said|told|answered)|earlier (we|you|i)|previous (question|message|answer)|what did i (just )?ask)\b", re.I)
+
+    _clarify: str | None = None
 
     def _wants_any_write(self, request: str) -> bool:
         return any(re.search(p, request, re.I) for sk, p in self.ACTION_WORDS.items() if sk != "reminder.add") and not self.QUESTIONLIKE.search(request)
@@ -96,7 +98,7 @@ class Agent:
         if m is None or (m.tier < 1 and not m.external_write):
             return True
         pat = self.ACTION_WORDS.get(skill)
-        return bool(pat and re.search(pat, request, re.I)) and not (self.QUESTIONLIKE.search(request) and skill in ("chat.reply", "mail.send", "calendar.add"))
+        return bool(pat and re.search(pat, request, re.I)) and not (self.QUESTIONLIKE.search(request) and skill in ("chat.reply", "mail.send", "mail.reply", "calendar.add", "drive.create"))
 
     @staticmethod
     def _now_text() -> str:
@@ -121,12 +123,28 @@ class Agent:
 
             if when and parse_when(when, _dt.fromtimestamp(get_clock().now_ms() / 1000)) is not None:
                 return Plan(nodes=[PlanNode(id="n1", goal=text[:200], skill=skill, params={"title": title, "when": when}, criteria=CRITERIA[skill])])
+        if skill == "mail.reply":
+            from ragnarok.router.when import split_reply
+
+            target, body = split_reply(text)
+            if target and body:
+                return Plan(nodes=[PlanNode(id="n1", goal=text[:200], skill=skill, params={"target": target, "body": body}, criteria=CRITERIA[skill])])
+            self._clarify = "What should the reply say? Tell me like: reply to Dev saying I will send it Thursday."
+            return None
+        if skill == "chat.reply":
+            from ragnarok.router.when import split_chat
+
+            platform, target, body = split_chat(text)
+            if platform and target and body:
+                return Plan(nodes=[PlanNode(id="n1", goal=text[:200], skill=skill, params={"platform": platform, "target": target, "text": body}, criteria=CRITERIA[skill])])
+            self._clarify = "Who should I message, on which app, and what should it say? For example: tell Ravi on telegram that I will be late."
+            return None
         if m.tier >= 1 or m.external_write:
             snippets = []  # what leaves the machine is built from the user's own words only, never from memory or received text
         deadline = get_clock().monotonic() + 8
         for _ in range(2):
             res = await self.gw.chat(role="extractor", schema=m.parameters, max_tokens=300, deadline=deadline, priority=Priority.INTERACTIVE, seed=0, temperature=0.0,
-                                     messages=[{"role": "system", "content": f"Fill the parameters for the skill '{skill}'. Use only facts from the request and context; do not add anything the user did not say. Current local time: {self._now_text()}; write times as ISO 8601 local date-time. JSON only."},
+                                     messages=[{"role": "system", "content": f"Fill the parameters for the skill '{skill}'. Use only facts from the request and context; do not add anything the user did not say. {('Current local time: ' + self._now_text() + '; write times as ISO 8601 local date-time. ') if 'when' in m.parameters.get('properties', {}) else ''}JSON only."},
                                                {"role": "user", "content": f"Context:\n{chr(10).join(snippets[:4])}\n\nRequest: {text}"}])
             try:
                 jsonschema.validate(res.parsed or {}, m.parameters)
@@ -159,6 +177,10 @@ class Agent:
             ans = await self.answerer.catch_up(request)
             dec = RouteDecision(tier="L1", intent_family="catchup", skills=[], plan_needed=False, risk_floor=0, memory_types=[], confidence=1.0, latency_ms=0.0, backend="catchup")
             return TurnResult("L1", dec, None, None, (time.perf_counter() - t0) * 1000, answer=ans)
+        if self.answerer is not None and (is_smalltalk(request) or is_agenda(request)):  # conversation and agendas need no routing and no tool
+            ans = await (self.answerer._general(request, history) if is_smalltalk(request) else self.answerer.agenda(request))
+            dec = RouteDecision(tier="L1", intent_family="general" if is_smalltalk(request) else "agenda", skills=[], plan_needed=False, risk_floor=0, memory_types=[], confidence=1.0, latency_ms=0.0, backend="rule")
+            return TurnResult("L1", dec, None, None, (time.perf_counter() - t0) * 1000, answer=ans)
         decision = await self.cascade.route(request, compartment=self.ctx.compartment, caller_trust=trust, now_ms=now)
         decision.memory_types = memory_types_hint(request)
         if decision.intent_family in ("memory", "general") and self.answerer is not None and decision.tier != "L0":
@@ -189,6 +211,9 @@ class Agent:
                 decision.tier, plan_source = "L3", "L3"
         if plan is None and decision.tier in ("L1", "L2"):
             plan = await self._single_skill_plan(request, decision.skills[0], snippets)
+            if plan is None and getattr(self, "_clarify", None):
+                msg, self._clarify = self._clarify, None
+                return TurnResult(decision.tier, decision, None, msg, (time.perf_counter() - t0) * 1000)
             if plan is None:
                 decision.tier, plan_source = "L3", "L3"
         if plan is None:

@@ -55,11 +55,12 @@ async def ingest_text(
     embed_model: str = "nomic-embed-text",
     priority: Priority = Priority.BACKGROUND,
     max_chunk_chars: int = 1200,
+    extra_flags: dict[str, Any] | None = None,
 ) -> IngestResult:
     body = message_body(text) if strip_quotes else text
     san = sanitize(body, html_hidden_seen=html_hidden)
     chunks = chunk_text(san.text, max_chars=max_chunk_chars)
-    flags = {**san.flags, "extracted": summarize(extract(san.text))}
+    flags = {**san.flags, "extracted": summarize(extract(san.text)), **{k: v for k, v in (extra_flags or {}).items() if isinstance(v, (str, int, bool)) and len(str(v)) < 300}}
     item = CanonicalItem(
         source=source, native_id=native_id, compartment=compartment, trust=trust, kind=kind, title=title,
         visibility=visibility, thread_id=thread_id, deep_link=deep_link, occurred_at=occurred_at, chunks=chunks, flags=flags,  # type: ignore[arg-type]

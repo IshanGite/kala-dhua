@@ -87,7 +87,7 @@ class ConnectorRunner:
                 res = await ingest_text(
                     self._m, self._gw, self._idx, source=raw.source, native_id=raw.native_id, compartment=self._comp, trust=raw.trust, text=raw.text,
                     title=raw.title, kind=raw.kind, visibility=raw.visibility, thread_id=raw.thread_id, deep_link=raw.deep_link,
-                    occurred_at=raw.occurred_at, html_hidden=raw.html_hidden, strip_quotes=raw.strip_quotes,
+                    occurred_at=raw.occurred_at, html_hidden=raw.html_hidden, strip_quotes=raw.strip_quotes, extra_flags={**raw.flags, **({'author': raw.author} if raw.author else {})},
                 )
                 self._q.complete(row.id)
                 if res.action == "unchanged":

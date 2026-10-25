@@ -1,0 +1,66 @@
+{
+  "name": "mail.reply",
+  "version": "0.1.0",
+  "description": "Use when the user asks to reply to an email from a person, in the same conversation.",
+  "entrypoint": {
+    "type": "native",
+    "action": "mail.reply"
+  },
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "target": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 120,
+        "description": "the sender's name or address"
+      },
+      "body": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 5000
+      }
+    },
+    "required": [
+      "target",
+      "body"
+    ],
+    "additionalProperties": false
+  },
+  "permissions": [
+    {
+      "permission": "mail.send"
+    }
+  ],
+  "side_effects": "irreversible",
+  "dry_run": true,
+  "param_roles": {
+    "free": [
+      "target",
+      "body"
+    ]
+  },
+  "examples": [
+    {
+      "params": {
+        "target": "Dev",
+        "body": "I will send the contract on Thursday."
+      },
+      "note": "reply to Dev's email saying I will send the contract on Thursday"
+    },
+    {
+      "params": {
+        "target": "Dev",
+        "body": "I will send the contract on Thursday."
+      },
+      "note": "answer Priya's email and say thanks"
+    },
+    {
+      "params": {
+        "target": "Dev",
+        "body": "I will send the contract on Thursday."
+      },
+      "note": "respond to the invoice email from Kestrel that we will pay on the 20th"
+    }
+  ]
+}

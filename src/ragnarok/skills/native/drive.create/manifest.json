@@ -1,0 +1,65 @@
+{
+  "name": "drive.create",
+  "version": "0.1.0",
+  "description": "Use when the user asks to write, save or create a document or note in Google Drive.",
+  "entrypoint": {
+    "type": "native",
+    "action": "drive.create"
+  },
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "title": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 200
+      },
+      "text": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 20000
+      }
+    },
+    "required": [
+      "title",
+      "text"
+    ],
+    "additionalProperties": false
+  },
+  "permissions": [
+    {
+      "permission": "net"
+    }
+  ],
+  "side_effects": "reversible",
+  "dry_run": true,
+  "param_roles": {
+    "free": [
+      "title",
+      "text"
+    ]
+  },
+  "examples": [
+    {
+      "params": {
+        "title": "Orion plan",
+        "text": "Launch 14 April."
+      },
+      "note": "create a Google Doc called Orion plan with the key dates"
+    },
+    {
+      "params": {
+        "title": "Orion plan",
+        "text": "Launch 14 April."
+      },
+      "note": "save these meeting notes to my Drive"
+    },
+    {
+      "params": {
+        "title": "Orion plan",
+        "text": "Launch 14 April."
+      },
+      "note": "write a document in Drive summarising the invoice"
+    }
+  ]
+}

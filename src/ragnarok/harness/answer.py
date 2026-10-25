@@ -35,6 +35,21 @@ CATCHUP_SCHEMA = {"type": "object", "properties": {"summary": {"type": "string"}
     "point": {"type": "string"}, "cites": {"type": "array", "items": {"type": "integer"}}, "needs_action": {"type": "boolean"}}, "required": ["point", "cites"]}}}, "required": ["summary", "points"]}
 
 
+_GREET = r"(?:hi|hello|hey|yo|good (?:morning|afternoon|evening|night)|thanks|thank you|thx|ok(?:ay)?|cool|nice|bye|goodbye|who are you|what can you do|what are you|how are you|how(?:'?s| is) it going)"
+_FILL = r"(?:there|again|friend|buddy|mate|today|ragnarok|everyone|all|so much|a lot)"
+SMALLTALK = re.compile(rf"^\s*{_GREET}(?:[\s!.?,]+(?:{_GREET}|{_FILL}))*[\s!.?,]*$", re.I)
+AGENDA = re.compile(r"\b(what('?s| is| do i have)|show|list|do i have|any|am i free)\b.*\b(calendar|agenda|schedule|meetings?|events?|appointments?)\b|\b(calendar|agenda|schedule)\b.*\b(today|tomorrow|this week|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b", re.I)
+NOT_AGENDA = re.compile(r"\b(put|add|schedule a|schedule an|book|block|create|move|cancel|reschedule|delete|set up)\b", re.I)
+
+
+def is_smalltalk(text: str) -> bool:
+    return bool(SMALLTALK.match(text))
+
+
+def is_agenda(text: str) -> bool:
+    return bool(AGENDA.search(text)) and not NOT_AGENDA.search(text)
+
+
 def is_catchup(text: str) -> bool:
     return bool(CATCHUP.search(text))
 
@@ -154,3 +169,25 @@ class Answerer:
         if suspicious:
             text += "\nWARNING: these messages tried to give me instructions, so I held them back and did not act on them: " + "; ".join(suspicious) + "."
         return Answered(text, [{"n": c, "citation": f"{rows[c - 1]['source']}: {rows[c - 1]['title'] or rows[c - 1]['kind']}", "link": rows[c - 1].get("deep_link")} for c in dict.fromkeys(cites_all)], True)
+
+    async def agenda(self, request: str) -> Answered:
+        """What is on the calendar for the asked day or range, straight from the calendar items: no model, nothing invented."""
+        from datetime import datetime
+
+        from ragnarok.router.analysis import parse_time_range
+
+        now = get_clock().now_ms()
+        rng = parse_time_range(request, now)
+        if rng is None:
+            day = datetime.fromtimestamp(now / 1000).replace(hour=0, minute=0, second=0, microsecond=0)
+            rng = (int(day.timestamp() * 1000), int(day.timestamp() * 1000) + 86_400_000)
+        rows = self._r.items_between(("gcal", "outlook_cal"), rng[0], rng[1])
+        label = datetime.fromtimestamp(rng[0] / 1000).strftime("%a %d %b")
+        if not rows:
+            return Answered(f"Nothing on your calendar for {label}.", notes=["agenda_empty"])
+        lines = []
+        for r in rows:
+            when = datetime.fromtimestamp((r["ts"] or 0) / 1000).strftime("%H:%M")
+            where = re.search(r"Where: (.+)", r["preview"] or "")
+            lines.append(f"{when}  {r['title'] or '(no title)'}" + (f" - {where.group(1)[:60]}" if where else ""))
+        return Answered(f"Your calendar from {label}:\n" + "\n".join(lines), [{"n": i + 1, "citation": f"{r['source']}: {r['title']}", "link": r.get("deep_link")} for i, r in enumerate(rows[:6])], True)

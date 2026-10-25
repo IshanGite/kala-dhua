@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import Any
 
 from ragnarok.connectors.discord import Discord
-from ragnarok.connectors.google import Calendar, Gmail, GoogleAuth, valid_address
+from ragnarok.connectors.google import Calendar, Drive, Gmail, GoogleAuth, valid_address
 from ragnarok.connectors.slack import Slack
 from ragnarok.connectors.telegram import Telegram
 from ragnarok.core.clock import get_clock
@@ -141,6 +141,35 @@ class Actions:
             mid = await Slack(tok).post(tok, chat_id, p["text"])
         return {"posted": True, "to": title, "id": mid}
 
+    async def mail_reply(self, p: dict[str, Any], ctx: ExecContext, *, dry_run: bool) -> dict[str, Any]:
+        m = self._r.find_mail("gmail", p["target"])
+        if m is None:
+            raise ActionError(f"no email from {p['target']!r} is known yet", code="E_UNKNOWN_TARGET")
+        to = str(m["flags"].get("from", ""))
+        if not valid_address(to):
+            raise ActionError("that message has no usable sender address", code="E_BAD_RECIPIENT")
+        title = str(m["title"] or "")
+        subject = title if title.lower().startswith("re:") else f"Re: {title}"
+        if dry_run:
+            return {"would_reply": {"to": to, "subject": subject, "body": p["body"], "in_thread": bool(m["thread_id"])}}
+        if self._senders and "mail_reply" in self._senders:
+            return {"sent": True, "to": to, "id": await self._senders["mail_reply"](to, subject, p["body"], m)}
+        auth = self._write_auth()
+        if auth is None:
+            raise ActionError("replying needs the write sign-in: ragnarok connect google --write", code="E_NOT_CONNECTED")
+        mid = await Gmail(auth).send(auth, to, subject, p["body"], thread_id=str(m["thread_id"] or ""), in_reply_to=str(m["flags"].get("message_id", "")), references=str(m["flags"].get("references", "")))
+        return {"sent": True, "to": to, "id": mid}
+
+    async def drive_create(self, p: dict[str, Any], ctx: ExecContext, *, dry_run: bool) -> dict[str, Any]:
+        if dry_run:
+            return {"would_create": {"title": p["title"], "chars": len(p["text"])}}
+        if self._senders and "drive" in self._senders:
+            return {"created": True, "title": p["title"], "link": await self._senders["drive"](p)}
+        auth = self._write_auth()
+        if auth is None:
+            raise ActionError("creating documents needs the write sign-in: ragnarok connect google --write", code="E_NOT_CONNECTED")
+        return {"created": True, "title": p["title"], "link": await Drive(auth).create_doc(auth, p["title"], p["text"])}
+
     def natives(self) -> dict[str, NativeHandler]:
         return {"memory.search": self.memory_search, "reminder.add": self.reminder_add, "reminder.list": self.reminder_list, "mail.draft": self.mail_draft,
-                "mail.send": self.mail_send, "chat.reply": self.chat_reply, "calendar.add": self.calendar_add}
+                "mail.send": self.mail_send, "chat.reply": self.chat_reply, "calendar.add": self.calendar_add, "mail.reply": self.mail_reply, "drive.create": self.drive_create}

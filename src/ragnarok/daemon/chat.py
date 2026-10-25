@@ -42,8 +42,10 @@ def summarize(turn: TurnResult) -> dict[str, Any]:
                 lines.append(f"Draft to {res['draft']['to']} saved {where}: {res['draft']['body'][:200]}")
             elif res.get("added"):
                 lines.append(f"Added to Google Calendar: {res['title']} ({res['when']}).")
+            elif res.get("created"):
+                lines.append(f"Created in Google Drive: {res['title']}." + (f" {res['link']}" if res.get("link") else ""))
             elif res.get("sent"):
-                lines.append("Email sent.")
+                lines.append("Email sent" + (f" to {res['to']}." if res.get("to") else "."))
             elif res.get("posted"):
                 lines.append(f"Message posted to {res.get('to', 'the chat')}.")
             elif "reminders" in res:

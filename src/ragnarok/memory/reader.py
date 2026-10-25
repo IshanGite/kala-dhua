@@ -54,7 +54,7 @@ class MemoryReader:
         rows = self._r.execute(
             "SELECT e.id AS id, e.content AS text, e.ts AS ts, e.trust AS trust, e.kind AS kind, bm25(events_fts) AS s"
             " FROM events_fts JOIN events e ON e.rowid = events_fts.rowid"
-            " WHERE events_fts MATCH ? AND e.compartment_id=? ORDER BY s LIMIT ?",
+            " WHERE events_fts MATCH ? AND e.compartment_id=? AND e.kind NOT IN ('user_message','clarification','task_result','draft') ORDER BY s LIMIT ?",
             (q, comp_id, k),
         ).fetchall()
         return [dict(r) for r in rows]
@@ -121,6 +121,22 @@ class MemoryReader:
             sql += " WHERE " + " AND ".join(where)
         sql += " ORDER BY ts DESC LIMIT ?"
         return [dict(x) for x in self._r.execute(sql, [*args, max(1, min(limit, 200))])]
+
+    def find_mail(self, source: str, who: str) -> dict[str, Any] | None:
+        """The most recent message on a mail source whose sender (name or address) matches; carries what a threaded reply needs."""
+        row = self._r.execute("SELECT native_id, title, thread_id, flags_json FROM items WHERE source=? AND lower(flags_json) LIKE ? ORDER BY coalesce(occurred_at,0) DESC LIMIT 1", (source, f"%{who.lower()}%")).fetchone()
+        if row is None:
+            return None
+        import json as _json
+
+        return {"native_id": row["native_id"], "title": row["title"], "thread_id": row["thread_id"], "flags": _json.loads(row["flags_json"] or "{}")}
+
+    def items_between(self, sources: tuple[str, ...], start_ms: int, end_ms: int, limit: int = 60) -> list[dict[str, Any]]:
+        """Items whose own time (an event's start, a message's date) falls in the window, soonest first. For agendas."""
+        q = ",".join("?" * len(sources))
+        rows = self._r.execute(f"SELECT i.source, i.title, i.occurred_at AS ts, i.deep_link, (SELECT text FROM chunks c WHERE c.item_id=i.id ORDER BY ordinal LIMIT 1) AS preview "
+                               f"FROM items i WHERE i.source IN ({q}) AND i.occurred_at >= ? AND i.occurred_at < ? ORDER BY i.occurred_at LIMIT ?", (*sources, start_ms, end_ms, limit)).fetchall()
+        return [dict(x) for x in rows]
 
     def find_conversation(self, source: str, name: str) -> dict[str, Any] | None:
         """The most recent conversation on a platform whose title matches a name: native_id is 'chat:message' for chat sources."""
