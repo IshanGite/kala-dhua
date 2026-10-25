@@ -61,7 +61,7 @@ def parse_when(text: str, now: datetime) -> datetime | None:
     return datetime(day.year, day.month, day.day, h, mi)
 
 
-_LEAD = re.compile(r"^\s*(?:please\s+)?(?:can you\s+)?(?:remind me|set (?:a )?reminder|add (?:a )?(?:to-?do|reminder)|note)\s*(?:to|about|that|for)?\s*", re.I)
+_LEAD = re.compile(r"^\s*(?:please\s+)?(?:can you\s+)?(?:remind me|set (?:a )?reminder|add (?:a )?(?:to-?do|reminder)|note)\s*(?:(?:to|about|that|for)\b)?\s*", re.I)
 _TIMEWORDS = re.compile(
     r"\b(?:tomorrow(?:\s+(?:morning|afternoon|evening|night))?|today|tonight|this\s+(?:morning|afternoon|evening)|in\s+\d{1,3}\s*(?:minutes?|mins?|hours?|hrs?|days?|weeks?)|"
     r"(?:on\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)(?:\s+(?:morning|afternoon|evening|night))?|(?:at\s+)?\d{1,2}(?::[0-5]\d)?\s*(?:am|pm)|at\s+(?:[01]?\d|2[0-3]):[0-5]\d)\b", re.I)
@@ -73,6 +73,7 @@ def split_reminder(request: str) -> tuple[str, str]:
     when = " ".join(m.group(0) for m in _TIMEWORDS.finditer(body))
     text = re.sub(r"\s{2,}", " ", _TIMEWORDS.sub("", body)).strip(" ,.;:-")
     text = re.sub(r"\b(?:at|on|by|for)\s*$", "", text, flags=re.I).strip(" ,.;:-")
+    text = re.sub(r"^(?:to|about|that)\b\s*", "", text, flags=re.I).strip(" ,.;:-")
     return (text or body.strip()), when
 
 
@@ -113,6 +114,12 @@ def split_chat(request: str) -> tuple[str, str, str]:
     text = m.group(1).strip() if m else ""
     head = request[: m.start()] if m else request
     target = ""
+    ms = re.search(r"\bsend\s+(?:a\s+)?(?:message\s+)?(?:saying\s+)?(.+?)\s+to\s+(.+?)\s+(?:on|in|via)\s+(telegram|discord|slack)\b", request, re.I)
+    if ms:
+        return ms.group(3).lower(), ms.group(2).strip(" ,.;:-\"'#"), ms.group(1).strip()
+    ms = re.search(r"\bsend\s+(?:a\s+)?(?:message\s+)?(?:saying\s+)?(.+?)\s+to\s+(.+?)\s+(?:on|in|via)\s+(telegram|discord|slack)\b", request, re.I)
+    if ms:
+        return ms.group(3).lower(), ms.group(2).strip(" ,.;:-\"'#"), ms.group(1).strip()
     t1 = re.search(r"\b(?:tell|message|text|ping|dm|reply to|respond to)\s+(.+?)(?:\s+(?:on|in|via)\s+(?:telegram|discord|slack))?\s*$", head, re.I)
     if t1:
         target = t1.group(1)

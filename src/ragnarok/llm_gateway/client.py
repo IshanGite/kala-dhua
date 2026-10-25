@@ -14,6 +14,7 @@ import asyncio
 import enum
 import ipaddress
 import json
+import re
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 from urllib.parse import urlparse
@@ -68,6 +69,17 @@ def assert_loopback(url: str) -> None:
     except ValueError:
         pass
     raise NetworkGuardError(f"model endpoint {host!r} is not a loopback address")
+
+
+_THINK_BLOCK = re.compile(r"<think>.*?</think>", re.S | re.I)
+
+
+def strip_thinking(text: str) -> str:
+    """Some qwen3 builds write their reasoning into the reply even with thinking switched off: never show it, never parse it."""
+    text = _THINK_BLOCK.sub("", text)
+    if "</think>" in text:
+        text = text.split("</think>")[-1]
+    return text.strip()
 
 
 def approx_tokens(text: str) -> int:
@@ -173,7 +185,7 @@ class OllamaGateway:
         started = get_clock().monotonic()
         data = await self._post("/api/chat", body, deadline, priority)
         latency = (get_clock().monotonic() - started) * 1000
-        text = data.get("message", {}).get("content", "")
+        text = strip_thinking(data.get("message", {}).get("content", ""))
         parsed = None
         if schema is not None:
             try:

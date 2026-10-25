@@ -84,3 +84,35 @@ from ragnarok.harness.answer import source_recall  # noqa: E402
                                        ("what did Ravi say on telegram about the permit", None), ("send an email to a@b.com", None), ("draft a reply on slack", None)])
 def test_source_recall(text, srcs):
     assert source_recall(text) == srcs
+
+
+def test_reminder_with_the_day_before_the_task():
+    from ragnarok.router.when import split_reminder
+
+    assert split_reminder("remind me tomorrow to call dad at 5pm") == ("call dad", "tomorrow at 5pm")
+    assert split_reminder("remind me to call the tomorrow-store")[0].startswith("call the")
+
+
+def test_send_text_to_person_on_app():
+    assert split_chat("send hi to ishan on telegram") == ("telegram", "ishan", "hi")
+    assert split_chat("send a message saying running late to Meera on slack") == ("slack", "Meera", "running late")
+
+
+def test_typed_confirmation_never_approves_anything():
+    import asyncio
+
+    from ragnarok.daemon.chat import CONFIRM, ChatService
+
+    assert all(CONFIRM.match(t) for t in ("do it", "yes", "go ahead", "Approve", "ok do it", "send it"))
+    assert not CONFIRM.match("yes please send the invoice to Dev")
+
+    class Hub:
+        def pending(self):
+            return [{"id": "a1"}]
+
+    class Boom:
+        async def handle(self, *a, **k):
+            raise AssertionError("an approval phrase must not reach the agent")
+
+    out = asyncio.run(ChatService(Boom(), Hub()).submit("do it"))
+    assert "Approvals tab" in out["text"] and out["state"] == "done"

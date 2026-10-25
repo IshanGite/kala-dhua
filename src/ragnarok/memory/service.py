@@ -157,6 +157,8 @@ class MemoryService:
             existing = self._w.execute("SELECT id, content_hash FROM items WHERE source=? AND native_id=?", (item.source, item.native_id)).fetchone()
             with transaction(self._w):
                 if existing and existing[1] == chash:
+                    fl = _json(item.flags)
+                    self._w.execute("UPDATE items SET flags_json=? WHERE id=? AND flags_json<>?", (fl, existing[0], fl))  # newer connector fields (author, message id) backfill old items
                     return ItemResult(item_id=existing[0], action="unchanged")
                 action = "inserted"
                 if existing:

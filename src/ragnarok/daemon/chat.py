@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -60,9 +61,13 @@ def summarize(turn: TurnResult) -> dict[str, Any]:
     return {"text": " ".join(lines) or f"Task {o.state}.", "citations": [], "state": o.state, **meta}
 
 
+CONFIRM = re.compile(r"^\s*(?:ok(?:ay)?[, ]*)?(?:do it|go ahead|yes|yep|yeah|sure|confirm|approve|approved|send it|proceed|please do|run it)\b[\s!.]*$", re.I)
+
+
 class ChatService:
-    def __init__(self, agent: Agent) -> None:
+    def __init__(self, agent: Agent, hub: Any = None) -> None:
         self._agent = agent
+        self._hub = hub
         self.jobs: dict[str, Job] = {}
         self.history: list[tuple[str, str]] = []  # the running conversation, in memory only
         self._tasks: set[asyncio.Task[None]] = set()
@@ -78,6 +83,11 @@ class ChatService:
             job.reply, job.state = {"text": f"Something went wrong ({type(exc).__name__}).", "citations": []}, "error"
 
     async def submit(self, text: str) -> dict[str, Any]:
+        if CONFIRM.match(text):  # approval is a click on a card, never a sentence: typed text cannot approve anything
+            n = len(self._hub.pending()) if self._hub is not None else 0
+            reply = (f"{n} action(s) are waiting for you in the Approvals tab. Each card shows exactly what will happen; press Approve there." if n else
+                     "Nothing is waiting for approval and I am not in the middle of anything. Tell me what to do.")
+            return {"ok": True, "pending": False, "job": "", "state": "done", "text": reply, "citations": [], "tier": "L1", "backend": "rule", "ms": 0}
         job = Job(new_id()[:10], text)
         self.jobs[job.id] = job
         task = asyncio.get_running_loop().create_task(self._run(job))

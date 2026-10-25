@@ -130,7 +130,7 @@ def build_world(*, use_laya: bool = True, sandbox: bool = True, embed_rungs: boo
     answerer = Answerer(reader, index, gw, COMPARTMENT)
     planner = Planner(gw, lambda n: _manifest(registry, n), Agent._now_text)
     agent = Agent(mem=mem, ledger=ledger, reader=reader, index=index, gateway=gw, cascade=cascade, planner=planner, executor=executor, registry=registry, library=library,
-                  routes=routes, ctx=ExecContext(compartment=COMPARTMENT, workspace=ws, data_dir=root, today=date.today().isoformat()), answerer=answerer)
+                  routes=routes, ctx=ExecContext(compartment=COMPARTMENT, workspace=ws, data_dir=root, today=date.today().isoformat()), answerer=answerer, fast_refuse=True)
     state = RuntimeState(mem)
     notif = Notifications(default_source(), lambda: json.loads(state.get("notif_apps", "[]")))
     runners["notifications"] = ConnectorRunner(mem, queue, notif, COMPARTMENT, gateway=gw, index=index)
@@ -142,7 +142,7 @@ def build_world(*, use_laya: bool = True, sandbox: bool = True, embed_rungs: boo
         token_file.chmod(0o600)
     except OSError:
         pass  # Windows: the per-user data directory ACL applies
-    services = Services(runtime, answerer, notif, ChatService(agent), reader, hub)
+    services = Services(runtime, answerer, notif, ChatService(agent, hub), reader, hub)
     w = World(mem, reader, index, gw, runtime, services, guard, token_file, agent, selector, l1)
     w.registry = registry  # type: ignore[attr-defined]
     return w

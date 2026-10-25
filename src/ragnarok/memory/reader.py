@@ -122,6 +122,19 @@ class MemoryReader:
         sql += " ORDER BY ts DESC LIMIT ?"
         return [dict(x) for x in self._r.execute(sql, [*args, max(1, min(limit, 200))])]
 
+    def chunk_context(self, chunk_ids: list[str]) -> dict[str, dict[str, Any]]:
+        """Who, where and when for retrieved chunks, so an answer can say 'Meera on Discord, Sun 16:54' and not only the text."""
+        if not chunk_ids:
+            return {}
+        import json as _json
+
+        q = ",".join("?" * len(chunk_ids))
+        out = {}
+        for row in self._r.execute(f"SELECT c.id AS cid, i.source, i.title, coalesce(i.occurred_at, i.ingested_at) AS ts, i.flags_json FROM chunks c JOIN items i ON i.id=c.item_id WHERE c.id IN ({q})", chunk_ids):
+            fl = _json.loads(row["flags_json"] or "{}")
+            out[row["cid"]] = {"source": row["source"], "title": row["title"], "ts": row["ts"], "author": fl.get("author") or fl.get("from")}
+        return out
+
     def find_mail(self, source: str, who: str) -> dict[str, Any] | None:
         """The most recent message on a mail source whose sender (name or address) matches; carries what a threaded reply needs."""
         row = self._r.execute("SELECT native_id, title, thread_id, flags_json FROM items WHERE source=? AND lower(flags_json) LIKE ? ORDER BY coalesce(occurred_at,0) DESC LIMIT 1", (source, f"%{who.lower()}%")).fetchone()

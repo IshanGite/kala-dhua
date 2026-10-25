@@ -57,8 +57,9 @@ class TurnResult:
 
 class Agent:
     def __init__(self, *, mem: MemoryService, ledger: Ledger, reader: MemoryReader, index: VectorIndex, gateway: Gateway, cascade: Cascade, planner: Planner,
-                 executor: Executor, registry: SkillRegistry, library: RouteLibrary | None, routes: RoutesStore | None, ctx: ExecContext, answerer: Answerer | None = None) -> None:
+                 executor: Executor, registry: SkillRegistry, library: RouteLibrary | None, routes: RoutesStore | None, ctx: ExecContext, answerer: Answerer | None = None, fast_refuse: bool = False) -> None:
         self.answerer = answerer
+        self.fast_refuse = fast_refuse  # the daemon sets it: one unresolved action is refused at once instead of spending the slow planner on it
         self.mem, self.ledger, self.reader, self.index, self.gw = mem, ledger, reader, index, gateway
         self.cascade, self.planner, self.executor, self.registry, self.library, self.routes, self.ctx = cascade, planner, executor, registry, library, routes, ctx
 
@@ -88,9 +89,42 @@ class Agent:
     HISTORYLIKE = re.compile(r"\b(i just (asked|said|told)|you (just )?(said|told|answered)|earlier (we|you|i)|previous (question|message|answer)|what did i (just )?ask|what have i asked|(earlier|before|previously|so far)\b.*\b(chat|conversation)|(this|our) (chat|conversation))\b", re.I)
 
     _clarify: str | None = None
+    ACTIONISH = re.compile(r"\b(send|post|message|tell|text|email|mail|remind|schedule|create|add|put|reply|respond|forward|delete|remove|book|cancel|save|write|draft|share|invite|set up)\b", re.I)
+    POLITE = re.compile(r"^\s*(?:please\s+)?(?:can|could|would|will) you\b", re.I)
+    PRONOUN = re.compile(r"\b(it|that|this|they|them|those|these|he|she|him|her|there|then)\b", re.I)
+    NO_ACTION = ("I did not do anything. That sounds like a request to act, but I could not tell which app, which person or what to say. "
+                 "Try: 'tell Ravi on telegram that I will be late', 'send an email to name@example.com saying ...', 'remind me to call the bank tomorrow at 5pm', or 'put a call with Priya on my calendar tomorrow at 4pm'.")
+
+    @classmethod
+    def _multistep(cls, request: str) -> bool:
+        return len({m.group(0).lower() for m in cls.ACTIONISH.finditer(request)}) >= 2 or bool(re.search(r"\bthen\b|\band then\b|\bafter that\b", request, re.I))
+
+    def _is_question(self, request: str) -> bool:
+        return bool(self.QUESTIONLIKE.search(request)) and not self.POLITE.match(request)
+
+    def _is_action_request(self, request: str) -> bool:
+        return bool(self.ACTIONISH.search(request)) and not self._is_question(request)
+
+    @staticmethod
+    def _hint(request: str, history: list[tuple[str, str]] | None) -> str:
+        """A short follow-up ('who sent it', 'and when?') is searched together with the previous question so 'it' means something."""
+        if not history or len(request.split()) > 8 or not Agent.PRONOUN.search(request) and not request.lower().startswith(("and ", "who", "when", "where")):
+            return ""
+        last = next((c for r, c in reversed(history) if r == "user"), "")
+        return last[:200]
+
+    async def _say(self, request: str, *, history: list[tuple[str, str]] | None, general: bool) -> Answered:
+        """Prose answers only. A request that sounds like an action never gets one: prose must not look like something was done."""
+        assert self.answerer is not None
+        if self._is_action_request(request):
+            return Answered(self.NO_ACTION, notes=["no_action_taken"])
+        ans = await self.answerer.answer(request, general=False, history=history, context_hint=self._hint(request, history))
+        if not ans.grounded and general:
+            ans = await self.answerer.answer(request, general=True, history=history)
+        return ans
 
     def _wants_any_write(self, request: str) -> bool:
-        return any(re.search(p, request, re.I) for sk, p in self.ACTION_WORDS.items() if sk != "reminder.add") and not self.QUESTIONLIKE.search(request)
+        return any(re.search(p, request, re.I) for sk, p in self.ACTION_WORDS.items() if sk != "reminder.add") and not self._is_question(request)
 
     def _wants_action(self, skill: str, request: str) -> bool:
         """A write-capable skill runs only if the words of the request actually ask for it: small talk and questions never trigger one."""
@@ -98,7 +132,7 @@ class Agent:
         if m is None or (m.tier < 1 and not m.external_write):
             return True
         pat = self.ACTION_WORDS.get(skill)
-        return bool(pat and re.search(pat, request, re.I)) and not (self.QUESTIONLIKE.search(request) and skill in ("chat.reply", "mail.send", "mail.reply", "calendar.add", "drive.create"))
+        return bool(pat and re.search(pat, request, re.I)) and not (self._is_question(request) and skill in ("chat.reply", "mail.send", "mail.reply", "calendar.add", "drive.create"))
 
     @staticmethod
     def _now_text() -> str:
@@ -188,21 +222,17 @@ class Agent:
         decision = await self.cascade.route(request, compartment=self.ctx.compartment, caller_trust=trust, now_ms=now)
         decision.memory_types = memory_types_hint(request)
         if decision.intent_family in ("memory", "general") and self.answerer is not None and decision.tier != "L0":
-            ans = await self.answerer.answer(request, general=decision.intent_family == "general", history=history)
+            ans = await self._say(request, history=history, general=decision.intent_family == "general")
             return TurnResult(decision.tier, decision, None, None, (time.perf_counter() - t0) * 1000, answer=ans)
         if self.answerer is not None and history is not None and self.HISTORYLIKE.search(request):
             ans = await self.answerer._general(request, history)
             return TurnResult(decision.tier, decision, None, None, (time.perf_counter() - t0) * 1000, answer=ans)
         if self.answerer is not None and decision.tier != "L0" and decision.skills and not all(self._wants_action(sk, request) for sk in decision.skills[:1]):
             decision.notes.append("no_action_asked_so_no_tool")
-            ans = await self.answerer.answer(request, general=False, history=history)
-            if not ans.grounded:
-                ans = await self.answerer.answer(request, general=True, history=history)
+            ans = await self._say(request, history=history, general=True)
             return TurnResult(decision.tier, decision, None, None, (time.perf_counter() - t0) * 1000, answer=ans)
-        if self.answerer is not None and decision.tier == "L3" and self.QUESTIONLIKE.search(request):  # a question is answered from memory, not handed to the slow planner
-            ans = await self.answerer.answer(request, general=False, history=history)
-            if not ans.grounded:
-                ans = await self.answerer.answer(request, general=True, history=history)
+        if self.answerer is not None and decision.tier == "L3" and not self._is_action_request(request):  # not an action: answer from memory, do not hand it to the slow planner
+            ans = await self._say(request, history=history, general=True)
             return TurnResult(decision.tier, decision, None, None, (time.perf_counter() - t0) * 1000, answer=ans)
         snippets = await self._snippets(request)
         plan: Plan | None = None
@@ -222,12 +252,17 @@ class Agent:
                 return TurnResult(decision.tier, decision, None, msg, (time.perf_counter() - t0) * 1000)
             if plan is None:
                 decision.tier, plan_source = "L3", "L3"
+        if plan is None and self.fast_refuse and self._is_action_request(request) and not self._multistep(request):  # one unresolved action: say so now, do not burn 30 s of planner on it
+            return TurnResult(decision.tier, decision, None, self.NO_ACTION, (time.perf_counter() - t0) * 1000)
         if plan is None:
             manifests = [m for n in decision.shortlist if (m := self._manifest(n)) is not None] or self._all_manifests()[:5]
             pr = await self.planner.plan(request, manifests, snippets=snippets, deadline=get_clock().monotonic() + 30)
             plan, clarification = pr.plan, pr.clarification
+        if plan is None and self.answerer is not None and self._is_action_request(request) and not decision.notes.count("clarified"):
+            decision.notes.append("action_not_understood")
+            return TurnResult(decision.tier, decision, None, self.NO_ACTION, (time.perf_counter() - t0) * 1000)
         if plan is None and self.answerer is not None and not self._wants_any_write(request):
-            ans = await self.answerer.answer(request, general=False, history=history)  # nothing safe to do: try to just answer from memory
+            ans = await self.answerer.answer(request, general=False, history=history, context_hint=self._hint(request, history))  # nothing safe to do: try to just answer from memory
             if ans.grounded:
                 return TurnResult(decision.tier, decision, None, None, (time.perf_counter() - t0) * 1000, answer=ans)
         if plan is None:
