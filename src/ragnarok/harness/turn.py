@@ -19,7 +19,7 @@ import numpy as np
 
 from ragnarok.core.clock import get_clock
 from ragnarok.core.errors import ModelError
-from ragnarok.harness.actionparse import parse_action
+from ragnarok.harness.actionparse import Step, parse_action, parse_steps
 from ragnarok.harness.answer import (
     CAPABILITIES,
     CAPABILITY_ASK,
@@ -314,8 +314,8 @@ class Agent:
             return node({"title": f.get("title") or what, "when": when}) if when else None
         if skill == "chat.reply":
             platform, target, body = f.get("platform", "").lower(), f.get("target", ""), f.get("body", "")
-            if platform not in ("telegram", "discord", "slack") or not body or not self._faithful(body, text):
-                return None
+            if platform not in ("telegram", "discord", "slack") or not body or not self._faithful(body, text) or (target and target.lower() not in text.lower()):
+                return None  # a name the user never wrote is the model echoing an example, not a person to message
             if not target:
                 recent = self.reader.recent_items(limit=1, source=platform)
                 target = str(recent[0]["title"]) if recent and recent[0]["title"] else ""
@@ -332,10 +332,90 @@ class Agent:
                     return None
             return node({"to": to, "subject": subject or "(no subject)", "body": body})
         if skill == "mail.reply":
-            return node({"target": f["target"], "body": f["body"]}) if f.get("target") and f.get("body") and self._faithful(f["body"], text) else None
+            return node({"target": f["target"], "body": f["body"]}) if f.get("target") and f["target"].lower() in text.lower() and f.get("body") and self._faithful(f["body"], text) else None
         if skill == "drive.create":
             return node({"title": f["title"], "text": f.get("body", "")}) if f.get("title") and f.get("body") and self._faithful(f["body"], text) else None
         return None
+
+    async def _compose(self, what: str, request: str) -> str:
+        """Text the assistant was asked to WRITE (a poem, a short note): composed by the small writer model from the user's own request, shown in full on the approval card before anything is sent."""
+        try:
+            res = await self.gw.chat(role="arbiter", schema=None, max_tokens=300, deadline=get_clock().monotonic() + 30, priority=Priority.INTERACTIVE, seed=1, temperature=0.7,
+                                     messages=[{"role": "system", "content": "You write short pieces of text on request. Reply with ONLY the text itself: no title line, no introduction, no explanation, no markdown. Use plain words."},
+                                               {"role": "user", "content": f"Write {what[:200]}."}])
+        except Exception:  # noqa: BLE001
+            return ""
+        return (res.text or "").strip()[:2500]
+
+    async def _plan_from_steps(self, text: str, steps: list[Any]) -> Plan | None:
+        """One to four ordered actions. Written text is composed here; a later step may use an earlier document's link through {ref:}. Every field is validated; every send still needs a click."""
+        if len(steps) == 1 and not steps[0].fields.get("compose"):
+            return await self._plan_from_parsed(text, steps[0])
+        if not steps or len(steps) > 4:
+            return None
+        nodes: list[PlanNode] = []
+        doc: tuple[str, str] | None = None  # (node id, text) of the last document step
+        for i, p in enumerate(steps, 1):
+            f, nid = p.fields, f"n{i}"
+            gen = await self._compose(f["compose"], text) if f.get("compose") else ""
+            if f.get("compose") and not gen:
+                self._clarify = "I could not write that text right now. Say what it should say and I will use your words."
+                return None
+            if p.skill == "drive.create":
+                body = gen or f.get("body", "")
+                title = f.get("title") or (f.get("compose", "").strip().capitalize()[:40] or "Note")
+                if not body or self._manifest("drive.create") is None:
+                    return None
+                nodes.append(PlanNode(id=nid, goal=text[:200], skill="drive.create", params={"title": title, "text": body}, criteria=CRITERIA["drive.create"]))
+                doc = (nid, body)
+            elif p.skill in ("mail.send", "mail.draft"):
+                to = f.get("to", "")
+                if not to or "@" not in to or to.lower() not in text.lower() or self._manifest(p.skill) is None:
+                    return None
+                note = re.sub(r"https?://\S+", "", f.get("body", "")).strip()  # a model never supplies a web address: real links come from the document step
+                if note and not self._faithful(note, text):
+                    return None
+                inc = f.get("include", "") or ("link_and_text" if doc and not note else "link" if doc else "")
+                parts = [note] if note else []
+                if gen:
+                    parts.append(gen)
+                elif doc and inc in ("text", "link_and_text"):
+                    parts.append(doc[1])
+                if doc and inc in ("link", "link_and_text"):
+                    parts.append(f"Document: {{ref:{doc[0]}.link}}")
+                body = "\n\n".join(x for x in parts if x).strip()
+                if not body:
+                    return None
+                subject = f.get("subject") or (nodes[-1].params.get("title") if doc and nodes else "") or "Message"
+                nodes.append(PlanNode(id=nid, goal=text[:200], skill=p.skill, params={"to": to, "subject": subject[:150], "body": body}, depends_on=[doc[0]] if doc and "{ref:" in body else [], criteria=CRITERIA[p.skill]))
+            elif p.skill == "chat.reply":
+                platform, target = f.get("platform", "").lower(), f.get("target", "")
+                note = re.sub(r"https?://\S+", "", f.get("body", "")).strip()
+                if platform not in ("telegram", "discord", "slack") or not target or self._manifest("chat.reply") is None:
+                    return None
+                if note.lower().strip(" .!") in ("the link", "link", "it", "this", "the document", "the doc", "the file", "include link", "include the link"):
+                    note = ""
+                if note and not self._faithful(note, text):
+                    if not doc:
+                        return None
+                    note = ""  # the model garbled a note next to a document step: the document's link is the message
+                parts = [x for x in (note, gen) if x]
+                if doc:
+                    parts.append(f"{{ref:{doc[0]}.link}}")
+                body = "\n".join(parts).strip()
+                if not body:
+                    return None
+                nodes.append(PlanNode(id=nid, goal=text[:200], skill="chat.reply", params={"platform": platform, "target": target, "text": body}, depends_on=[doc[0]] if doc else [], criteria=CRITERIA["chat.reply"]))
+            elif p.skill in ("reminder.add", "calendar.add"):
+                one = await self._plan_from_parsed(text, Step(p.skill, f), p.skill)
+                if one is None:
+                    return None
+                for n in one.nodes:
+                    nodes.append(n.model_copy(update={"id": f"n{len(nodes) + 1}"}))
+            else:
+                return None
+        plan = Plan(nodes=nodes)
+        return plan if validate_plan(plan, self._manifest).ok else None
 
     async def _write_mail(self, to: str, topic: str) -> tuple[str, str]:
         """Subject and body for a DRAFT from a topic, by the small fast writer model (no reasoning); the user reviews before anything is sent."""
@@ -469,14 +549,6 @@ class Agent:
                 return TurnResult("L1", dec, None, None, (time.perf_counter() - t0) * 1000, answer=Answered(said, grounded=True), timings=tm)
         strong = match_intent(request)  # a clear command wording (a strong cue): none of the read-only keyword gates below may take it over
         decomposer_note = ""
-        if trust in ("user_direct", "agent") and is_compound(request):  # FR3.1: several steps in one request become a small execution graph, by code
-            d = decompose(request)
-            if d.plan is not None and validate_plan(d.plan, self._manifest).ok:
-                dec = RouteDecision(tier="L1", intent_family="compound", skills=[n.skill for n in d.plan.nodes], plan_needed=True, risk_floor=0, memory_types=memory_types_hint(request),
-                                    confidence=1.0, latency_ms=0.0, backend="decomposer",
-                                    trace=[f"Split into {len(d.clauses)} steps by code: " + " then ".join(f"{n.skill}" for n in d.plan.nodes) + "; later steps use earlier results, so anything derived from outside content asks for your click"])
-                return await self._run_plan(request, dec, d.plan, "C", [], t0, tm)
-            decomposer_note = f"The step splitter could not handle it ({d.reason}), so the planner model tries"  # falls through to the cascade and the LLM planner
         if (calc := try_calc(request)) is not None:  # arithmetic is done by code, never by the model
             dec = RouteDecision(tier="L1", intent_family="calc", skills=[], plan_needed=False, risk_floor=0, memory_types=[], confidence=1.0, latency_ms=0.0, backend="rule", trace=["Arithmetic evaluated by code (a model is not trusted with sums)"])
             return TurnResult("L1", dec, None, None, (time.perf_counter() - t0) * 1000, answer=Answered(calc if " " in calc else f"= {calc}", grounded=True), timings=tm)
@@ -491,19 +563,29 @@ class Agent:
             dec = RouteDecision(tier="L1", intent_family="capabilities", skills=[], plan_needed=False, risk_floor=0, memory_types=[], confidence=1.0, latency_ms=0.0, backend="rule")
             return TurnResult("L1", dec, None, None, (time.perf_counter() - t0) * 1000, answer=Answered(CAPABILITIES))
         self._said_action = False
-        u = pa = None
+        u, steps = None, []
         if self.answerer is not None and trust in ("user_direct", "agent") and request.strip():
             if strong is None:
-                u, pa = await asyncio.gather(understand(self.gw, request, history), parse_action(self.gw, request))  # one reading for what it is, one for what to do; both are small and run together
+                u, steps = await asyncio.gather(understand(self.gw, request, history), parse_steps(self.gw, request))  # one reading for what it is, one for what to do; both are small and run together
             else:
-                pa = await parse_action(self.gw, request)  # a clear command wording: only the details are read by the model
+                steps = await parse_steps(self.gw, request)  # a clear command wording: only the details are read by the model
         # the two readings must agree it is a request to DO something: a message the understanding reads as a question, a summary, the calendar or the screen is never turned into an action
-        accept = pa is not None and (strong is not None or (u is None and not self._is_question(request)) or (u is not None and (u.intent == "action" or (u.intent in ("chat", "unclear") and not self._is_question(request)))))
-        if accept and (plan_llm := await self._plan_from_parsed(request, pa)) is not None:
+        if len(steps) == 1 and is_compound(request) and (dd := decompose(request)).plan is not None and len(dd.plan.nodes) >= 2 and validate_plan(dd.plan, self._manifest).ok:
+            steps = []  # the model saw one step in what is plainly several: the code splitter handles it below
+        accept = bool(steps) and (strong is not None or (u is None and not self._is_question(request)) or (u is not None and (u.intent == "action" or (u.intent in ("chat", "unclear") and not self._is_question(request)))))
+        if accept and (plan_llm := await self._plan_from_steps(request, steps)) is not None:
             dec = RouteDecision(tier="L2", intent_family="action", skills=[n.skill for n in plan_llm.nodes], plan_needed=len(plan_llm.nodes) > 1, risk_floor=0, memory_types=memory_types_hint(request), confidence=0.9, latency_ms=0.0,
                                 backend="language-model", trace=["The language model read who, what and when from your own words; code checked every field; anything that sends or changes something still needs your click"])
             return await self._run_plan(request, dec, plan_llm, "L2", [], t0, tm)
-        self._clarify = None if pa is not None else getattr(self, "_clarify", None)
+        if trust in ("user_direct", "agent") and is_compound(request):  # FR3.1: several steps in one request become a small execution graph, by code
+            d = decompose(request)
+            if d.plan is not None and validate_plan(d.plan, self._manifest).ok:
+                dec = RouteDecision(tier="L1", intent_family="compound", skills=[n.skill for n in d.plan.nodes], plan_needed=True, risk_floor=0, memory_types=memory_types_hint(request),
+                                    confidence=1.0, latency_ms=0.0, backend="decomposer",
+                                    trace=[f"Split into {len(d.clauses)} steps by code: " + " then ".join(f"{n.skill}" for n in d.plan.nodes) + "; later steps use earlier results, so anything derived from outside content asks for your click"])
+                return await self._run_plan(request, dec, d.plan, "C", [], t0, tm)
+            decomposer_note = f"The step splitter could not handle it ({d.reason}), so the planner model tries"  # falls through to the cascade and the LLM planner
+        self._clarify = None if steps else getattr(self, "_clarify", None)
         self._said_action = bool(u is not None and u.intent == "action")
         if u is not None and u.intent != "action":  # the model decided this is not a request to DO something: it can only be answered, never acted on
             res = await self._answer_intent(request, u, history, trust, t0, tm)

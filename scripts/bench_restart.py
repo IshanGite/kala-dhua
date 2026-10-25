@@ -1,6 +1,13 @@
 """NFR3.2 measured for real: kill -9 the running app while a task waits for approval, restart it, and time until the state is back.
 Uses a throwaway data folder and the real keychain key. Prints one JSON line (also saved to docs/evidence/nfr3_2_restart.json)."""
-import json, os, signal, subprocess, sys, tempfile, time
+import json
+import os
+import signal
+import subprocess
+import sys
+import tempfile
+import time
+
 import httpx
 
 HOME = tempfile.mkdtemp()

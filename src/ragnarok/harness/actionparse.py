@@ -72,3 +72,47 @@ async def parse_action(gateway: Gateway, text: str) -> Parsed | None:
     if skill not in SKILLS or skill == "none":
         return None
     return Parsed(skill, {k: str(v).strip()[:1500] for k, v in d.items() if k != "skill" and isinstance(v, str) and v.strip()})
+
+
+STEP_FIELDS = {"skill": {"type": "string", "enum": list(SKILLS)}, "platform": {"type": "string"}, "target": {"type": "string"}, "to": {"type": "string"}, "subject": {"type": "string"},
+               "body": {"type": "string"}, "when": {"type": "string"}, "title": {"type": "string"},
+               "compose": {"type": "string"}, "include": {"type": "string", "enum": ["", "link", "text", "link_and_text"]}}
+STEPS_SCHEMA = {"type": "object", "properties": {"steps": {"type": "array", "maxItems": 4, "items": {"type": "object", "properties": STEP_FIELDS, "required": ["skill"]}}}, "required": ["steps"]}
+STEPS_SYSTEM = SYSTEM.split("Examples:")[0] + """A request can have several steps in order (at most 4). RULE: when the user asks you to write, compose or make up text, put that in compose and leave body empty; body holds ONLY words the user dictated. Never write a web address anywhere; links are added by the assistant. For text the assistant must WRITE (a poem, a summary, a short note), put what to write in compose (for example "a poem about a father"); the user's own words go in body.
+include (for an email or message that follows a document step): link = include the document's link, text = include the written text, link_and_text = both. Leave it empty when the step has nothing to do with an earlier step.
+Examples:
+"make a doc on my drive named papa with a poem about a father and mail it to tushar@x.com" -> steps: [drive.create title "papa" compose "a poem about a father"], [mail.send to tushar@x.com subject "papa" include link_and_text]
+"make a file on the drive, write a poem in the drive and mail it to tushar@x.com saying this is for you" -> steps: [drive.create title "Poem" compose "a short poem"], [mail.send to tushar@x.com body "this is for you" include link_and_text]
+"write a haiku about rain and email it to sam@x.com" -> steps: [mail.send to sam@x.com subject "A haiku about rain" compose "a haiku about rain"]
+"email sam@x.com a limerick about debugging" -> steps: [mail.send to sam@x.com subject "A limerick" compose "a limerick about debugging"]
+"write a short thank you note and post it on slack general" -> steps: [chat.reply platform slack target general compose "a short thank you note"]
+"create a doc called Trip plan with a three day itinerary for Goa and send the link to Tushar on telegram" -> steps: [drive.create title "Trip plan" compose "a three day itinerary for Goa"], [chat.reply platform telegram target Tushar include link]
+"remind me tomorrow at 9am to call mom and tell Ravi on telegram I will be late" -> steps: [reminder.add body "call mom" when "tomorrow at 9 am"], [chat.reply platform telegram target Ravi body "I will be late"]
+"tell Ravi on discord I am late" -> steps: [chat.reply platform discord target Ravi body "I am late"]
+"how are you" -> steps: []
+"who sent me the contract request" -> steps: []
+"summarize my emails" -> steps: []
+Reply with JSON only."""
+
+
+@dataclass
+class Step:
+    skill: str
+    fields: dict[str, str] = field(default_factory=dict)
+
+
+async def parse_steps(gateway: Gateway, text: str) -> list[Step]:
+    """One to four ordered actions from the request. Empty when the model is down, answers badly, or says there is nothing to do."""
+    from datetime import datetime
+
+    stamp = datetime.fromtimestamp(get_clock().now_ms() / 1000).astimezone().strftime("%A %Y-%m-%d %H:%M")
+    try:
+        out = await gateway.chat(role="arbiter", messages=[{"role": "system", "content": STEPS_SYSTEM + f"\nNow: {stamp}."}, {"role": "user", "content": text[:900]}], schema=STEPS_SCHEMA, max_tokens=420,
+                                 deadline=get_clock().monotonic() + 20, priority=Priority.INTERACTIVE, seed=0, temperature=0.0)
+    except ModelError:
+        return []
+    steps: list[Step] = []
+    for d in ((out.parsed or {}).get("steps") or [])[:4]:
+        if isinstance(d, dict) and d.get("skill") in SKILLS and d["skill"] != "none":
+            steps.append(Step(d["skill"], {k: str(v).strip()[:1500] for k, v in d.items() if k != "skill" and isinstance(v, str) and v.strip()}))
+    return steps

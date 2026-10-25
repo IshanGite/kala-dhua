@@ -1,5 +1,10 @@
 """Sustained load for NFR2.2: back-to-back questions, briefings and drafts on the real models for N seconds (default 50). Run the sampler on this process's pid."""
-import asyncio, os, sys, tempfile, time
+import asyncio
+import os
+import sys
+import tempfile
+import time
+
 os.environ["RAGNAROK_HOME"] = tempfile.mkdtemp()
 sys.path.insert(0, "src")
 from ragnarok.daemon.wiring import build_world, warm_up  # noqa: E402

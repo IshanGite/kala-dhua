@@ -1,8 +1,14 @@
 """Measure the embedding-similarity rung: how often is the shortlist's top skill right, by similarity and margin. Real embedder (nomic via Ollama). Output: docs/spikes/embed_rung.json."""
-import asyncio, json, os, sys, tempfile, time
+import asyncio
+import json
+import os
+import sys
+import tempfile
+import time
 from pathlib import Path
+
 os.environ["RAGNAROK_SECRETS"] = "memory"; os.environ["RAGNAROK_HOME"] = tempfile.mkdtemp(); sys.path.insert(0, "src")
-from ragnarok.daemon.wiring import FAMILY_SKILLS, build_world, warm_up  # noqa: E402
+from ragnarok.daemon.wiring import build_world, warm_up  # noqa: E402
 from ragnarok.llm_gateway.client import Priority  # noqa: E402
 from ragnarok.platform.secrets import MemoryStore  # noqa: E402
 

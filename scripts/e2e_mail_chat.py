@@ -1,5 +1,10 @@
 """End to end on the real Gmail inbox with the real local models: ingest the test mails, ask questions, check the injection mail changes nothing."""
-import asyncio, os, sys, tempfile, time
+import asyncio
+import os
+import sys
+import tempfile
+import time
+
 os.environ["RAGNAROK_HOME"] = tempfile.mkdtemp()
 sys.path.insert(0, "src")
 from ragnarok.daemon.chat import summarize  # noqa: E402

@@ -1,5 +1,8 @@
 """Delete only what our own tests created in the user's real accounts: Gmail drafts to attacker@evil.example, calendar events titled in TEST_TITLES, Drive files named 'Ragnarok test ...'."""
-import asyncio, json, sys
+import asyncio
+import json
+import sys
+
 sys.path.insert(0, "src")
 from ragnarok.connectors.google import Calendar, Gmail, GoogleAuth
 from ragnarok.connectors.http import request

@@ -1,5 +1,8 @@
 """Send five test emails from the user's own Gmail to itself (the user asked for this test). One is a prompt-injection attack. Subjects start with [Ragnarok test]."""
-import asyncio, json, sys
+import asyncio
+import json
+import sys
+
 sys.path.insert(0, "src")
 from ragnarok.connectors.google import Gmail, GoogleAuth, build_raw
 from ragnarok.connectors.http import request

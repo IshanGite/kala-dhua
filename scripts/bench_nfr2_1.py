@@ -1,14 +1,22 @@
 """NFR2.1: retrieval and intent classification latency (gate: < 800 ms), measured on a seeded corpus with the real embedder and the real router.
 Corpus: 2,000 generated messages across mail/chat/notes (same on macOS and Windows: seeded). Queries: 200 natural questions, each with a known answer message,
 so recall@5 is measured too. Output: docs/evidence/nfr2_1.json."""
-import asyncio, json, os, random, statistics, sys, tempfile, time
+import asyncio
+import json
+import os
+import random
+import statistics
+import sys
+import tempfile
+import time
+
 os.environ["RAGNAROK_HOME"] = tempfile.mkdtemp()
 sys.path.insert(0, "src")
+from ragnarok.core.clock import get_clock  # noqa: E402
 from ragnarok.daemon.wiring import build_world, warm_up  # noqa: E402
 from ragnarok.ingest.pipeline import ingest_text  # noqa: E402
 from ragnarok.memory.retrieval import retrieve  # noqa: E402
 from ragnarok.platform.secrets import MemoryStore  # noqa: E402
-from ragnarok.core.clock import get_clock  # noqa: E402
 
 rng = random.Random(20261026)
 PEOPLE = ["Priya Nair", "Dev Malhotra", "Meera Iyer", "Ravi Shah", "Asha Menon", "Kabir Anand", "Tara Bose", "Imran Qureshi", "Nisha Rao", "Vikram Sethi", "Leela Das", "Omar Farooq"]

@@ -78,7 +78,7 @@ def decompose(request: str) -> Decomposed:
             platform, target, body = split_chat(c)
             if (uses_prev or not body) and last_read:
                 body = f"{{ref:{last_read}.summary}}"
-            if not (platform and target and body):
+            if not (platform and target and body) or body.lower().strip(" .!") in ("the link", "link", "it", "this", "the document", "the doc", "the file"):
                 return Decomposed(None, clauses, f"clause {i}: I need the app, the person and the text")
             nodes.append(PlanNode(id=nid, goal=c[:200], skill="chat.reply", params={"platform": platform, "target": target, "text": body}, depends_on=dep, criteria=[{"kind": "equals", "path": "posted", "value": True}]))
         elif re.search(r"\bcalendar\b", low) and re.match(r"^\s*(?:please\s+)?(?:put|add|schedule|book|block|create)\b", c, re.I):

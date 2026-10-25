@@ -1,5 +1,11 @@
 """Where does a turn's time go? Real models, approval cards denied. Prints per-stage milliseconds for each phrasing, repeated for p50."""
-import asyncio, os, statistics, sys, tempfile, time
+import asyncio
+import os
+import statistics
+import sys
+import tempfile
+import time
+
 os.environ["RAGNAROK_HOME"] = tempfile.mkdtemp()
 sys.path.insert(0, "src")
 from ragnarok.daemon.wiring import build_world, warm_up

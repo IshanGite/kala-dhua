@@ -1,5 +1,11 @@
 """How fast does a new email reach the agent's memory? Starts the app (live polling defaults), sends a real email to the user's own inbox, polls /messages until it appears. Telegram is excluded so the real bot queue is never consumed."""
-import json, os, subprocess, sys, tempfile, time
+import json
+import os
+import subprocess
+import sys
+import tempfile
+import time
+
 import httpx
 
 HOME = tempfile.mkdtemp()
@@ -24,6 +30,7 @@ try:
     time.sleep(25)  # let the first sync of every source finish
     sys.path.insert(0, "src")
     import asyncio
+
     from ragnarok.connectors.google import Gmail, GoogleAuth, build_raw
     from ragnarok.connectors.http import request
     from ragnarok.platform.secrets import default_store, token_name

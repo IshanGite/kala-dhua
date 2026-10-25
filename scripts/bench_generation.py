@@ -1,5 +1,9 @@
 """Latency of the generation tasks that must be fast: grounded answer (JSON, 3 snippets), mail draft fields, one-line chat. Per model: p50/p95 over 6 runs, tokens out, and sample outputs."""
-import json, statistics, sys, time, urllib.request
+import json
+import statistics
+import sys
+import time
+import urllib.request
 
 SNIP = ('[1] source=discord:broseph #general from=Ishan Gite at=Sun 25 Oct 16:54\n<<<\nare we still on for the meet on monday\n>>>\n'
         '[2] source=gmail:[Ragnarok test] Orion launch update from=Priya Nair at=Sun 25 Oct 15:02\n<<<\nthe Orion launch has moved to 14 April because the vendor delayed the hardware. The budget review is on Thursday at 3pm in Room 4.\n>>>\n'

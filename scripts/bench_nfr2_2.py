@@ -1,6 +1,10 @@
 """NFR2.2: the always-on agent plus local model inference must not use more than 30% of the machine. Samples the running app (and Ollama) every few seconds.
 Usage: python scripts/bench_nfr2_2.py <pid> <seconds> ; writes docs/evidence/nfr2_2.json. 'machine share' = process CPU % divided by the number of logical cores (so 100% = every core busy)."""
-import json, statistics, sys, time
+import json
+import statistics
+import sys
+import time
+
 import psutil
 
 pid, seconds = int(sys.argv[1]), int(sys.argv[2])

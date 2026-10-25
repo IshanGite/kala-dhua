@@ -146,6 +146,10 @@ def split_chat(request: str) -> tuple[str, str, str]:
     ms = re.search(r"\bsend\s+(?:a\s+)?(?:message\s+)?(?:saying\s+)?(.+?)\s+to\s+(.+?)\s+(?:on|in|via)\s+(telegram|discord|slack)\b", request, re.I)
     if ms:
         return ms.group(3).lower(), ms.group(2).strip(" ,.;:-\"'#"), ms.group(1).strip()
+    if not text:  # 'tell Tushar on telegram I will be late': no 'that' or ':' but the words after the app are the message
+        m2 = re.search(r"\b(?:tell|message|text|ping|dm)\s+(.+?)\s+(?:on|in|via)\s+(telegram|discord|slack)\s+(?:that\s+)?(.{2,})$", request, re.I)
+        if m2 and m2.group(1).strip(" ,.;:-\"'#").lower() not in _NOT_A_TARGET:
+            return m2.group(2).lower(), m2.group(1).strip(" ,.;:-\"'#"), m2.group(3).strip()
     t1 = re.search(r"\b(?:tell|message|text|ping|dm|reply to|respond to)\s+(.+?)(?:\s+(?:on|in|via)\s+(?:telegram|discord|slack))?\s*$", head, re.I)
     if t1:
         target = t1.group(1)

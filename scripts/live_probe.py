@@ -1,5 +1,10 @@
 """Quick live probe of phrasings with real models. All approval cards are DENIED (nothing is sent). Prints tier, time, answer, cards, and flags for leaked reasoning or false success claims."""
-import asyncio, os, sys, tempfile, time
+import asyncio
+import os
+import sys
+import tempfile
+import time
+
 os.environ["RAGNAROK_HOME"] = tempfile.mkdtemp()
 sys.path.insert(0, "src")
 from ragnarok.daemon.chat import summarize

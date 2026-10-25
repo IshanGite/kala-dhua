@@ -1,6 +1,12 @@
 """FR4 live: a user-defined trigger and a schedule, then a real email arrives; the agent notices on its own, with a macOS notification. Uses a throwaway store, the real accounts and models."""
-import asyncio, json, os, sys, tempfile, time
+import asyncio
+import json
+import os
+import sys
+import tempfile
+import time
 from datetime import datetime, timedelta
+
 os.environ["RAGNAROK_HOME"] = tempfile.mkdtemp()
 sys.path.insert(0, "src")
 from ragnarok.connectors.google import Gmail, GoogleAuth, build_raw  # noqa: E402

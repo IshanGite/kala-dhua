@@ -1,4 +1,10 @@
-import asyncio, json, os, sys, tempfile, time
+import asyncio
+import json
+import os
+import sys
+import tempfile
+import time
+
 os.environ["RAGNAROK_HOME"] = tempfile.mkdtemp()
 sys.path.insert(0, "src")
 from ragnarok.connectors.google import Calendar, GoogleAuth

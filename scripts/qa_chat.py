@@ -1,9 +1,16 @@
 """Broad behaviour QA: real local models, seeded memory, FAKE senders (nothing real is sent). Every utterance gets a check; prints failures.
 Run: RAGNAROK_SKIP_SOURCES=telegram uv run python scripts/qa_chat.py [filter]"""
-import asyncio, json, os, re, sys, tempfile, time
+import asyncio
+import json
+import os
+import re
+import sys
+import tempfile
+import time
+
 os.environ.setdefault("HF_HOME", os.path.expanduser("~/.cache/huggingface")); os.environ["HF_HUB_OFFLINE"] = "1"; os.environ["RAGNAROK_HOME"] = tempfile.mkdtemp(); os.environ["HOME"] = os.environ["RAGNAROK_HOME"]; os.environ["RAGNAROK_SKIP_SOURCES"] = "telegram,slack,discord,gmail,gcal,gdrive,gmeet,outlook,outlook_cal,files,notifications"
 sys.path.insert(0, "src")
-from ragnarok.daemon.chat import ChatService, summarize  # noqa: E402
+from ragnarok.daemon.chat import ChatService  # noqa: E402
 from ragnarok.daemon.wiring import build_world, warm_up  # noqa: E402
 from ragnarok.ingest.pipeline import ingest_text  # noqa: E402
 from ragnarok.platform.secrets import MemoryStore, token_name  # noqa: E402

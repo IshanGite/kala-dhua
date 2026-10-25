@@ -1,10 +1,15 @@
 """Full live test: sends on every platform (approving each card as the user asked), context questions over all memory, and route learning. Real local models, real accounts."""
-import asyncio, json, os, sys, tempfile, time
-from datetime import datetime, timedelta
+import asyncio
+import json
+import os
+import sys
+import tempfile
+import time
+
 if not os.environ.get("RAGNAROK_HOME"):
     os.environ["RAGNAROK_HOME"] = tempfile.mkdtemp()
 sys.path.insert(0, "src")
-from ragnarok.connectors.google import Calendar, Gmail, GoogleAuth  # noqa: E402
+from ragnarok.connectors.google import Gmail, GoogleAuth  # noqa: E402
 from ragnarok.daemon.chat import summarize  # noqa: E402
 from ragnarok.daemon.wiring import build_world, warm_up  # noqa: E402
 from ragnarok.platform.secrets import default_store, token_name  # noqa: E402

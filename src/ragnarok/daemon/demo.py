@@ -152,7 +152,7 @@ def make_senders(state: DemoState) -> dict[str, Any]:
 
     async def drive(p: dict[str, Any]) -> str:
         state.record("drive document", p.get("title", ""), p.get("body", p.get("text", "")))
-        return "id|https://docs.google.com/document/u/0/"
+        return "https://docs.google.com/document/d/demo-" + str(abs(hash(p.get("title", ""))) % 10**8) + "/edit"
 
     def chat(platform: str):  # noqa: ANN202
         async def f(chat_id: str, text: str) -> str:
