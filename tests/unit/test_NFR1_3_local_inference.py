@@ -24,7 +24,7 @@ NETWORK_ALLOWED = {
     "daemon/auth.py",
     "daemon/api.py",
 }
-NETWORK_ALLOWED_PREFIXES = ("connectors/",)
+NETWORK_ALLOWED_PREFIXES = ("connectors/", "sandbox/suite/")
 
 
 def _py_files():
