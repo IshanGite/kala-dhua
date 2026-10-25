@@ -118,6 +118,7 @@ def split_event(request: str) -> tuple[str, str]:
 _REPLY_LEAD = re.compile(r"^\s*(?:please\s+)?(?:can you\s+)?(?:reply|respond|answer|write back)\s+(?:to\s+)?(?:the\s+)?(?:email|mail|message)?\s*(?:from\s+)?", re.I)
 _SAYING = re.compile(r"\b(?:saying|and say|and tell (?:them|him|her)|that|with|:)\s+(.+)$", re.I | re.S)
 _PLATFORMS = ("telegram", "discord", "slack")
+_NOT_A_TARGET = {"on", "in", "via", "a", "an", "the", "to", "message", "msg", "text", "telegram", "discord", "slack", "saying", "that", "everyone", "team", "all"}
 
 
 def split_reply(request: str) -> tuple[str, str]:
@@ -152,6 +153,8 @@ def split_chat(request: str) -> tuple[str, str, str]:
     if t2:
         target = t2.group(1)
     target = re.sub(r"\s+(?:on|in|via)\s+(?:telegram|discord|slack)\b.*$", "", target, flags=re.I).strip(" ,.;:-\"'#")
+    if re.fullmatch(r"(?:on|in|via)\s+(?:telegram|discord|slack)", target, re.I) or target.lower() in _NOT_A_TARGET or re.fullmatch(r"(?:an?\s+)?(?:new\s+)?(?:message|msg|text)(?:\s+(?:on|in|via)\s+\w+)?", target, re.I):
+        target = ""  # 'send a message on telegram saying hi' names nobody: the caller picks the most recent conversation and shows it on the card
     return platform, target, text
 
 

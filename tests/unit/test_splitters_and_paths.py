@@ -147,3 +147,16 @@ def test_agenda_for_an_explicit_date():
     assert agenda_range("what is on my calendar on 27 oct", now)[0] == datetime(2026, 10, 27)
     assert agenda_range("anything on oct 30", now)[0] == datetime(2026, 10, 30)
     assert agenda_range("my schedule on 3rd november", now)[0] == datetime(2026, 11, 3)
+
+
+def test_no_named_target_is_blank_not_the_word_on():
+    assert split_chat("send a message on telegram saying hi team") == ("telegram", "", "hi team")
+    assert split_chat("send a message on discord saying hi") == ("discord", "", "hi")
+    assert split_chat("tell team on slack that lunch is ready")[1] == ""
+
+
+def test_time_questions_are_recognised():
+    from ragnarok.harness.answer import TIME_ASK
+
+    assert all(TIME_ASK.search(t) for t in ("what is the time right now", "what's the date", "what time is it", "what day is today"))
+    assert not TIME_ASK.search("what time is the budget review")

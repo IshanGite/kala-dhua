@@ -22,9 +22,19 @@ class Job:
     reply: dict[str, Any] = field(default_factory=dict)
 
 
+FRIENDLY = {
+    "E_UNKNOWN_TARGET": "I do not know that conversation yet. Say the name as it appears in the app, for example 'tell Ravi on telegram that ...'.",
+    "E_NOT_CONNECTED": "That app is not connected for writing yet. Run the connect command for it (see Sources).",
+    "E_BAD_RECIPIENT": "That is not a valid email address.", "E_NO_TIME": "I could not tell what time that is. Say it like 'tomorrow at 3pm'.",
+    "E_AUTH": "The app refused the request (permission or expired sign-in).", "E_SLACK": "Slack refused the message. It needs the chat:write permission and the bot invited to the channel.",
+    "E_DISCORD": "Discord refused the message. The bot needs permission to send messages in that channel.", "E_TELEGRAM": "Telegram refused the message.",
+    "E_APPROVAL_DENIED": "You denied it, so nothing was done.", "E_GOOGLE": "Google refused the request.", "E_NET": "No network connection to that app.",
+}
+
+
 def summarize(turn: TurnResult) -> dict[str, Any]:
     """A plain-words reply from what the turn did. Never includes more than the user's own request and the action results."""
-    meta = {"tier": turn.tier, "backend": turn.decision.backend, "ms": round(turn.latency_ms), "learned": turn.learned, "route_id": turn.decision.route_id}
+    meta = {"timings": turn.timings, "tier": turn.tier, "backend": turn.decision.backend, "ms": round(turn.latency_ms), "learned": turn.learned, "route_id": turn.decision.route_id}
     if turn.answer is not None:
         return {"text": turn.answer.text, "citations": turn.answer.citations, "grounded": turn.answer.grounded, **meta}
     if turn.clarification:
@@ -55,9 +65,11 @@ def summarize(turn: TurnResult) -> dict[str, Any]:
             else:
                 lines.append("Done.")
         elif st in ("denied", "blocked", "skipped"):
-            lines.append(f"Not done ({st}): {o.errors.get(nid, 'a rule or you stopped it')}.")
+            code = o.errors.get(nid, "")
+            lines.append(FRIENDLY.get(code, f"Not done ({st}): {code or 'a rule or you stopped it'}."))
         else:
-            lines.append(f"Could not finish ({st}): {o.errors.get(nid, 'unknown')}.")
+            code = o.errors.get(nid, "unknown")
+            lines.append(FRIENDLY.get(code, f"Could not finish ({st}): {code}."))
     return {"text": " ".join(lines) or f"Task {o.state}.", "citations": [], "state": o.state, **meta}
 
 

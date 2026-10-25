@@ -112,7 +112,7 @@ class OllamaGateway:
         *,
         background_slots: int = 1,
         interactive_slots: int = 2,
-        keep_alive: str = "30m",
+        keep_alive: str = "24h",
         client: httpx.AsyncClient | None = None,
     ) -> None:
         assert_loopback(base_url)

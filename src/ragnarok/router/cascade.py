@@ -62,6 +62,11 @@ class Cascade:
         notes: list[str] = []
         injection = scan(text, "prompt").injection_suspected
 
+        if self._rules is not None:  # unambiguous wording selects the skill before any model or embedding runs: routing costs about a millisecond
+            hit0 = self._rules(text)
+            if hit0 and hit0 in {s2 for v in self._family_skills.values() for s2 in v}:
+                return RouteDecision(tier="L1", intent_family="rule", skills=[hit0], plan_needed=False, risk_floor=0, memory_types=[], confidence=1.0, latency_ms=(time.perf_counter() - t0) * 1000,
+                                     backend="rule", injection_flag=injection, notes=[f"rule_{hit0}"])
         l1_task = self._guard(self._l1.decide(text, [Q_FAMILY, Q_PLAN, Q_INJECT, Q_RISK], deadline=clock_deadline), self._budget_s) if self._l1 else None
         sig_text = signature(text, detect(text, now_ms))  # route matching is value-neutral: '...to 4pm' and '...to 5pm' look the same
         embed_task = self._gw.embed([text, sig_text], deadline=clock_deadline + 5, priority=Priority.INTERACTIVE)

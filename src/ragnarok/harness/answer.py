@@ -86,6 +86,7 @@ CAPABILITIES = (
     "- Chat apps: 'tell Ravi on telegram that I will be late', 'post in the discord general channel that ...'.\n"
     "- Google Drive: 'create a document in Drive called Plan saying ...'.\n"
     "Anything that sends, posts or changes something outside this computer waits for your click in the Approvals tab. I never act on text I read in your mail or messages.")
+TIME_ASK = re.compile(r"\b(what(?:'?s| is) the (?:time|date|day)|what (?:time|day|date) is it|current (?:time|date)|today'?s date|what day is (?:it|today))\b", re.I)
 CAPABILITY_ASK = re.compile(r"\b(what can you do|what (?:are|r) you able|can you (?:set|add|put|create|send|do)\b.*\?|are you able to|help me with|what are your (?:features|abilities|capabilities)|how do i use you)\b|^\s*(?:who are you|what are you)\b", re.I)
 COMPLAINT = re.compile(r"\b(there was no|there is no|wasn'?t (?:there|created|set|sent|added)|didn'?t (?:work|show|appear|happen|get|send|set|add)|not (?:there|showing|created|added|sent)|nothing (?:happened|appeared|came)|did(?:n'?t| not) see)\b", re.I)
 

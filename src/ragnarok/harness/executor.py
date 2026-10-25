@@ -291,7 +291,8 @@ class Executor:
             try:
                 return {"ok": True, "result": await handler(params, ctx, dry_run=dry_run)}
             except Exception as exc:  # noqa: BLE001
-                return {"ok": False, "code": f"E_NATIVE_{type(exc).__name__.upper()}"}
+                code = getattr(exc, "code", None)  # our own errors carry a stable code and a safe, human-readable message
+                return {"ok": False, "code": code if isinstance(code, str) and code.startswith("E_") else f"E_NATIVE_{type(exc).__name__.upper()}"}
         rc = RunContext(workspace=ctx.workspace, data_dir=ctx.data_dir, today=ctx.today, dry_run=dry_run)
         try:
             res = await asyncio.to_thread(run_skill, self._backend, self._reg, skill, params, rc)

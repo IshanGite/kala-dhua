@@ -19,6 +19,7 @@ from ragnarok.harness.answer import (
     CAPABILITIES,
     CAPABILITY_ASK,
     COMPLAINT,
+    TIME_ASK,
     Answered,
     Answerer,
     is_agenda,
@@ -38,6 +39,7 @@ from ragnarok.memory.retrieval import retrieve
 from ragnarok.memory.routes_store import RoutesStore
 from ragnarok.memory.service import MemoryService
 from ragnarok.router.cascade import Cascade, memory_types_hint
+from ragnarok.router.intent_rules import match_intent
 from ragnarok.router.route_library import RouteLibrary
 from ragnarok.router.slots import detect
 from ragnarok.router.types import RouteDecision
@@ -64,6 +66,7 @@ class TurnResult:
     notes: list[str] = field(default_factory=list)
     answer: Answered | None = None
     task_id: str | None = None
+    timings: dict[str, int] = field(default_factory=dict)  # milliseconds per stage: where a turn's time went
 
 
 class Agent:
@@ -184,6 +187,12 @@ class Agent:
             from ragnarok.router.when import split_chat
 
             platform, target, body = split_chat(text)
+            if platform and body and not target:  # nobody named: the most recent conversation on that app, shown on the approval card so it can be corrected
+                recent = self.reader.recent_items(limit=1, source=platform)
+                target = str(recent[0]["title"]) if recent and recent[0]["title"] else ""
+                if not target:
+                    self._clarify = f"I have not read anything on {platform} yet, so I do not know who to message. Say who: 'tell Ravi on {platform} that ...'."
+                    return None
             if platform and target and body:
                 return Plan(nodes=[PlanNode(id="n1", goal=text[:200], skill=skill, params={"platform": platform, "target": target, "text": body}, criteria=CRITERIA[skill])])
             self._clarify = "Who should I message, on which app, and what should it say? For example: tell Ravi on telegram that I will be late."
@@ -229,8 +238,11 @@ class Agent:
 
     async def handle(self, request: str, *, trust: str = "user_direct", history: list[tuple[str, str]] | None = None) -> TurnResult:
         t0 = time.perf_counter()
+        tm: dict[str, int] = {}
+        mark = lambda name, since: tm.__setitem__(name, round((time.perf_counter() - since) * 1000))  # noqa: E731
         now = get_clock().now_ms()
         self.mem.write_event(EventIn(compartment=self.ctx.compartment, kind="user_message", actor="user", content=request, trust=trust))  # type: ignore[arg-type]
+        mark("log", t0)
         if self.answerer is not None and is_catchup(request):  # a briefing is read-only and needs no routing
             ans = await self.answerer.catch_up(request)
             dec = RouteDecision(tier="L1", intent_family="catchup", skills=[], plan_needed=False, risk_floor=0, memory_types=[], confidence=1.0, latency_ms=0.0, backend="catchup")
@@ -239,6 +251,13 @@ class Agent:
             ans = await self.answerer.recent_from(srcs)
             dec = RouteDecision(tier="L1", intent_family="recall", skills=[], plan_needed=False, risk_floor=0, memory_types=["episodic"], confidence=1.0, latency_ms=0.0, backend="rule")
             return TurnResult("L1", dec, None, None, (time.perf_counter() - t0) * 1000, answer=ans)
+        if self.answerer is not None and TIME_ASK.search(request) and not self._is_action_request(request):
+            from datetime import datetime as _dt
+
+            n = _dt.fromtimestamp(get_clock().now_ms() / 1000).astimezone()
+            txt = n.strftime("It is %H:%M on %A %d %B %Y") + f" ({n.tzname()})."
+            dec = RouteDecision(tier="L1", intent_family="clock", skills=[], plan_needed=False, risk_floor=0, memory_types=[], confidence=1.0, latency_ms=0.0, backend="rule")
+            return TurnResult("L1", dec, None, None, (time.perf_counter() - t0) * 1000, answer=Answered(txt), timings=tm)
         if self.answerer is not None and CAPABILITY_ASK.search(request) and not self._is_action_request(request.replace("can you", "")):
             dec = RouteDecision(tier="L1", intent_family="capabilities", skills=[], plan_needed=False, risk_floor=0, memory_types=[], confidence=1.0, latency_ms=0.0, backend="rule")
             return TurnResult("L1", dec, None, None, (time.perf_counter() - t0) * 1000, answer=Answered(CAPABILITIES))
@@ -251,7 +270,15 @@ class Agent:
             ans = await (self.answerer._general(request, history) if is_smalltalk(request) else self.answerer.agenda(request))
             dec = RouteDecision(tier="L1", intent_family="general" if is_smalltalk(request) else "agenda", skills=[], plan_needed=False, risk_floor=0, memory_types=[], confidence=1.0, latency_ms=0.0, backend="rule")
             return TurnResult("L1", dec, None, None, (time.perf_counter() - t0) * 1000, answer=ans)
+        if self.answerer is not None and self.fast_refuse and self._is_question(request) and not self._is_action_request(request) and match_intent(request) is None:
+            t_ans = time.perf_counter()  # a plain question needs no classification: retrieve and answer
+            ans = await self._say(request, history=history, general=True)
+            mark("answer", t_ans)
+            dec = RouteDecision(tier="L1", intent_family="question", skills=[], plan_needed=False, risk_floor=0, memory_types=memory_types_hint(request), confidence=1.0, latency_ms=0.0, backend="rule")
+            return TurnResult("L1", dec, None, None, (time.perf_counter() - t0) * 1000, answer=ans, timings=tm)
+        t_route = time.perf_counter()
         decision = await self.cascade.route(request, compartment=self.ctx.compartment, caller_trust=trust, now_ms=now)
+        mark("route", t_route)
         decision.memory_types = memory_types_hint(request)
         if decision.intent_family in ("memory", "general") and self.answerer is not None and decision.tier != "L0":
             ans = await self._say(request, history=history, general=decision.intent_family == "general")
@@ -304,16 +331,21 @@ class Agent:
         if self.answerer is not None and [n.skill for n in plan.nodes] == ["memory.search"]:  # a lookup is answered in words, with citations
             ans = await self.answerer.answer(request)
             return TurnResult(decision.tier, decision, None, None, (time.perf_counter() - t0) * 1000, answer=ans)
+        mark("plan", t0 + (tm["log"] + tm["route"]) / 1000)
+        t_exec = time.perf_counter()
         tid = self.executor.start_task(request, plan, self.ctx, plan_meta={"tier": decision.tier, "route_id": decision.route_id})
         outcome = await self.executor.run_task(tid, self.ctx)
+        mark("run", t_exec)
+        t_learn = time.perf_counter()
         learned = await self._learn(request, decision, plan, plan_source, outcome)
+        mark("learn", t_learn)
         latency = (time.perf_counter() - t0) * 1000
         if self.routes is not None:
             self.routes.add_event(decision.route_id, "tier_used", tier=decision.tier, latency_ms=latency, ok=outcome.state == "succeeded", trace_id=tid[:12])
         self.ledger.record_decision("route", task_id=tid, tier=decision.tier, backend=decision.backend, choice={"skills": decision.skills, "plan_needed": decision.plan_needed},
                                     rationale="; ".join(decision.notes) or None, outcome={"state": outcome.state}, latency_ms=latency)
         self.mem.write_event(EventIn(compartment=self.ctx.compartment, kind="task_result", actor="agent", content=f"{request[:200]} -> {outcome.state}", trust="agent", task_id=tid))
-        return TurnResult(decision.tier, decision, outcome, None, latency, learned, decision.notes, task_id=tid)
+        return TurnResult(decision.tier, decision, outcome, None, latency, learned, decision.notes, task_id=tid, timings=tm)
 
     def _free_text_marked(self, skill: str, params: dict, found: set[str]) -> dict:
         """Parameters a skill declares as free text (a reminder's words, a message body) are never baked into a stored route: they are marked for refill.
