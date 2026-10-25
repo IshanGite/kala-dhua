@@ -1,0 +1,55 @@
+# Declarative policy (ARCHITECTURE 5.5). Extend, never weaken. Evaluated by policy/engine.py: decide().
+# The most restrictive matching decision wins: panic > deny > quarantine > require_stepup > require_approval > allow.
+- id: R-TAINT-01
+  when: { node.tier: ">=1", node.min_trust: [received, web] }
+  then: require_approval
+  warn: "Derived from untrusted content"
+- id: R-SEND-01
+  when: { skill: mail.send, recipient: not_in_contacts }
+  then: require_approval
+  warn: "First message to this address"
+- id: R-SEND-02
+  when: { skill: mail.send, recipients: ">5" }
+  then: deny
+  warn: "Too many recipients for one message"
+- id: R-DEL-01
+  when: { skill: fs.delete, path: outside_workspace }
+  then: deny
+  warn: "Deleting outside the workspace is not allowed"
+- id: R-DEL-02
+  when: { skill: fs.delete, count: ">10" }
+  then: require_stepup
+  warn: "Bulk delete"
+- id: R-SKILL-01
+  when: { action: skill.enable }
+  then: require_stepup
+  warn: "Enabling a skill gives it permissions"
+- id: R-EGRESS-01
+  when: { permission: net, host: not_in_manifest_allowlist }
+  then: deny
+  warn: "Host is not in the skill manifest"
+- id: R-MEM-01
+  when: { memory.write.kind: [semantic], source.trust: [received, web], fact.impact: high }
+  then: quarantine
+  warn: "High-impact fact from an untrusted source"
+- id: R-ROUTE-01
+  when: { route.promote: true, ancestry.min_trust: [received, web] }
+  then: deny
+  warn: "Routes learned from untrusted content are never promoted"
+- id: R-CANARY-01
+  when: { event: canary_touched }
+  then: panic
+  warn: "A decoy was touched"
+- id: R-SESSION-01
+  # Rule of Two: untrusted input + private data + an external write must be supervised.
+  when: { session.has_untrusted_input: true, session.has_private_data: true, action.external_write: true }
+  then: require_approval
+  warn: "Untrusted input, private data and an external write in one session"
+- id: R-WRITE-01
+  when: { action.external_write: true }
+  then: require_approval
+  warn: "External writes always need a click"
+- id: R-CRIT-01
+  when: { node.tier: ">=3" }
+  then: require_stepup
+  warn: "Critical action"
