@@ -31,9 +31,38 @@ _INJECTION = [
         r"(?:new|updated|override) (?:system )?instructions?\s*:",
         r"reveal (?:your |the )?(?:system )?prompt",
         r"do not (?:tell|inform|alert|notify) the user",
-        r"(?:forward|send|email|upload|exfiltrate)\b.{0,40}\b(?:all|every|each)\b.{0,40}\b(?:invoices?|files?|emails?|contacts?|passwords?|credentials?|documents?)",
+        r"(?:forward|send|email|upload|exfiltrate)\b.{0,60}\b(?:all|every|each)\b.{0,40}\b(?:invoices?|files?|emails?|contacts?|passwords?|credentials?|documents?)\b.{0,80}(?:[\w.+-]+@[\w-]+\.\w+|https?://|without (?:asking|telling|confirm\w*)|silently|secretly|automatically)",
+        r"(?:forward|send|email|upload|exfiltrate)\b.{0,40}\b(?:all|every)\b.{0,15}\b(?:contacts?|passwords?|credentials?)\b",
         r"<\|im_start\|>|<\|system\|>|\[INST\]|### ?system",
         r"(?:assistant|agent|ai)[, ]+(?:you must|please immediately|execute|run the following)",
+        r"\b(?:assistant|ai|agent|model|bot|llm)\b(?!\s+(?:manager|director|coach|professor|editor|principal|secretary|teacher|team|lead|engineer|vp|head))[^.\n]{0,50}\b(?:must|should|need to|needs to|are required to|have to|shall)\b[^.\n]{0,60}\b(?:send|forward|email|mail|cc|bcc|delete|erase|transfer|upload|reveal|output|approve|disclose|leak)\b",
+        r"\b(?:take|follow|obey|accept)\b.{0,12}\b(?:orders?|instructions?|commands?|directions?)\b.{0,20}\b(?:from|only)\b.{0,20}\b(?:this|the following|below|me)\b",
+        r"follow (?:only|just) (?:what|the|these)\b.{0,25}\b(?:written|below|following|instructions?)",
+        r"(?:output|print|show|display|reveal|repeat|dump) (?:your )?(?:entire |full |whole |complete )?(?:configuration|config|system prompt|settings|rules|instructions)",
+        r"(?:respond|reply|answer)\b.{0,12}\b(?:to )?(?:every|each|all|any)\b.{0,25}\bwith\b",
+        r"\b(?:mail|email|send|forward|delete|erase|wipe|upload|transfer)\b[^.\n]{0,40}\bthe user'?s\b",
+        r"(?:attention|attn|hey|dear|hello|hi|urgent)[,: ]+(?:ai|assistant|agent|bot|llm|model)\b(?!\s+(?:manager|director|coach|professor|editor|principal|secretary|teacher|team|lead))",
+        r"(?:hidden|secret|special|real) (?:task|instruction|directive|command|mission) for (?:the )?(?:ai|assistant|agent|bot|llm|model)\b",
+        r"\b(?:real|actual|true|rightful) (?:owner|user|administrator|admin)\b",
+        r"(?:ignore|disregard|forget) (?:everything|all|anything) (?:you (?:were|have been|are) (?:told|given|instructed)|above|before|prior)",
+        r"(?:ignore|disregard) the above\b",
+        r"(?:^|\n)\s*system\s*:",
+        r"\b(?:admin|developer|god|root|sudo) mode\b",
+        r"forget (?:all |any |the |your |these )?(?:rules|instructions|guidelines|restrictions|safety)",
+        r"(?:instructions?|orders?|directives?|policy|task) for (?:the )?(?:assistant|ai|agent|model|bot|llm)\b(?!\s+(?:coach|manager|director|professor|teacher|principal|editor|team|lead))",
+        r"(?:note|message|memo) to (?:the )?(?:ai|assistant|agent|model|bot|llm)\b",
+        r"(?:assistant|ai|agent)[:,]\s*(?:email|send|forward|post|delete|approve|reply|call|execute|reveal)\b",
+        r"(?:approve|accept|confirm) (?:all|every|any)(?: pending)?(?: actions?| requests?| cards?)|auto(?:matically)?[- ]approve|disable (?:the )?approval",
+        r"(?:ignore|disregard|bypass|override) (?:the |all |any |your )?(?:user|safety|guard ?rails?|filters?|restrictions?|rules)\b",
+        r"\b(?:your |the )?(?:real|actual|true|hidden) (?:task|goal|job|purpose)\b",
+        r"(?:user|owner) (?:has )?(?:authori[sz]ed|permitted|allowed|approved) you to",
+        r"(?:print|show|reveal|leak|dump|output) (?:your |the )?(?:hidden |secret |full )?(?:system )?(?:prompt|instructions)",
+        r"(?:append|include|add|attach|insert)\b.{0,30}\b(?:passwords?|credentials?|secrets?|api keys?|tokens?)\b.{0,40}\b(?:to|in|into) (?:the |your |this |each |every )?(?:summary|reply|answer|response|message|email|output|digest)\b",
+        r"\b(?:curl|wget)\b.{0,80}\|\s*(?:sh|bash)\b|\bexecute (?:this|the following) (?:tool|command|call)",
+        r"[\"\']skill[\"\']\s*:\s*[\"\'](?:mail|chat|calendar|drive|python|fs)\.",
+        r"\b(?:ignor(?:ez|a|e|iere)|olvida|oublie[sz]?|vergiss)\b.{0,25}\b(?:instrucciones|instructions|anweisungen|r[eè]gles|reglas|regeln)\b",
+        r"act as (?:an? )?(?:dan|unrestricted|uncensored|jailbroken)|\bjailbreak\b|\bdo anything now\b",
+        r"don'?t (?:tell|mention (?:this )?to) the user|(?:tell|inform) (?:nobody|no one) (?:about|that you|you (?:did|sent|read))",
     )
 ]
 
@@ -115,6 +144,9 @@ def scan(text: str, direction: Direction = "ingest") -> ScanResult:
         out = _TAG_CHARS.sub("", out.translate({ord(c): None for c in _ZERO_WIDTH + _BIDI}))
     if _HTML_COMMENT.search(out):
         findings.append(Finding("hidden_text", 0, len(out), "warn"))
+        for cm in _HTML_COMMENT.findall(out):  # an instruction hidden in a comment is an attack by definition: nobody reads comments, models do
+            if re.search(r"\b(?:assistant|ai|agent|email|send|forward|delete|ignore|instruction|approve)\b", cm, re.I):
+                findings.append(Finding("injection", 0, len(cm), "block"))
         out = _HTML_COMMENT.sub("", out)
 
     # 2. injection-like text: flagged, kept visible

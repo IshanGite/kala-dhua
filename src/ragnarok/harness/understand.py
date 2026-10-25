@@ -11,6 +11,7 @@ from dataclasses import dataclass
 
 from ragnarok.core.clock import get_clock
 from ragnarok.core.errors import ModelError
+from ragnarok.core.logging import log
 from ragnarok.llm_gateway.client import Gateway, Priority
 
 INTENTS = ("chat", "recall", "catchup", "agenda", "screen", "action", "unclear")
@@ -88,7 +89,8 @@ async def understand(gateway: Gateway, text: str, history: list[tuple[str, str]]
             out = await gateway.chat(role="arbiter", messages=[{"role": "system", "content": SYSTEM}, {"role": "user", "content": ctx + text[:600]}], schema=SCHEMA, max_tokens=60,
                                      deadline=get_clock().monotonic() + (12 if attempt == 0 else 25), priority=Priority.INTERACTIVE, seed=0, temperature=0.0)
             break
-        except ModelError:
+        except ModelError as exc:
+            log("understand_failed", err=getattr(exc, "code", "?"), attempt=attempt)
             if attempt:
                 return None
     if out is None:

@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 
 from ragnarok.core.clock import get_clock
 from ragnarok.core.errors import ModelError
+from ragnarok.core.logging import log
 from ragnarok.llm_gateway.client import Gateway, Priority
 
 SKILLS = ("reminder.add", "calendar.add", "mail.send", "mail.draft", "mail.reply", "chat.reply", "drive.create", "python.run", "reminder.list", "none")
@@ -47,6 +48,9 @@ Examples:
 "schedule lunch with Priya on friday at 1pm" -> calendar.add, title "lunch with Priya", when "friday at 1 pm"
 "put dentist friday 5pm on my calendar" -> calendar.add, title "dentist", when "friday at 5 pm"
 "block tomorrow 2pm for deep work" -> calendar.add, title "deep work", when "tomorrow at 2 pm"
+"what happens if I tell Ravi on telegram that I quit" -> none
+"what's the date tomorrow" -> none
+"shoot priya@x.com a note that the slides are attached" -> mail.send, to priya@x.com, body "the slides are attached"
 "how are you" -> none
 "tell me a joke" -> none
 "what is on my calendar tomorrow" -> none
@@ -101,6 +105,8 @@ Examples:
 "yo remind me in half an hour to stretch" -> steps: [reminder.add body "stretch" when "in 30 minutes"]
 "schedule lunch with Priya on friday at 1pm" -> steps: [calendar.add title "lunch with Priya" when "friday at 1 pm"]
 "block tomorrow 2pm for deep work" -> steps: [calendar.add title "deep work" when "tomorrow at 2 pm"]
+"what happens if I tell Ravi on telegram that I quit" -> steps: []
+"shoot priya@x.com a note that the slides are attached" -> steps: [mail.send to priya@x.com body "the slides are attached"]
 "how are you" -> steps: []
 "who sent me the contract request" -> steps: []
 "summarize my emails" -> steps: []
@@ -124,7 +130,8 @@ async def parse_steps(gateway: Gateway, text: str) -> list[Step]:
             out = await gateway.chat(role="arbiter", messages=[{"role": "system", "content": STEPS_SYSTEM + f"\nNow: {stamp}."}, {"role": "user", "content": text[:900]}], schema=STEPS_SCHEMA, max_tokens=420,
                                      deadline=get_clock().monotonic() + (20 if attempt == 0 else 30), priority=Priority.INTERACTIVE, seed=0, temperature=0.0)
             break
-        except ModelError:
+        except ModelError as exc:
+            log("parse_steps_failed", err=getattr(exc, "code", "?"), attempt=attempt)  # a silent failure here means a real request is not understood: it must be visible
             if attempt:
                 return []
     if out is None:

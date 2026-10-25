@@ -127,6 +127,11 @@ def date_math(text: str, now: datetime) -> str | None:
         tgt = _target_date(m.group(3), now)
         if tgt is None:
             return None
+        if m.group(2) in ("until", "till", "to") and tgt < today and not re.search(r"\b(19|20)\d\d\b", m.group(3)):  # 'until 1 january' in October means next January
+            try:
+                tgt = tgt.replace(year=tgt.year + 1)
+            except ValueError:
+                tgt = tgt + timedelta(days=365)
         diff = (tgt - today).days
         if m.group(2) == "since" or m.group(2) == "from" and diff < 0:
             diff = -diff if diff < 0 else diff

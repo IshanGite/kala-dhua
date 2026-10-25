@@ -133,6 +133,12 @@ class Agent:
     def _multistep(cls, request: str) -> bool:
         return len({m.group(0).lower() for m in cls.ACTIONISH.finditer(request)}) >= 2 or bool(re.search(r"\bthen\b|\band then\b|\bafter that\b", request, re.I))
 
+    ASKS_ABOUT = re.compile(r"^\s*(?:what|why|how|who|when|where|which|should|is|are|do|does|did|would|if)\b", re.I)
+
+    def _asks_about(self, request: str) -> bool:
+        """'what happens if I tell Ravi on telegram that I quit' mentions an action but asks about it: a clear command starts with the verb, not with a question word."""
+        return bool(self.ASKS_ABOUT.match(request)) and not self.POLITE.match(request)
+
     def _is_question(self, request: str) -> bool:
         return bool(self.QUESTIONLIKE.search(request)) and not self.POLITE.match(request)
 
@@ -166,7 +172,11 @@ class Agent:
         m = self._manifest(skill)
         if m is None or (m.tier < 1 and not m.external_write):
             return True
-        if match_intent(request) == skill or getattr(self, "_said_action", False):
+        if self._asks_about(request):
+            return False  # a question about an action ('what happens if I email Dev', 'if I post this will they see it') is answered, never run
+        if match_intent(request) == skill:
+            return True
+        if getattr(self, "_said_action", False):
             return True
         pat = self.ACTION_WORDS.get(skill)
         return bool(pat and re.search(pat, request, re.I)) and not (self._is_question(request) and skill in ("chat.reply", "mail.send", "mail.reply", "calendar.add", "drive.create"))
@@ -300,6 +310,10 @@ class Agent:
         return sum(1 for w in ws if w in low) / len(ws) >= 0.6
 
     async def _plan_from_parsed(self, text: str, p: Any, skill: str | None = None) -> Plan | None:
+        tgt = p.fields.get("target", "")
+        if p.skill == "chat.reply" and re.fullmatch(r"[\w.+-]+@[\w-]+\.[\w.-]+", tgt):
+            p.skill, p.fields = "mail.send", {"to": tgt, "body": p.fields.get("body", ""), "subject": p.fields.get("subject", "")}
+            skill = None
         skill = skill or p.skill
         if skill not in LLM_PARSED or self._manifest(skill) is None:
             return None
@@ -313,10 +327,17 @@ class Agent:
 
         now = _dt.fromtimestamp(get_clock().now_ms() / 1000)
         if skill in ("reminder.add", "calendar.add"):
+            from ragnarok.router.when import split_event, split_reminder
+
             what = f.get("body") or f.get("title") or ""
             when = f.get("when", "")
             if not what or not self._faithful(what, text) or what.lower().strip(" .?!") in GENERIC:
                 return None
+            if when:  # an explicit time phrase that is literally in the request is read by code too: when the two readings differ, the code's wins (a small model once turned "in an hour" into "in 30 minutes")
+                code_when = (split_event(text)[1] if skill == "calendar.add" else split_reminder(text)[1]) or ""
+                cw, mw = (parse_when(code_when, now) if code_when else None), parse_when(when, now)
+                if cw is not None and code_when.lower() in text.lower() and (mw is None or abs((cw - mw).total_seconds()) > 60):
+                    when = code_when
             if when and parse_when(when, now) is None:
                 from ragnarok.router.when import localize_when
 
@@ -342,8 +363,8 @@ class Agent:
             to, body, subject = f.get("to", ""), f.get("body", ""), f.get("subject", "")
             if not to or "@" not in to or to.lower() not in text.lower() or not (body or subject):
                 return None
-            if body and not self._faithful(body, text):
-                return None
+            if body and not self._faithful(body, text) and skill != "mail.draft":
+                return None  # a SENT message is the user's words; a draft may carry text the assistant composed (it is only saved, and shown in full)
             if not body:
                 subject, body = await self._write_mail(to, subject)
                 if not body:
@@ -369,6 +390,11 @@ class Agent:
         """One to four ordered actions. Written text is composed here; a later step may use an earlier document's link through {ref:}. Every field is validated; every send still needs a click."""
         from ragnarok.router.when import split_event, split_reminder
 
+        for p in steps:
+            tgt = p.fields.get("target", "")
+            if p.skill == "chat.reply" and re.fullmatch(r"[\w.+-]+@[\w-]+\.[\w.-]+", tgt):  # a message to an e-mail ADDRESS is an e-mail, whatever app the model guessed
+                p.skill = "mail.send"
+                p.fields = {"to": tgt, "body": p.fields.get("body", ""), "subject": p.fields.get("subject", "")}
         for p in steps:  # a small model sometimes puts the sentence in `compose` for a reminder or event and forgets the time: those never compose text, and the time is read from the sentence by code
             if p.skill in ("reminder.add", "calendar.add"):
                 p.fields.pop("compose", None)
@@ -624,7 +650,7 @@ class Agent:
             if said:
                 dec = RouteDecision(tier="L1", intent_family="memory_cmd", skills=[], plan_needed=False, risk_floor=0, memory_types=["semantic", "episodic"], confidence=1.0, latency_ms=0.0, backend="rule")
                 return TurnResult("L1", dec, None, None, (time.perf_counter() - t0) * 1000, answer=Answered(said, grounded=True), timings=tm)
-        strong = match_intent(request)  # a clear command wording (a strong cue): none of the read-only keyword gates below may take it over
+        strong = match_intent(request) if not self._asks_about(request) else None  # a clear command wording (a strong cue): none of the read-only keyword gates below may take it over
         decomposer_note = ""
         if (calc := try_calc(request)) is not None:  # arithmetic is done by code, never by the model
             dec = RouteDecision(tier="L1", intent_family="calc", skills=[], plan_needed=False, risk_floor=0, memory_types=[], confidence=1.0, latency_ms=0.0, backend="rule", trace=["Arithmetic evaluated by code (a model is not trusted with sums)"])
@@ -662,7 +688,7 @@ class Agent:
         # the two readings must agree it is a request to DO something: a message the understanding reads as a question, a summary, the calendar or the screen is never turned into an action
         if len(steps) == 1 and is_compound(request) and (dd := decompose(request)).plan is not None and len(dd.plan.nodes) >= 2 and validate_plan(dd.plan, self._manifest).ok:
             steps = []  # the model saw one step in what is plainly several: the code splitter handles it below
-        accept = bool(steps) and (strong is not None or (u is None and not self._is_question(request)) or (u is not None and (u.intent == "action" or (u.intent in ("chat", "unclear") and not self._is_question(request)) or (not self._is_question(request) and all(s.skill in ("reminder.add", "calendar.add") for s in steps)))))
+        accept = bool(steps) and not self._asks_about(request) and (strong is not None or (u is None and not self._is_question(request)) or (u is not None and (u.intent == "action" or (u.intent in ("chat", "unclear") and not self._is_question(request)) or (not self._is_question(request) and all(s.skill in ("reminder.add", "calendar.add") for s in steps)))))
         if accept and (plan_llm := await self._plan_from_steps(request, steps)) is not None:
             dec = RouteDecision(tier="L2", intent_family="action", skills=[n.skill for n in plan_llm.nodes], plan_needed=len(plan_llm.nodes) > 1, risk_floor=0, memory_types=memory_types_hint(request), confidence=0.9, latency_ms=0.0,
                                 backend="language-model", trace=["The language model read who, what and when from your own words; code checked every field; anything that sends or changes something still needs your click"])
@@ -676,7 +702,7 @@ class Agent:
                 return await self._run_plan(request, dec, d.plan, "C", [], t0, tm)
             decomposer_note = f"The step splitter could not handle it ({d.reason}), so the planner model tries"  # falls through to the cascade and the LLM planner
         self._clarify = None if steps else getattr(self, "_clarify", None)
-        self._said_action = bool(u is not None and u.intent == "action")
+        self._said_action = bool(u is not None and u.intent == "action" and not self._asks_about(request))
         if u is not None and u.intent != "action":  # the model decided this is not a request to DO something: it can only be answered, never acted on
             res = await self._answer_intent(request, u, history, trust, t0, tm)
             if res is not None:

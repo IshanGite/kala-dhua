@@ -30,7 +30,7 @@ from ragnarok.llm_gateway.models import ModelLock
 LOOPBACK_NAMES = {"localhost"}
 DEFAULT_URL = "http://127.0.0.1:11434"
 # Starting context sizes per role, tuned by measured memory use (ARCHITECTURE 6.3).
-NUM_CTX = {"planner": 8192, "arbiter": 2048, "extractor": 2048, "writer": 2048, "judge": 2048, "embedder": 2048, "vision": 4096}  # small contexts: prefill time is part of the latency budget
+NUM_CTX = {"planner": 8192, "arbiter": 4096, "extractor": 2048, "writer": 2048, "judge": 2048, "embedder": 2048, "vision": 4096}  # small contexts: prefill time is part of the latency budget
 
 
 class Priority(enum.IntEnum):

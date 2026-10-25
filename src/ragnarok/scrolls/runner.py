@@ -11,7 +11,7 @@ from typing import Any
 from ragnarok.core.clock import get_clock
 from ragnarok.core.errors import ModelError
 from ragnarok.core.logging import log
-from ragnarok.gateway_scan.scan import scan
+from ragnarok.gateway_scan.deep import suspect as deep_suspect
 from ragnarok.harness.answer import drop_false_claims
 from ragnarok.llm_gateway.client import Gateway, Priority
 from ragnarok.memory.reader import MemoryReader
@@ -57,7 +57,7 @@ class ScrollRunner:
                         res = await retrieve(text, compartment=comp, reader=self._r, index=self._i, gateway=self._gw, now_ms=now, deadline=get_clock().monotonic() + 3, k=4, token_budget=500)
                         for h in res.hits:
                             body = h.text[:300]
-                            body = "[withheld: this text tries to give instructions]" if h.trust in ("received", "web") and scan(body, "prompt").injection_suspected else body
+                            body = "[withheld: this text tries to give instructions]" if h.trust in ("received", "web") and await deep_suspect(self._gw, body) else body
                             parts.append(f"[memory {comp}] {body}")
                 elif tool == "memory.recent":
                     for r in self._r.recent_items(limit=5):
