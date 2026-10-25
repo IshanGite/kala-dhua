@@ -142,16 +142,16 @@ Read and write tokens are **separate**; tokens live in the OS keychain, never in
 
 | Source | Read | Write (click-gated) |
 |---|---|---|
-| Gmail | ✅ | Draft & send |
-| Google Calendar | ✅ | Create / move events |
-| Google Drive | ✅ | Create documents |
+| Gmail | ✅ | Draft, reply in thread, send |
+| Google Calendar | ✅ | Create event |
+| Google Drive | ✅ | Create document |
 | Google Meet | ✅ (transcripts) | — |
-| Slack | ✅ (polling) | Post, react |
-| Telegram | ✅ | — (send not yet exposed) |
-| Discord | ✅ | Send |
-| Outlook | ✅ (code ready, not yet live-tested) | Draft & send (designed) |
+| Slack | ✅ (polling) | Posting not enabled yet |
+| Telegram | ✅ | Send message |
+| Discord | ✅ | Post in channel |
+| Outlook | ✅ (coded, not yet live-tested) | Draft & send (designed) |
 | Local files | ✅ | — |
-| Desktop notifications | ✅ (macOS reader) | — |
+| Desktop notifications | Built, not yet live-tested | — |
 
 See **[`docs/CONNECTOR_SETUP.md`](docs/CONNECTOR_SETUP.md)** for the exact console steps for every source.
 
@@ -164,6 +164,7 @@ Pinned in [`models.lock`](models.lock) (name + digest); the daemon refuses a mod
 | Role | Model |
 |---|---|
 | Embeddings | `nomic-embed-text` |
+| Writer (chat & drafts) | `qwen3:0.6b` |
 | Arbiter (L2) | `qwen3:1.7b` |
 | Planner (L3) | `qwen3:4b` |
 
@@ -219,6 +220,7 @@ kala-dhua/
 - [`CLAUDE.md`](CLAUDE.md) — operating rules for the build (binding).
 - [`docs/CONNECTOR_SETUP.md`](docs/CONNECTOR_SETUP.md) — step-by-step connector setup.
 - [`docs/HANDOVER_TUSHAR.md`](docs/HANDOVER_TUSHAR.md) — Windows handover and honest gap list.
+- [`docs/BRIEF_MID_EVAL.md`](docs/BRIEF_MID_EVAL.md) — measured numbers, security posture, and the demo script.
 - [`docs/adr/`](docs/adr/) — one decision record per deviation.
 - [`docs/spikes/`](docs/spikes/) — measured spike results (Laya, Ollama, calibration).
 
@@ -228,9 +230,9 @@ kala-dhua/
 
 Under active construction for a hackathon deadline of **09:00 IST, 26 October 2026**.
 
-**Done (macOS-verified):** encrypted store + memory service, Zero Trust layer, executor with crash recovery, router + route library, all read-side connectors, always-on runtime and window.
+**Done (verified live on real accounts):** encrypted store + memory service, Zero Trust layer, executor with crash recovery, router + route library, read-side connectors (Gmail, Calendar, Drive, Meet, Slack, Telegram, Discord), the always-on window, and click-gated actions (email, calendar, Drive, Telegram, Discord).
 
-**In progress / honest gaps:** Windows sandbox backends (report grade `NONE` honestly), Windows notification reader, autostart, Outlook not yet live-tested, and the memory explorer / delete preview / route library screens are not in the window yet.
+**Honest gaps:** Windows sandbox backends and notification reader, Laya fine-tuning, Outlook and notifications on real accounts, Slack posting permission, the full red-team report, and the memory explorer / delete preview / route library screens in the window.
 
 See [`docs/HANDOVER_TUSHAR.md`](docs/HANDOVER_TUSHAR.md) for the full list.
 
