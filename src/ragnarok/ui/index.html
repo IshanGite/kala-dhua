@@ -47,6 +47,7 @@ h2{font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:var(--mute)
 </header>
 <nav role="tablist">
   <button role="tab" aria-selected="true" data-t="chat">Chat</button>
+  <button role="tab" aria-selected="false" data-t="inb">Inbox <span id="ibadge" class="small"></span></button>
   <button role="tab" aria-selected="false" data-t="msg">Messages</button>
   <button role="tab" aria-selected="false" data-t="appr">Approvals <span id="badge" class="small"></span></button>
   <button role="tab" aria-selected="false" data-t="act">Activity</button>
@@ -57,6 +58,7 @@ h2{font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:var(--mute)
     <div id="log" aria-live="polite"><p class="sys">Ask about anything it has read. It answers only from your memory and cites where.</p></div>
     <form id="f"><input id="q" type="text" autocomplete="off" placeholder="Ask your memory" aria-label="Message" maxlength="4000"><button class="btn pri" type="submit">Send</button></form>
   </section>
+  <section id="inb"><div style="padding:10px 14px 0;display:flex;gap:8px;align-items:center"><span class="small grow" style="flex:1">What I noticed on my own: meetings, things that need you, your briefing, your triggers.</span><button class="btn" id="idis">Clear all</button></div><div id="ibox" style="flex:1;overflow:auto;padding:8px 14px"></div></section>
   <section id="msg"><div style="padding:10px 14px 0"><input id="mq" type="text" placeholder="Search what has been read" aria-label="Search messages" maxlength="200" style="width:100%;padding:8px 10px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--ink)"></div><div id="msgs" style="flex:1;overflow:auto;padding:8px 14px"></div></section>
   <section id="appr"><div id="cards" style="flex:1;overflow:auto;padding:12px 14px"></div></section>
   <section id="act"><div id="feed"></div></section>
@@ -91,6 +93,10 @@ h2{font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:var(--mute)
       names.forEach(function(n){var s=rt.sources[n],r=el("div","row"),g=el("div","grow");g.appendChild(el("div","",n));
         g.appendChild(el("div","small "+(s.ok===false?"err":""),s.ok===null?"waiting for first sync":s.ok?("last sync "+ago(s.at)+" - "+(s.ingested||0)+" new"):("problem: "+s.code)));
         r.appendChild(g);r.appendChild(el("span",s.ok?"ok":s.ok===false?"err":"small",s.ok?"OK":s.ok===false?"!":"..."));box.appendChild(r)});
+      var st=el("div","card");st.style.marginTop="12px";st.appendChild(el("div","","Proactive"));var hint=el("div","small","Daily briefing time (empty = off) and system notifications.");st.appendChild(hint);
+      var bt=el("input");bt.type="time";bt.id="briefat";bt.style.cssText="margin-top:6px;padding:6px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)";st.appendChild(bt);
+      var sv=el("button","btn","Save");sv.style.marginLeft="8px";sv.onclick=function(){var v=bt.value;api("/proactive",v?{briefing_at:v}:{briefing_off:true}).then(function(){sv.textContent="Saved";setTimeout(function(){sv.textContent="Save"},1200)})};st.appendChild(sv);
+      api("/inbox").then(function(d){if(d.settings&&d.settings.briefing_at)bt.value=d.settings.briefing_at});box.appendChild(st);
       var b=document.createElement("div");var sync=el("button","btn","Sync now");sync.onclick=function(){sync.disabled=true;sync.textContent="Syncing...";api("/tick",{}).then(function(){sync.disabled=false;sync.textContent="Sync now";refresh()})};b.style.marginTop="12px";b.appendChild(sync);box.appendChild(b);
       renderFeed(rt.held||[]);
     }).catch(function(){document.getElementById("state").textContent="offline"});
@@ -121,7 +127,14 @@ h2{font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:var(--mute)
       it.forEach(function(m){var r=el("div","row"),g=el("div","grow");g.appendChild(el("div","small",m.source+" - "+(m.title||m.kind)+" - "+ago(m.ts)+(m.trust==="received"?" - from outside":"")));g.appendChild(el("div","",m.preview||""));if(m.deep_link){var l=el("a","small","Open in "+m.source);l.href=m.deep_link;l.target="_blank";l.rel="noopener noreferrer";g.appendChild(l)}r.appendChild(g);b.appendChild(r)})}).catch(function(){})}
   var mt;document.getElementById("mq").oninput=function(){clearTimeout(mt);mt=setTimeout(loadMsgs,300)};
   tabs.forEach(function(b){b.addEventListener("click",function(){if(b.dataset.t==="msg")loadMsgs()})});setInterval(function(){if(document.getElementById("msg").classList.contains("show")&&!document.getElementById("mq").value)loadMsgs()},5000);
-  refresh();pullCards();setInterval(refresh,4000);setInterval(pullCards,1500);
+  var KIND={attention:"Needs you",heads_up:"Heads-up",briefing:"Briefing",alert:"Alert",reminder:"Reminder",scheduled:"Scheduled"};
+  function loadInbox(){api("/inbox").then(function(d){var it=d.items||[],b=document.getElementById("ibox");b.textContent="";document.getElementById("ibadge").textContent=it.length?("("+it.length+")"):"";
+      if(!it.length)b.appendChild(el("p","small","Nothing new. Try: every day at 8am catch me up on my emails, or: when I get an email from Dev, tell me."));
+      it.forEach(function(m){var c=el("div","card");c.appendChild(el("div","small",(KIND[m.kind]||m.kind)+" - "+ago(m.ts)+(m.source?" - "+m.source:"")));c.appendChild(el("div","",m.title));var bd=el("div","small",m.body);bd.style.whiteSpace="pre-wrap";c.appendChild(bd);
+        var row=el("div","row");if(m.link){var l=el("a","small","Open");l.href=m.link;l.target="_blank";l.rel="noopener noreferrer";row.appendChild(l)}var x=el("button","btn","Dismiss");x.onclick=function(){api("/inbox/dismiss?item_id="+encodeURIComponent(m.id),{}).then(loadInbox)};row.appendChild(x);c.appendChild(row);b.appendChild(c)})}).catch(function(){})}
+  document.getElementById("idis").onclick=function(){api("/inbox/dismiss",{}).then(loadInbox)};
+  tabs.forEach(function(b){b.addEventListener("click",function(){if(b.dataset.t==="inb")loadInbox()})});setInterval(loadInbox,5000);
+  refresh();pullCards();loadInbox();setInterval(refresh,4000);setInterval(pullCards,1500);
 })();
 </script>
 </body>

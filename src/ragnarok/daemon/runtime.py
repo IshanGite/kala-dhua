@@ -33,6 +33,7 @@ class Runtime:
     def __init__(self, state: RuntimeState, runners: dict[str, ConnectorRunner], *, interval_s: float = 60.0, governor: Governor | None = None, commitments: Commitments | None = None) -> None:
         self.state, self.runners, self.interval = state, runners, interval_s
         self.commitments = commitments
+        self.proactive: Any = None  # set by the wiring: the FR4 engine (triggers, heads-ups, briefing)
         self.reminders: deque[dict[str, Any]] = deque(maxlen=50)
         self.governor = governor or Governor()
         self.activity: deque[dict[str, Any]] = deque(maxlen=200)
@@ -60,11 +61,18 @@ class Runtime:
             item = {"ts": get_clock().now_ms(), "kind": "reminder", "source": "reminder", "code": "due", "text": d["what"]}
             self.reminders.appendleft(item)
             self.activity.appendleft(item)
+            if self.proactive is not None:
+                self.proactive.inbox.add("reminder", f"Reminder: {d['what'][:80]}", d["what"], key=f"rem:{d['id']}", os_notify=self.proactive.settings()["os_notify"])
         return due
 
     async def tick(self) -> dict[str, CycleReport]:
         out: dict[str, CycleReport] = {}
         self.fire_reminders()
+        if self.proactive is not None:
+            try:
+                await self.proactive.run()
+            except Exception as exc:  # noqa: BLE001 - proactivity must never stop ingestion
+                log("proactive_failed", err=type(exc).__name__)
         if not self.enabled:
             return out
         for name, runner in self.runners.items():

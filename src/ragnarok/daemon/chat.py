@@ -77,9 +77,10 @@ CONFIRM = re.compile(r"^\s*(?:ok(?:ay)?[, ]*)?(?:do it|go ahead|yes|yep|yeah|sur
 
 
 class ChatService:
-    def __init__(self, agent: Agent, hub: Any = None) -> None:
+    def __init__(self, agent: Agent, hub: Any = None, triggers: Any = None) -> None:
         self._agent = agent
         self._hub = hub
+        self._triggers = triggers
         self.jobs: dict[str, Job] = {}
         self.history: list[tuple[str, str]] = []  # the running conversation, in memory only
         self._tasks: set[asyncio.Task[None]] = set()
@@ -99,6 +100,8 @@ class ChatService:
             n = len(self._hub.pending()) if self._hub is not None else 0
             reply = (f"{n} action(s) are waiting for you in the Approvals tab. Each card shows exactly what will happen; press Approve there." if n else
                      "Nothing is waiting for approval and I am not in the middle of anything. Tell me what to do.")
+            return {"ok": True, "pending": False, "job": "", "state": "done", "text": reply, "citations": [], "tier": "L1", "backend": "rule", "ms": 0}
+        if self._triggers is not None and (reply := self._triggers.parse(text)) is not None:  # 'every day at 8am ...' / 'when I get an email from X ...' / 'list my triggers'
             return {"ok": True, "pending": False, "job": "", "state": "done", "text": reply, "citations": [], "tier": "L1", "backend": "rule", "ms": 0}
         job = Job(new_id()[:10], text)
         self.jobs[job.id] = job

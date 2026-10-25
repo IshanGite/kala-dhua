@@ -31,6 +31,7 @@ class Services:
     chat: ChatService | None = None
     reader: MemoryReader | None = None
     hub: ApprovalHub | None = None
+    proactive: Any = None
 
 
 class ChatIn(BaseModel):
@@ -43,6 +44,13 @@ class ToggleIn(BaseModel):
 
 class NotifIn(BaseModel):
     apps: list[str] = Field(max_length=50)
+
+
+class ProSettingsIn(BaseModel):
+    briefing_at: str | None = Field(default=None, pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
+    briefing_off: bool = False
+    os_notify: bool | None = None
+    enabled: bool | None = None
 
 
 class DecideIn(BaseModel):
@@ -133,6 +141,29 @@ def create_app(guard: TokenGuard | None = None, port: int = DEFAULT_PORT, servic
             return {"items": []}
         rows = svc.reader.recent_items(limit=limit, source=source, query=q)
         return {"items": [{**r, "preview": (r["preview"] or "")[:240], "deep_link": r["deep_link"] if str(r["deep_link"] or "").startswith("https://") else None} for r in rows]}
+
+    @app.get("/inbox")
+    async def inbox() -> dict[str, Any]:
+        return {"items": svc.proactive.inbox.items() if svc.proactive else [], "settings": svc.proactive.settings() if svc.proactive else {}}
+
+    @app.post("/inbox/dismiss")
+    async def inbox_dismiss(item_id: str | None = None) -> dict[str, Any]:
+        return {"ok": True, "dismissed": svc.proactive.inbox.dismiss(item_id) if svc.proactive else 0}
+
+    @app.get("/triggers")
+    async def triggers_list() -> dict[str, Any]:
+        return {"items": svc.proactive.triggers.all() if svc.proactive else []}
+
+    @app.delete("/triggers/{tid}")
+    async def triggers_delete(tid: int) -> dict[str, Any]:
+        return {"ok": True, "removed": svc.proactive.triggers.remove(tid) if svc.proactive else 0}
+
+    @app.post("/proactive")
+    async def proactive_settings(body: ProSettingsIn) -> dict[str, Any]:
+        if svc.proactive is None:
+            return {"ok": False, "error": "E_NO_RUNTIME"}
+        svc.proactive.configure(briefing_at=None if body.briefing_off else (body.briefing_at if body.briefing_at else False), os_notify=body.os_notify, enabled=body.enabled)
+        return {"ok": True, "settings": svc.proactive.settings()}
 
     @app.get("/approvals")
     async def approvals() -> dict[str, Any]:

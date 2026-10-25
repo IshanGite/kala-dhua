@@ -122,6 +122,21 @@ class MemoryReader:
         sql += " ORDER BY ts DESC LIMIT ?"
         return [dict(x) for x in self._r.execute(sql, [*args, max(1, min(limit, 200))])]
 
+    def items_since(self, ingested_after_ms: int, limit: int = 100) -> list[dict[str, Any]]:
+        """Items that arrived after a point in time, oldest first: what the proactive engine looks at."""
+        import json as _json
+
+        rows = self._r.execute("SELECT i.id, i.source, i.title, i.kind, i.trust, i.native_id, i.deep_link, i.ingested_at, coalesce(i.occurred_at, i.ingested_at) AS ts, i.flags_json, "
+                               "(SELECT text FROM chunks c WHERE c.item_id = i.id ORDER BY ordinal LIMIT 1) AS preview FROM items i WHERE i.ingested_at > ? ORDER BY i.ingested_at LIMIT ?", (ingested_after_ms, limit)).fetchall()
+        out = []
+        for row in rows:
+            d = dict(row)
+            fl = _json.loads(d.pop("flags_json") or "{}")
+            d["author"] = fl.get("author") or fl.get("from") or ""
+            d["from_addr"] = fl.get("from") or ""
+            out.append(d)
+        return out
+
     def chunk_context(self, chunk_ids: list[str]) -> dict[str, dict[str, Any]]:
         """Who, where and when for retrieved chunks, so an answer can say 'Meera on Discord, Sun 16:54' and not only the text."""
         if not chunk_ids:

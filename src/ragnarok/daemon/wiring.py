@@ -20,7 +20,8 @@ from ragnarok.daemon.actions import Actions
 from ragnarok.daemon.api import Services
 from ragnarok.daemon.approvals import ApprovalHub
 from ragnarok.daemon.auth import TokenGuard
-from ragnarok.daemon.chat import ChatService
+from ragnarok.daemon.chat import ChatService, summarize
+from ragnarok.daemon.proactive import Proactive
 from ragnarok.daemon.runtime import PAIRED, Governor, Runtime
 from ragnarok.harness.answer import Answerer
 from ragnarok.harness.executor import ExecContext, Executor
@@ -135,6 +136,14 @@ def build_world(*, use_laya: bool = True, sandbox: bool = True, embed_rungs: boo
     notif = Notifications(default_source(), lambda: json.loads(state.get("notif_apps", "[]")))
     runners["notifications"] = ConnectorRunner(mem, queue, notif, COMPARTMENT, gateway=gw, index=index)
     runtime = Runtime(state, runners, interval_s=interval_s, governor=Governor(max_cpu), commitments=Commitments(mem))
+    async def run_command(cmd: str) -> str:
+        return str(summarize(await agent.handle(cmd, trust="agent")).get("text", ""))  # a trigger's task is not more trusted than a typed one: sends still wait for a card
+
+    async def agenda_today() -> str:
+        return (await answerer.agenda("today")).text
+
+    proactive = Proactive(state, reader, run_command=run_command, agenda=agenda_today)
+    runtime.proactive = proactive
     guard = TokenGuard(secrets.token_urlsafe(32))
     token_file = root / "run" / "session.token"
     token_file.write_text(guard.token, encoding="utf-8")
@@ -142,7 +151,7 @@ def build_world(*, use_laya: bool = True, sandbox: bool = True, embed_rungs: boo
         token_file.chmod(0o600)
     except OSError:
         pass  # Windows: the per-user data directory ACL applies
-    services = Services(runtime, answerer, notif, ChatService(agent, hub), reader, hub)
+    services = Services(runtime, answerer, notif, ChatService(agent, hub, proactive.triggers), reader, hub, proactive)
     w = World(mem, reader, index, gw, runtime, services, guard, token_file, agent, selector, l1)
     w.registry = registry  # type: ignore[attr-defined]
     return w
