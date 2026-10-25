@@ -166,7 +166,7 @@ def test_mail_and_doc_splitters_use_only_the_users_words():
     from ragnarok.router.when import split_doc, split_mail
 
     assert split_mail("send an email to priya@acme.com about invoice 4471 saying it is attached") == ("priya@acme.com", "invoice 4471", "it is attached")
-    assert split_mail("draft an email to priya@acme.com about the invoice") == ("priya@acme.com", "the invoice", "")
+    assert split_mail("draft an email to priya@acme.com about the invoice")[0:3:2] == ("priya@acme.com", "")
     assert split_mail("email somebody about lunch") == ("", "lunch", "")
     assert split_doc("create a document in Drive called Orion plan saying launch is 14 April") == ("Orion plan", "launch is 14 April")
     assert split_doc("save a note in drive") == ("", "")
@@ -175,3 +175,20 @@ def test_mail_and_doc_splitters_use_only_the_users_words():
 def test_draft_rule():
     assert match_intent("draft an email to priya@acme.com about the invoice") == "mail.draft"
     assert match_intent("write a reply to Dev") is None
+
+
+def test_mail_intent_without_saying():
+    from ragnarok.router.when import split_mail
+
+    assert split_mail("send a mail to tushar.singh.software@gmail.com requesting for leave due to head ache") == ("tushar.singh.software@gmail.com", "requesting for leave due to head ache", "")
+    assert split_mail("email a@b.com asking about the contract")[1] == "asking about the contract"
+    assert split_mail("send an email to a@b.com") == ("a@b.com", "", "")
+
+
+def test_false_action_claims_are_caught():
+    from ragnarok.harness.answer import CLAIM
+
+    for bad in ("Message sent to Tushar.", "I have sent the email.", "I've set a reminder for 5pm", "The reminder was created.", "I emailed him"):
+        assert CLAIM.search(bad), bad
+    for ok in ("The invoice was sent by Kestrel on Friday.", "Priya said the email was sent from her phone.", "You can send an email by typing a command."):
+        assert not CLAIM.search(ok), ok

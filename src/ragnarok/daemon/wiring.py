@@ -81,7 +81,7 @@ def _load_index(mem: MemoryService, reader: MemoryReader, index: VectorIndex) ->
                 index.load(name, ids, mat)
 
 
-def build_world(*, use_laya: bool = True, sandbox: bool = True, embed_rungs: bool = True, senders: dict | None = None, vault: SecretStore | None = None, gateway: Gateway | None = None, lock_path: Path | None = None, interval_s: float = 60.0,
+def build_world(*, use_laya: bool = True, sandbox: bool = True, embed_rungs: bool = True, rules: bool = True, senders: dict | None = None, vault: SecretStore | None = None, gateway: Gateway | None = None, lock_path: Path | None = None, interval_s: float = 60.0,
                 files: list[str] | None = None, max_cpu: float = 60.0) -> World:
     vault = vault or default_store()
     root = ensure_dirs()
@@ -126,7 +126,7 @@ def build_world(*, use_laya: bool = True, sandbox: bool = True, embed_rungs: boo
         return {sk: (ledger.get_skill(sk) or {}).get("tree_hash", "") for sk in skills}
 
     library = RouteLibrary(routes, skill_hashes=hashes)
-    cascade = Cascade(gateway=gw, selector=selector, l1=l1, l2=small, calibrator=calibrator, library=library, family_skills=FAMILY_SKILLS, l2_timeout_ms=2500, read_only_skills={"memory.search", "reminder.list"}, embed_accept=0.70 if embed_rungs else None, general_below=0.50 if embed_rungs else None, intent_rules=match_intent if embed_rungs else None)
+    cascade = Cascade(gateway=gw, selector=selector, l1=l1, l2=small, calibrator=calibrator, library=library, family_skills=FAMILY_SKILLS, l2_timeout_ms=2500, read_only_skills={"memory.search", "reminder.list"}, embed_accept=0.70 if embed_rungs else None, general_below=0.50 if embed_rungs else None, intent_rules=match_intent if rules else None)
     answerer = Answerer(reader, index, gw, COMPARTMENT)
     planner = Planner(gw, lambda n: _manifest(registry, n), Agent._now_text)
     agent = Agent(mem=mem, ledger=ledger, reader=reader, index=index, gateway=gw, cascade=cascade, planner=planner, executor=executor, registry=registry, library=library,

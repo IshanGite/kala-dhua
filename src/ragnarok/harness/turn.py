@@ -104,6 +104,7 @@ class Agent:
     HISTORYLIKE = re.compile(r"\b(i just (asked|said|told)|you (just )?(said|told|answered)|earlier (we|you|i)|previous (question|message|answer)|what did i (just )?ask|what have i asked|(earlier|before|previously|so far)\b.*\b(chat|conversation)|(this|our) (chat|conversation))\b", re.I)
 
     _clarify: str | None = None
+    _pending: tuple[str, float] | None = None  # (the half-finished request, when it was asked)
     ACTIONISH = re.compile(r"\b(send|post|message|tell|text|email|mail|remind|schedule|create|add|put|reply|respond|forward|delete|remove|book|cancel|save|write|draft|share|invite|set up)\b", re.I)
     POLITE = re.compile(r"^\s*(?:please\s+)?(?:can|could|would|will) you\b", re.I)
     PRONOUN = re.compile(r"\b(it|that|this|they|them|those|these|he|she|him|her|there|then)\b", re.I)
@@ -182,12 +183,13 @@ class Agent:
             if not to:
                 self._clarify = "Which email address should it go to? For example: send an email to name@example.com saying ..."
                 return None
-            if skill == "mail.send" and not body:
-                self._clarify = "What should the email say? For example: send an email to name@example.com saying the invoice is attached."
+            if not body and not subject:
+                self._clarify = "What should the email say? For example: send an email to name@example.com requesting leave for tomorrow."
                 return None
-            if skill == "mail.draft" and not body:  # a draft the user will review: the small writer model composes it from the topic
-                subject, body = await self._write_mail(to, subject or text)
+            if not body:  # the user gave an intent, not the words: the small writer composes it, and the approval card shows the full text before anything is sent
+                subject, body = await self._write_mail(to, subject)
                 if not body:
+                    self._clarify = "I could not compose that. Tell me what it should say: send an email to name@example.com saying ..."
                     return None
             subject = subject or (body[:50].rstrip(".") if body else "Message")
             return Plan(nodes=[PlanNode(id="n1", goal=text[:200], skill=skill, params={"to": to, "subject": subject, "body": body}, criteria=CRITERIA[skill])])
@@ -240,7 +242,7 @@ class Agent:
         schema = {"type": "object", "properties": {"subject": {"type": "string"}, "body": {"type": "string"}}, "required": ["subject", "body"]}
         try:
             res = await self.gw.chat(role="writer", schema=schema, max_tokens=110, deadline=get_clock().monotonic() + 10, priority=Priority.INTERACTIVE, seed=0, temperature=0.0,
-                                     messages=[{"role": "system", "content": "Write a short, polite email. Two sentences. Use only the facts given; invent no dates, amounts or names. JSON {subject, body}."},
+                                     messages=[{"role": "system", "content": "Write a short, polite email for the sender. Two or three sentences. Use only the facts given; invent no dates, amounts or names. Do not use placeholders like [Name]; end with just a thanks. JSON {subject, body}."},
                                                {"role": "user", "content": f"To: {to}\nAbout: {topic[:300]}"}])
         except Exception:  # noqa: BLE001
             return "", ""
@@ -274,6 +276,11 @@ class Agent:
 
     async def handle(self, request: str, *, trust: str = "user_direct", history: list[tuple[str, str]] | None = None) -> TurnResult:
         t0 = time.perf_counter()
+        if self._pending is not None:  # the last turn asked for a missing detail: a short plain reply completes that request
+            prev, asked = self._pending
+            self._pending = None
+            if time.monotonic() - asked < 240 and len(request.split()) <= 14 and match_intent(request) is None and not self._is_question(request) and not self._is_action_request(request):
+                request = f"{prev} {request}"
         tm: dict[str, int] = {}
         mark = lambda name, since: tm.__setitem__(name, round((time.perf_counter() - since) * 1000))  # noqa: E731
         now = get_clock().now_ms()
@@ -344,6 +351,7 @@ class Agent:
             plan = await self._single_skill_plan(request, decision.skills[0], snippets)
             if plan is None and getattr(self, "_clarify", None):
                 msg, self._clarify = self._clarify, None
+                self._pending = (request, time.monotonic())
                 return TurnResult(decision.tier, decision, None, msg, (time.perf_counter() - t0) * 1000)
             if plan is None:
                 decision.tier, plan_source = "L3", "L3"

@@ -69,6 +69,16 @@ def is_catchup(text: str) -> bool:
     return bool(CATCHUP.search(text))
 
 
+CLAIM = re.compile(r"\b(?:i(?:'ve| have)?|we)\s+(?:just\s+|already\s+)?(?:sent|set|scheduled|posted|created|added|emailed|messaged|reminded|booked|saved|forwarded|replied|deleted|updated)\b"
+                   r"|\b(?:message|email|mail|reminder|event|invitation|post)\s+(?:has been\s+|was\s+|is\s+|successfully\s+)?(?:sent|set|created|scheduled|added|posted|delivered)\b(?!\s+(?:by|from|on)\b)", re.I)
+NO_CLAIM = "I did not do anything: no message was sent and nothing was changed. If you want an action, say it as a command and approve the card that appears in the Approvals tab."
+
+
+def drop_false_claims(text: str) -> str:
+    """Words are not actions. A model's prose may never say that something was sent, set or created: only the action path can, and it reports from the real result."""
+    return NO_CLAIM if CLAIM.search(text) else text
+
+
 WITHHELD = "[withheld: this text tries to give the assistant instructions]"
 
 
@@ -143,7 +153,7 @@ class Answerer:
         cites = [c for c in data.get("cites", []) if isinstance(c, int) and 1 <= c <= len(res.hits)]
         if not cites:
             return Answered(NOTHING, notes=["ungrounded_answer_discarded"])  # an answer with no valid citation is not shown as fact
-        text = str(data.get("answer", "")).strip()
+        text = drop_false_claims(str(data.get("answer", "")).strip())
         if _echo(text, question) or len(text) < 8:  # a small model sometimes just repeats the question: show the evidence itself instead
             quotes = " | ".join(f"[{c}] {res.hits[c - 1].text[:160]}" for c in dict.fromkeys(cites))
             text = f"Here is what I found: {quotes}"
@@ -158,7 +168,7 @@ class Answerer:
                                       deadline=get_clock().monotonic() + 40, priority=Priority.INTERACTIVE, seed=0, temperature=0.2)
         except ModelError as exc:
             return Answered(f"The local model is not available ({exc.code}).", notes=["model_unavailable"])
-        return Answered((out.text or "").strip() or NOTHING, [], False, ["general_model_answer_not_from_your_data"])
+        return Answered(drop_false_claims((out.text or "").strip()) or NOTHING, [], False, ["general_model_answer_not_from_your_data"])
 
     async def catch_up(self, request: str, *, max_items: int = 20) -> Answered:
         """'Catch me up on X': read what arrived in the window (default three days), optionally about a topic, and summarise it with citations.

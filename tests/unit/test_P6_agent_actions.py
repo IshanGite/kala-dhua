@@ -22,6 +22,11 @@ async def fake_post(chat_id, text):
     return "m1"
 
 
+async def fake_mail(p):
+    SENT.append(("mail", p["to"], p["subject"], p["body"]))
+    return "gm1"
+
+
 async def fake_cal(p, due):
     SENT.append(("calendar", p["title"], due))
     return "https://calendar.example/e1"
@@ -33,6 +38,8 @@ async def fake_gmail_draft(draft):
 
 
 def responder(messages, schema):
+    if schema is None:  # plain chat: a bad model that lies about having acted
+        return "Message sent to someone@example.com."
     props = (schema or {}).get("properties", {})
     user = messages[-1]["content"]
     if "skill" in props and "needs_plan" in props:  # L2 arbiter: pick by keyword
@@ -57,7 +64,7 @@ def world(tmp_path, monkeypatch):
     set_clock(RealClock())
     monkeypatch.setenv("RAGNAROK_HOME", str(tmp_path / "home"))
     SENT.clear()
-    w = build_world(vault=MemoryStore(), gateway=FakeGateway(responder), sandbox=False, use_laya=False, embed_rungs=False, senders={"telegram": fake_post, "calendar": fake_cal, "gmail_draft": fake_gmail_draft}, max_cpu=101)
+    w = build_world(vault=MemoryStore(), gateway=FakeGateway(responder), sandbox=False, use_laya=False, embed_rungs=False, senders={"telegram": fake_post, "calendar": fake_cal, "gmail_draft": fake_gmail_draft, "mail": fake_mail}, max_cpu=101)
     yield w
     w.mem.close()
 
@@ -161,3 +168,32 @@ async def test_a_reminder_also_asks_to_go_on_the_calendar_when_google_write_is_c
         assert SENT[-1][0] == "calendar" and SENT[-1][1] == "gym"
     finally:
         w.mem.close()
+
+
+async def test_the_screenshot_flow_email_from_an_intent_is_composed_shown_and_only_sent_after_a_click(world):
+    await start(world)
+    task = asyncio.create_task(world.agent.handle("send a mail to tushar.singh@example.com requesting for leave due to head ache"))
+    cards = await asyncio.wait_for(approve_all(world, True), 8)
+    out = summarize(await asyncio.wait_for(task, 8))
+    assert cards[0]["skill"] == "mail.send"
+    fields = {f["name"]: f["value"] for f in cards[0]["fields"]}
+    assert fields["to"] == "tushar.singh@example.com" and fields["body"] and "[" not in fields["body"]
+    assert [x[0] for x in SENT] == ["mail"] and "Email sent" in out["text"]
+
+
+async def test_a_missing_detail_is_asked_for_and_the_short_reply_completes_the_request(world):
+    await start(world)
+    first = summarize(await world.agent.handle("send an email to tushar.singh@example.com"))
+    assert "What should the email say" in first["text"] and SENT == []
+    task = asyncio.create_task(world.agent.handle("requesting leave for tomorrow"))
+    cards = await asyncio.wait_for(approve_all(world, True), 8)
+    await asyncio.wait_for(task, 8)
+    assert cards[0]["skill"] == "mail.send" and SENT and SENT[0][1] == "tushar.singh@example.com"
+
+
+async def test_a_model_that_claims_it_sent_something_is_overruled(world):
+    await start(world)
+    ans = await world.agent.answerer._general("tushar.singh@example.com")
+    assert "Message sent" not in ans.text and "did not do anything" in ans.text.lower() and SENT == []
+    out = summarize(await world.agent.handle("tushar.singh@example.com"))
+    assert SENT == [] and "Message sent to" not in out["text"]

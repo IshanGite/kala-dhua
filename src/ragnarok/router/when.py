@@ -192,8 +192,12 @@ def agenda_range(text: str, now: datetime) -> tuple[datetime, datetime]:
 _EMAIL = re.compile(r"\b[\w.+-]+@[\w-]+\.[\w.-]+\b")
 
 
+_MAIL_LEAD = re.compile(r"^\s*(?:please\s+)?(?:can you\s+)?(?:send|write|draft|compose|prepare|email|mail)\s+(?:an?\s+|the\s+)?(?:email|mail|message)?\s*(?:to\s+)?", re.I)
+
+
 def split_mail(request: str) -> tuple[str, str, str]:
-    """(to, subject, body) from the user's own words: 'send an email to a@b.com about the invoice saying it is attached'. Blank where the user did not say it."""
+    """(to, subject, body) from the user's own words. 'saying X' gives the body verbatim, 'about X' gives the subject; anything else after the address
+    ('requesting leave due to a headache') is an INTENT: it goes in `subject` with the body blank, for the writer model to compose from."""
     m = _EMAIL.search(request)
     to = m.group(0) if m else ""
     sm = _SAYING.search(request)
@@ -201,6 +205,12 @@ def split_mail(request: str) -> tuple[str, str, str]:
     head = request[: sm.start()] if sm else request
     sub = re.search(r"\b(?:about|regarding|re:|subject)\s+(.+?)\s*$", head, re.I)
     subject = sub.group(1).strip(" ,.;:-") if sub else ""
+    if not body and m:
+        tail = _MAIL_LEAD.sub("", head, count=1)
+        tail = (tail.replace(to, "", 1) if to else tail)
+        tail = re.sub(r"^\s*(?:to\s+)?", "", tail).strip(" ,.;:-")
+        if len(tail.split()) >= 2:
+            subject = tail  # the whole intent, 'asking about the contract', not just the noun
     return to, subject, body
 
 
