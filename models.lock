@@ -10,5 +10,9 @@
   "planner": {
     "name": "qwen3:4b",
     "digest": "359d7dd4bcdab3d86b87d73ac27966f4dbb9f5efdfcc75d34a8764a09474fae7"
+  },
+  "writer": {
+    "name": "qwen3:0.6b",
+    "digest": "7df6b6e09427a769808717c0a93cadc4ae99ed4eb8bf5ca557c90846becea435"
   }
 }

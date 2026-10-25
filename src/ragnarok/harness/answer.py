@@ -113,7 +113,7 @@ class Answerer:
             return await self._general(question, history)
         now = get_clock().now_ms()
         try:
-            res = await retrieve((context_hint + " " + question).strip(), compartment=self._comp, reader=self._r, index=self._i, gateway=self._gw, now_ms=now, deadline=get_clock().monotonic() + 3, k=k, token_budget=900)
+            res = await retrieve((context_hint + " " + question).strip(), compartment=self._comp, reader=self._r, index=self._i, gateway=self._gw, now_ms=now, deadline=get_clock().monotonic() + 3, k=min(k, 4), token_budget=600)
         except Exception:  # noqa: BLE001 - memory trouble must not crash a chat turn
             return Answered("I could not search memory just now.", notes=["retrieval_failed"])
         if not res.hits:
@@ -135,7 +135,7 @@ class Answerer:
             {"role": "user", "content": "Snippets:\n" + "\n".join(lines) + f"\n\nQuestion: {question}"},
         ]
         try:
-            out = await self._gw.chat(role=self._role, messages=messages, schema=SCHEMA, max_tokens=300, deadline=get_clock().monotonic() + 40, priority=Priority.INTERACTIVE, seed=0, temperature=0.0)
+            out = await self._gw.chat(role=self._role, messages=messages, schema=SCHEMA, max_tokens=90, deadline=get_clock().monotonic() + 20, priority=Priority.INTERACTIVE, seed=0, temperature=0.0)
         except ModelError as exc:
             top = res.hits[0]
             return Answered(f"The model is not available ({exc.code}). Closest memory: {top.text[:200]}", [{"n": 1, "citation": top.citation}], False, ["model_unavailable"])
@@ -154,7 +154,7 @@ class Answerer:
     async def _general(self, question: str, history: list[tuple[str, str]] | None = None) -> Answered:
         """No tool fits and memory has nothing: an honest small-model answer, clearly labelled as not from the user's data."""
         try:
-            out = await self._gw.chat(role="arbiter", messages=[{"role": "system", "content": GENERAL_SYSTEM}, *[{"role": r, "content": c[:600]} for r, c in (history or [])[-6:]], {"role": "user", "content": question[:1500]}], schema=None, max_tokens=250,
+            out = await self._gw.chat(role="writer", messages=[{"role": "system", "content": GENERAL_SYSTEM}, *[{"role": r, "content": c[:600]} for r, c in (history or [])[-6:]], {"role": "user", "content": question[:1500]}], schema=None, max_tokens=250,
                                       deadline=get_clock().monotonic() + 40, priority=Priority.INTERACTIVE, seed=0, temperature=0.2)
         except ModelError as exc:
             return Answered(f"The local model is not available ({exc.code}).", notes=["model_unavailable"])

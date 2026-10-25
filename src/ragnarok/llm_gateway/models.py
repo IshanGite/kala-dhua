@@ -12,7 +12,7 @@ from pathlib import Path
 
 from ragnarok.core.errors import ConfigError, ModelNotAllowed
 
-ROLES = ("embedder", "arbiter", "planner")
+ROLES = ("embedder", "arbiter", "planner", "writer")
 
 
 @dataclass(frozen=True)
@@ -45,7 +45,7 @@ class ModelLock:
     def for_role(self, role: str) -> ModelEntry:
         # extractor and judge share the small arbiter model
         mapped = {"extractor": "arbiter", "judge": "arbiter"}.get(role, role)
-        entry = self.entries.get(mapped)
+        entry = self.entries.get(mapped) or (self.entries.get("arbiter") if mapped == "writer" else None)  # no separate writer model locked: the arbiter writes
         if entry is None:
             raise ModelNotAllowed(f"no model locked for role {role}")
         return entry

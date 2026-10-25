@@ -43,8 +43,8 @@ def responder(messages, schema):
         return {"platform": "telegram", "target": "Ravi", "text": "I will be late"}
     if "title" in props and "when" in props:
         return {"title": "Call with Priya", "when": "tomorrow at 3pm"}
-    if "to" in props and "body" in props and "subject" in props:
-        return {"to": "priya@acme.com", "subject": "Invoice", "body": "Hi Priya, the invoice is attached."}
+    if "body" in props and "subject" in props:
+        return {"subject": "Invoice", "body": "Hi Priya, the invoice is attached."}
     if "query" in props:
         return {"query": "standup"}
     if "answer" in props and "cites" in props:

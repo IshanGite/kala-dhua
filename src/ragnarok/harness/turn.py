@@ -175,6 +175,30 @@ class Agent:
 
             if when and parse_when(when, _dt.fromtimestamp(get_clock().now_ms() / 1000)) is not None:
                 return Plan(nodes=[PlanNode(id="n1", goal=text[:200], skill=skill, params={"title": title, "when": when}, criteria=CRITERIA[skill])])
+        if skill in ("mail.send", "mail.draft"):
+            from ragnarok.router.when import split_mail
+
+            to, subject, body = split_mail(text)
+            if not to:
+                self._clarify = "Which email address should it go to? For example: send an email to name@example.com saying ..."
+                return None
+            if skill == "mail.send" and not body:
+                self._clarify = "What should the email say? For example: send an email to name@example.com saying the invoice is attached."
+                return None
+            if skill == "mail.draft" and not body:  # a draft the user will review: the small writer model composes it from the topic
+                subject, body = await self._write_mail(to, subject or text)
+                if not body:
+                    return None
+            subject = subject or (body[:50].rstrip(".") if body else "Message")
+            return Plan(nodes=[PlanNode(id="n1", goal=text[:200], skill=skill, params={"to": to, "subject": subject, "body": body}, criteria=CRITERIA[skill])])
+        if skill == "drive.create":
+            from ragnarok.router.when import split_doc
+
+            title, doc = split_doc(text)
+            if not title or not doc:
+                self._clarify = "What should the document be called and what should it say? For example: create a document in Drive called Plan saying the key dates."
+                return None
+            return Plan(nodes=[PlanNode(id="n1", goal=text[:200], skill=skill, params={"title": title, "text": doc}, criteria=CRITERIA[skill])])
         if skill == "mail.reply":
             from ragnarok.router.when import split_reply
 
@@ -210,6 +234,18 @@ class Agent:
                 continue
             return Plan(nodes=[PlanNode(id="n1", goal=text[:200], skill=skill, params=res.parsed or {}, criteria=CRITERIA.get(skill) or [{"kind": "ok"}])])
         return None
+
+    async def _write_mail(self, to: str, topic: str) -> tuple[str, str]:
+        """Subject and body for a DRAFT from a topic, by the small fast writer model (no reasoning); the user reviews before anything is sent."""
+        schema = {"type": "object", "properties": {"subject": {"type": "string"}, "body": {"type": "string"}}, "required": ["subject", "body"]}
+        try:
+            res = await self.gw.chat(role="writer", schema=schema, max_tokens=110, deadline=get_clock().monotonic() + 10, priority=Priority.INTERACTIVE, seed=0, temperature=0.0,
+                                     messages=[{"role": "system", "content": "Write a short, polite email. Two sentences. Use only the facts given; invent no dates, amounts or names. JSON {subject, body}."},
+                                               {"role": "user", "content": f"To: {to}\nAbout: {topic[:300]}"}])
+        except Exception:  # noqa: BLE001
+            return "", ""
+        d = res.parsed or {}
+        return str(d.get("subject", ""))[:150], str(d.get("body", ""))[:1500]
 
     async def _route_plan(self, d: RouteDecision, request: str) -> Plan | None:
         nodes = d.route_nodes or []

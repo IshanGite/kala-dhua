@@ -160,3 +160,18 @@ def test_time_questions_are_recognised():
 
     assert all(TIME_ASK.search(t) for t in ("what is the time right now", "what's the date", "what time is it", "what day is today"))
     assert not TIME_ASK.search("what time is the budget review")
+
+
+def test_mail_and_doc_splitters_use_only_the_users_words():
+    from ragnarok.router.when import split_doc, split_mail
+
+    assert split_mail("send an email to priya@acme.com about invoice 4471 saying it is attached") == ("priya@acme.com", "invoice 4471", "it is attached")
+    assert split_mail("draft an email to priya@acme.com about the invoice") == ("priya@acme.com", "the invoice", "")
+    assert split_mail("email somebody about lunch") == ("", "lunch", "")
+    assert split_doc("create a document in Drive called Orion plan saying launch is 14 April") == ("Orion plan", "launch is 14 April")
+    assert split_doc("save a note in drive") == ("", "")
+
+
+def test_draft_rule():
+    assert match_intent("draft an email to priya@acme.com about the invoice") == "mail.draft"
+    assert match_intent("write a reply to Dev") is None

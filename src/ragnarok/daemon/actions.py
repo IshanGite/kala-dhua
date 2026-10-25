@@ -46,6 +46,8 @@ class Actions:
         self._m, self._r, self._i, self._gw, self._vault, self._comp = mem, reader, index, gateway, vault, compartment
         self._c = Commitments(mem)
         self._senders = senders  # tests inject fakes; None means the real connectors
+        self._wauth: GoogleAuth | None = None
+        self._wraw = ""
 
     # ------------------------------------------------------------------ reads and local writes
     async def memory_search(self, p: dict[str, Any], ctx: ExecContext, *, dry_run: bool) -> dict[str, Any]:
@@ -86,8 +88,10 @@ class Actions:
         raw = self._vault.get(token_name("google", "write"))
         if raw is None:
             return None
-        g = json.loads(raw)
-        return GoogleAuth(g["client_id"], g["client_secret"], g["refresh_token"])
+        if self._wauth is None or self._wraw != raw:  # one object keeps its short-lived access token, so each action skips a sign-in round trip
+            g = json.loads(raw)
+            self._wauth, self._wraw = GoogleAuth(g["client_id"], g["client_secret"], g["refresh_token"]), raw
+        return self._wauth
 
     async def calendar_add(self, p: dict[str, Any], ctx: ExecContext, *, dry_run: bool) -> dict[str, Any]:
         due = parse_due(p["when"])

@@ -187,3 +187,27 @@ def agenda_range(text: str, now: datetime) -> tuple[datetime, datetime]:
             d = start + timedelta(days=(i - start.weekday()) % 7)
             return d, d + one
     return start, start + one
+
+
+_EMAIL = re.compile(r"\b[\w.+-]+@[\w-]+\.[\w.-]+\b")
+
+
+def split_mail(request: str) -> tuple[str, str, str]:
+    """(to, subject, body) from the user's own words: 'send an email to a@b.com about the invoice saying it is attached'. Blank where the user did not say it."""
+    m = _EMAIL.search(request)
+    to = m.group(0) if m else ""
+    sm = _SAYING.search(request)
+    body = sm.group(1).strip() if sm else ""
+    head = request[: sm.start()] if sm else request
+    sub = re.search(r"\b(?:about|regarding|re:|subject)\s+(.+?)\s*$", head, re.I)
+    subject = sub.group(1).strip(" ,.;:-") if sub else ""
+    return to, subject, body
+
+
+def split_doc(request: str) -> tuple[str, str]:
+    """(title, text) from 'create a document in Drive called Plan saying the key dates'."""
+    t = re.search(r"\b(?:called|named|titled|title)\s+(.+?)(?:\s+(?:saying|with|that|containing|about)\b|$)", request, re.I)
+    title = t.group(1).strip(" ,.;:-\"'") if t else ""
+    sm = _SAYING.search(request)
+    text = sm.group(1).strip() if sm else ""
+    return title, text
