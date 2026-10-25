@@ -14,7 +14,7 @@ import jsonschema
 import numpy as np
 
 from ragnarok.core.clock import get_clock
-from ragnarok.harness.answer import Answered, Answerer, is_agenda, is_catchup, is_smalltalk
+from ragnarok.harness.answer import Answered, Answerer, is_agenda, is_catchup, is_smalltalk, source_recall
 from ragnarok.harness.executor import ExecContext, Executor, TaskOutcome
 from ragnarok.harness.plan import Plan, PlanNode, validate_plan
 from ragnarok.harness.planner import Planner
@@ -85,7 +85,7 @@ class Agent:
         "reminder.add": r"\b(remind|reminder|to-?do|note|remember)\b",
     }
     QUESTIONLIKE = re.compile(r"^\s*(what|when|where|who|whom|whose|which|why|how|is|are|was|were|do|does|did|can|could|will|would|should|any|has|have)\b|\?\s*$", re.I)
-    HISTORYLIKE = re.compile(r"\b(i just (asked|said|told)|you (just )?(said|told|answered)|earlier (we|you|i)|previous (question|message|answer)|what did i (just )?ask)\b", re.I)
+    HISTORYLIKE = re.compile(r"\b(i just (asked|said|told)|you (just )?(said|told|answered)|earlier (we|you|i)|previous (question|message|answer)|what did i (just )?ask|what have i asked|(earlier|before|previously|so far)\b.*\b(chat|conversation)|(this|our) (chat|conversation))\b", re.I)
 
     _clarify: str | None = None
 
@@ -176,6 +176,10 @@ class Agent:
         if self.answerer is not None and is_catchup(request):  # a briefing is read-only and needs no routing
             ans = await self.answerer.catch_up(request)
             dec = RouteDecision(tier="L1", intent_family="catchup", skills=[], plan_needed=False, risk_floor=0, memory_types=[], confidence=1.0, latency_ms=0.0, backend="catchup")
+            return TurnResult("L1", dec, None, None, (time.perf_counter() - t0) * 1000, answer=ans)
+        if self.answerer is not None and (srcs := source_recall(request)) is not None and not is_agenda(request) and not is_catchup(request):
+            ans = await self.answerer.recent_from(srcs)
+            dec = RouteDecision(tier="L1", intent_family="recall", skills=[], plan_needed=False, risk_floor=0, memory_types=["episodic"], confidence=1.0, latency_ms=0.0, backend="rule")
             return TurnResult("L1", dec, None, None, (time.perf_counter() - t0) * 1000, answer=ans)
         if self.answerer is not None and (is_smalltalk(request) or is_agenda(request)):  # conversation and agendas need no routing and no tool
             ans = await (self.answerer._general(request, history) if is_smalltalk(request) else self.answerer.agenda(request))

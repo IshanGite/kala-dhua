@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import time
 
 import pytest
@@ -104,3 +105,14 @@ async def test_a_poisoned_item_is_dead_lettered_and_does_not_stall_the_rest(worl
     for _ in range(3):
         await run.drain()
     assert q.stats().get("dead") == 1 and q.stats().get("done") == 1
+
+
+async def test_runners_sharing_one_queue_never_touch_each_others_items(world):
+    mem, keys, docs = world
+    q = IngestQueue(mem)
+    q.enqueue("slackfake", "okA", payload=json.dumps({}))
+    q.enqueue("otherfake", "okB")
+    run = ConnectorRunner(mem, q, FakeChat(), "work")
+    await run.drain()
+    assert q.stats().get("queued") == 1 and q.stats().get("dead", 0) == 0, "the other source's row is untouched, not failed"
+    assert q.revive("E_WRONG_SOURCE") == 0

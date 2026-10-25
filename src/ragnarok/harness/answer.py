@@ -42,6 +42,21 @@ AGENDA = re.compile(r"\b(what('?s| is| do i have)|show|list|do i have|any|am i f
 NOT_AGENDA = re.compile(r"\b(put|add|schedule a|schedule an|book|block|create|move|cancel|reschedule|delete|set up)\b", re.I)
 
 
+SOURCE_WORDS = {"telegram": ("telegram",), "discord": ("discord",), "slack": ("slack",), "gmail": ("gmail", "email", "emails", "mail", "inbox"), "gdrive": ("drive",), "gcal": ("calendar",)}
+SOURCE_ASK = re.compile(r"\b(?:what|which|show|list|any|latest|recent|new|read|get|got|receive[d]?|see|saw|said|sent)\b", re.I)
+SOURCE_ACT = re.compile(r"\b(?:tell|post|reply|respond|draft|write|remind|put|add|schedule|book|create|forward|email\s+\S+@|send\s+(?:an?\s+)?(?:email|message|mail)\s+to)\b", re.I)
+TOPIC = re.compile(r"\b(?:about|regarding|concerning|on the topic)\b", re.I)
+
+
+def source_recall(text: str) -> list[str] | None:
+    """Sources a plain 'what is new on X' question names, or None. A topic ('about Orion') or an action word sends it to the normal paths instead."""
+    low = text.lower()
+    if not SOURCE_ASK.search(low) or SOURCE_ACT.search(low) or TOPIC.search(low):
+        return None
+    hits = [s for s, words in SOURCE_WORDS.items() if any(re.search(rf"\b{w}\b", low) for w in words)]
+    return hits or None
+
+
 def is_smalltalk(text: str) -> bool:
     return bool(SMALLTALK.match(text))
 
@@ -123,7 +138,7 @@ class Answerer:
             return Answered(f"The local model is not available ({exc.code}).", notes=["model_unavailable"])
         return Answered((out.text or "").strip() or NOTHING, [], False, ["general_model_answer_not_from_your_data"])
 
-    async def catch_up(self, request: str, *, max_items: int = 30) -> Answered:
+    async def catch_up(self, request: str, *, max_items: int = 20) -> Answered:
         """'Catch me up on X': read what arrived in the window (default three days), optionally about a topic, and summarise it with citations.
         Received text is data: it is wrapped, flagged, and the model is told to report it, never obey it."""
         from ragnarok.router.analysis import parse_time_range
@@ -151,7 +166,7 @@ class Answerer:
                                                    "flag anything that needs the user to act (needs_action), and cite item numbers for every point. Reply as JSON {summary, points:[{point, cites, needs_action}]}."},
                     {"role": "user", "content": "Items:\n" + "\n".join(lines) + f"\n\nUser asked: {request}"}]
         try:
-            out = await self._gw.chat(role="planner", messages=messages, schema=CATCHUP_SCHEMA, max_tokens=700, deadline=get_clock().monotonic() + 90, priority=Priority.INTERACTIVE, seed=0, temperature=0.0)
+            out = await self._gw.chat(role="planner", messages=messages, schema=CATCHUP_SCHEMA, max_tokens=500, deadline=get_clock().monotonic() + 90, priority=Priority.INTERACTIVE, seed=0, temperature=0.0)
         except ModelError as exc:
             return Answered(f"The model is not available ({exc.code}); {len(rows)} items arrived.", notes=["model_unavailable"])
         data = out.parsed or {}
@@ -189,3 +204,21 @@ class Answerer:
             where = re.search(r"Where: (.+)", r["preview"] or "")
             lines.append(f"{when}  {r['title'] or '(no title)'}" + (f" - {where.group(1)[:60]}" if where else ""))
         return Answered(f"Your calendar from {label}:\n" + "\n".join(lines), [{"n": i + 1, "citation": f"{r['source']}: {r['title']}", "link": r.get("deep_link")} for i, r in enumerate(rows[:6])], True)
+
+    async def recent_from(self, sources: list[str], limit: int = 8) -> Answered:
+        """The latest items from the named apps, newest first: a lookup, not a model answer."""
+        from datetime import datetime
+
+        rows = []
+        for s in sources:
+            rows += self._r.recent_items(limit=limit, source=s)
+        rows.sort(key=lambda r: r["ts"] or 0, reverse=True)
+        rows = rows[:limit]
+        if not rows:
+            return Answered(f"Nothing has been read from {', '.join(sources)} yet.", notes=["recall_empty"])
+        lines = [f"{datetime.fromtimestamp((r['ts'] or 0) / 1000).strftime('%a %d %b %H:%M')}  {r['source']} - {r['title'] or r['kind']}: {(r['preview'] or '')[:110]}" for r in rows]
+        held = guarded("\n".join(r["preview"] or "" for r in rows if r["trust"] in ("received", "web")))[1]
+        text = f"Latest from {', '.join(sources)}:\n" + "\n".join(lines)
+        if held:
+            text += "\nWARNING: at least one of these messages tries to give me instructions; I only list it and will not act on it."
+        return Answered(text, [{"n": i + 1, "citation": f"{r['source']}: {r['title']}", "link": r.get("deep_link")} for i, r in enumerate(rows[:6])], True)

@@ -50,12 +50,12 @@ class IngestQueue:
 
         return bool(self._mem.with_tx(op))
 
-    def claim(self, limit: int = 1) -> list[QueueRow]:
+    def claim(self, limit: int = 1, source: str | None = None) -> list[QueueRow]:
         def op(c) -> list[QueueRow]:
             rows = c.execute(
                 "SELECT id,source,item_ref,stage,priority,attempts,payload_blob_id,payload FROM ingest_queue WHERE state='queued'"
-                " ORDER BY priority, created_at LIMIT ?",
-                (limit,),
+                + (" AND source=?" if source else "") + " ORDER BY priority, created_at LIMIT ?",
+                (source, limit) if source else (limit,),
             ).fetchall()
             now = self._now()
             for r in rows:
@@ -80,6 +80,10 @@ class IngestQueue:
             return state
 
         return self._mem.with_tx(op)
+
+    def revive(self, code: str) -> int:
+        """Put dead-lettered rows with a given error code back in the queue (after the cause was fixed)."""
+        return self._mem.with_tx(lambda c: c.execute("UPDATE ingest_queue SET state='queued', attempts=0, last_error_code=NULL, updated_at=? WHERE state='dead' AND last_error_code=?", (self._now(), code)).rowcount)
 
     def recover(self) -> int:
         """Boot: anything left 'running' by a crash goes back to the queue (stages are idempotent)."""

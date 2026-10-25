@@ -5,7 +5,7 @@ from ragnarok.connectors.google import Calendar, Gmail, GoogleAuth
 from ragnarok.connectors.http import request
 from ragnarok.platform.secrets import default_store, token_name
 
-TEST_TITLES = {"hiring plan sync", "call with priya", "ragnarok test standup", "ragnarok test dentist", "ragnarok test orion review"}
+TEST_TITLES = {"hiring plan sync", "call with priya", "ragnarok test standup", "ragnarok test dentist", "ragnarok test orion review", "ragnarok test sync"}
 
 
 def auth(kind):

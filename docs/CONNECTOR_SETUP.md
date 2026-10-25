@@ -8,7 +8,7 @@ Manager), never in a file. Use a test account or workspace first. Read tokens an
 2. **OAuth & Permissions**, **Bot Token Scopes**, add: `channels:history`, `channels:read`, `groups:history`, `groups:read`, `im:history`, `im:read`, `mpim:history`, `mpim:read`, `users:read`.
 3. Click **Install to Workspace** and allow. Copy the **Bot User OAuth Token** (starts `xoxb-`). This is the read token.
 4. In Slack, open the channels you want read and run `/invite @YourAppName`. A bot only sees conversations it belongs to.
-5. Later, for sending: add `chat:write`, reinstall, copy the new token as the separate write token.
+5. Sending: the manifest in `docs/slack-app-manifest.json` now includes `chat:write`. For an existing app: OAuth & Permissions → add `chat:write` → **Reinstall to Workspace** → copy the (possibly new) Bot User OAuth Token → `ragnarok connect slack`. The bot must be invited to the channel it posts in.
 6. Live push (optional, later): **Socket Mode** on, then **Basic Information**, **App-Level Tokens**, scope `connections:write` (starts `xapp-`).
 
 ## Telegram (about 2 min)

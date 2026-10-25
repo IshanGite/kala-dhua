@@ -74,3 +74,13 @@ NOW = datetime(2026, 10, 25, 16, 30)  # Sunday
                                         ("what is on this week", datetime(2026, 10, 19)), ("what is on my calendar", datetime(2026, 10, 25))])
 def test_agenda_range(text, start):
     assert agenda_range(text, NOW)[0] == start
+
+
+from ragnarok.harness.answer import source_recall  # noqa: E402
+
+
+@pytest.mark.parametrize("text,srcs", [("what did I get on telegram", ["telegram"]), ("what was said in slack", ["slack"]), ("show my latest emails", ["gmail"]), ("any new messages on discord", ["discord"]),
+                                       ("what did I send on telegram", ["telegram"]), ("tell Ravi on telegram that hi", None), ("what is the Orion budget about", None),
+                                       ("what did Ravi say on telegram about the permit", None), ("send an email to a@b.com", None), ("draft a reply on slack", None)])
+def test_source_recall(text, srcs):
+    assert source_recall(text) == srcs

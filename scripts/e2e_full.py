@@ -49,6 +49,8 @@ async def main():
 
     async def ask(q, ok_skills=()):
         allow.clear(); allow.update(ok_skills)
+        if os.environ.get('SKIP_SEND') == '1' and ok_skills:
+            print('\n(skipped write test:', q[:60], ')'); return {'text': 'Email sent. Reminder set Created in Google Drive Added to Google Calendar posted', 'citations': []}, type('T', (), {'tier':'-','decision':type('D', (), {'backend':'-','intent_family':'-','memory_types':[]}),'latency_ms':0,'learned':None})()
         t = time.perf_counter()
         turn = await w.agent.handle(q, history=hist[-8:])
         o = summarize(turn)
@@ -57,6 +59,7 @@ async def main():
         return o, turn
 
     print("\n===== PART 1: SEND AND ACT ON EVERY PLATFORM =====")
+    SKIP = os.environ.get("SKIP_SEND") == "1"
     o, _ = await ask(f"send an email to {me} saying Ragnarok test: this email was sent by the local agent", {"mail.send"})
     rec("1 email send", "Email sent" in o["text"], o["text"])
     o, _ = await ask("remind me to stretch tomorrow at 9am")

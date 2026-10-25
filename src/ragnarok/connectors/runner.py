@@ -73,7 +73,7 @@ class ConnectorRunner:
 
     async def drain(self, rep: CycleReport | None = None, limit: int = 50) -> CycleReport:
         rep = rep or CycleReport()
-        for row in self._q.claim(limit):
+        for row in self._q.claim(limit, self._c.name):
             if row.source != self._c.name:
                 self._q.fail(row.id, "E_WRONG_SOURCE")
                 continue
