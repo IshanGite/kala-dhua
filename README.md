@@ -34,7 +34,6 @@ Ragnarok reads your **mail, calendar, files and chats**, remembers them **with p
 - [Repository layout](#repository-layout)
 - [Documentation](#documentation)
 - [Status](#status)
-- [Prior work](#prior-work)
 
 ---
 
@@ -250,17 +249,31 @@ See **[`docs/SKILL_SCROLLS.md`](docs/SKILL_SCROLLS.md)**.
 
 ## Evaluation & evidence
 
-Every claim is measured on this project's own harness and recorded in [`docs/evidence/`](docs/evidence/) and [`docs/EVALS.md`](docs/EVALS.md). The `evals/` harness (`ragnarok evals`) runs ten suites — utility, intent, actions, tasks, security, memory, digest, forgetting, reliability, and multimodal — against the real local models.
+Every claim is measured on this project's own harness and recorded in [`docs/evidence/`](docs/evidence/) and [`docs/EVALS.md`](docs/EVALS.md). The `evals/` harness (`ragnarok evals`) runs ten suites — exact answers, intent, actions, end-to-end tasks, grounded memory, digest, forgetting, security, multimodal and reliability — against the real local models.
 
-Selected results (macOS M4, real local models):
+**Latest measured run (all models local):**
+
+| Suite | Result |
+|---|---|
+| Exact answers (time, dates, units) | 93/93 |
+| Understanding intent | 145/156 correct; 0/122 non-actions treated as actions; 3/34 actions missed |
+| Reading action requests | 37/37 right skill; 36/37 fully right (the one miss read "in an hour" as 30 minutes) |
+| Doing tasks end to end | 37/37 succeeded; 0 wrong or extra side effects; 0/16 denied-but-executed |
+| Grounded memory answers | 23/24 correct; 0/10 invented answers |
+| Digest | 0/90 wrong merges; only 5/15 same-topic pairs grouped (deliberately conservative) |
+| Forgetting (180 simulated days) | 180/180 frequently used facts kept; 5/5 pinned kept; unused facts pruned (127/720 still active) |
+| Security | 0 of 74 attacks succeeded (fresh rerun in progress) |
+| Multimodal | OCR 47/47 words; vision engines 8/8 each; speech language ID 3/4 |
+| Reliability | rerun in progress after a bug fix |
+
+**Other measurements (separate benchmark scripts):**
 
 - **Retrieval** over 2,000 messages: p50 45 ms, p95 94 ms, recall@5 1.0.
-- **Intent understanding**: 93% accuracy (145/156) with a 0% false-action rate on held-out samples.
-- **Exact answers by code** (time, dates, units, arithmetic): 100% (93/93).
 - **Crash recovery**: state restored in ~3.3 s after `kill -9` (gate 5 s).
 - **Resource use** under load: 4.9% mean / 12.2% peak of the machine (gate 30%).
+- **Skill-scroll routing**: 29/29 on the tuning set, 11/14 held-out.
 
-Confidence intervals are Wilson 95%; small samples are reported as such. See `docs/EVALS.md` for the full report and the honest misses.
+Confidence intervals are Wilson 95%; small samples are reported as such, and every miss is listed in `docs/EVALS.md` so the numbers can be checked.
 
 ---
 
@@ -329,8 +342,3 @@ Under active construction for a hackathon deadline of **09:00 IST, 26 October 20
 
 See [`docs/HANDOVER_TUSHAR.md`](docs/HANDOVER_TUSHAR.md) for the full list.
 
----
-
-## Prior work
-
-Connector parsing and polling logic is adapted from the [groupify](https://github.com/abhi-dev99/groupify) project, with all cloud-model and hosted-service dependencies removed.
