@@ -77,12 +77,7 @@ class Showcase:
             except Exception as exc:  # noqa: BLE001
                 return self._say("vision", str(exc) if getattr(exc, "code", "").startswith("E_") else "I could not look at the screen.", t0, "screen")
         if name == "attention":
-            d = self.digest.build(48, now_ms=None)
-            need = [s for s in d["sections"] if s["needs_action"]]
-            if not need:
-                return self._say("attention", "Nothing needs you right now.", t0, "real messages checked")
-            lines = [f"{i}. {s['title']} ({', '.join(s['sources'])}, {s['count']}): {s['summary'][:160]}" for i, s in enumerate(need[:6], 1)]
-            return self._say("attention", f"{len(need)} thing(s) need you:\n" + "\n".join(lines), t0, "real messages that look like they need an answer")
+            return self._say("attention", (await self.answerer.attention()).text, t0, "real messages that look like they need an answer")
         if name == "alert":
             d = self.digest.build(72, now_ms=None)
             sec = next((s for s in d["sections"] if s["needs_action"]), None) or (d["sections"][0] if d["sections"] else None)

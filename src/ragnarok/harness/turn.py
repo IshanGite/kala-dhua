@@ -509,6 +509,8 @@ class Agent:
             except Exception as exc:  # noqa: BLE001
                 text = str(exc) if getattr(exc, "code", "").startswith("E_") else "I could not look at the screen."
             return done("vision", Answered(text, notes=["vision"]), "one capture, only to the local vision model, never stored")
+        if u.intent == "catchup" and re.search(r"attention|urgent|important|priorit|pending|unanswered|need(s)? (me|to)|waiting on me|to reply|to answer", f"{u.topic} {request}", re.I):
+            return done("attention", await self.answerer.attention(), "real messages that look like they need an answer, from the digest's flags")
         if u.intent == "catchup":
             return done("catchup", await self.answerer.catch_up(request, source=u.source, topic_hint=u.topic if u.topic and not u.person else ""), "summary built from your messages, grouped by context")
         if u.intent == "agenda":

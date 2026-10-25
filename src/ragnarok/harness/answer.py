@@ -247,6 +247,18 @@ class Answerer:
         text, cites = self._digest.chat_text(d)
         return Answered(text, cites, True, ["digest"])
 
+    async def attention(self, hours: float = 48) -> Answered:
+        """What needs the user, straight from the digest's own flags: real messages that look like they need an answer or a decision. No model, nothing invented."""
+        if self._digest is None:
+            return Answered("The digest is not available yet.", notes=["no_digest"])
+        d = self._digest.build(hours)
+        need = [x for x in d["sections"] if x["needs_action"]]
+        if not need:
+            return Answered("Nothing needs you right now.", notes=["attention_empty"], grounded=True)
+        lines = [f"{i}. {x['title']} ({', '.join(x['sources'])}, {x['count']}): {x['summary'][:170]}" for i, x in enumerate(need[:6], 1)]
+        cites = [{"n": i + 1, "citation": f"{x['sources'][0]}: {x['title']}", "link": (x["items"][0].get("link") if x["items"] else None)} for i, x in enumerate(need[:6])]
+        return Answered(f"{len(need)} thing(s) need you:\n" + "\n".join(lines), cites, True, ["digest"])
+
     async def agenda(self, request: str) -> Answered:
         """What is on the calendar for the asked day or range, straight from the calendar items: no model, nothing invented."""
         from datetime import datetime

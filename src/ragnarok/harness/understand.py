@@ -37,6 +37,9 @@ Examples:
 "how much is invoice 8812" -> recall, topic invoice 8812
 "summarize everything we ingested" -> catchup
 "give me a summary of all contexts" -> catchup
+"what needs my attention" -> catchup, topic attention
+"anything urgent?" -> catchup, topic urgent
+"what do I need to reply to" -> catchup, topic attention
 "what happened on slack today" -> catchup, source slack
 "what do I have tomorrow" -> agenda
 "what is my day like" -> agenda
