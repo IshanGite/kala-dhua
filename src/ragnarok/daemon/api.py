@@ -11,6 +11,7 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
 from ragnarok import __version__
+from ragnarok.connectors.notifications import Notifications
 from ragnarok.daemon.auth import LocalOnlyMiddleware, TokenGuard
 from ragnarok.daemon.runtime import Runtime
 from ragnarok.harness.answer import Answerer
@@ -23,6 +24,7 @@ DEFAULT_PORT = 8765
 class Services:
     runtime: Runtime | None = None
     answerer: Answerer | None = None
+    notifications: Notifications | None = None
 
 
 class ChatIn(BaseModel):
@@ -31,6 +33,10 @@ class ChatIn(BaseModel):
 
 class ToggleIn(BaseModel):
     enabled: bool
+
+
+class NotifIn(BaseModel):
+    apps: list[str] = Field(max_length=50)
 
 
 class PairIn(BaseModel):
@@ -90,6 +96,25 @@ def create_app(guard: TokenGuard | None = None, port: int = DEFAULT_PORT, servic
             return {"ok": True, "released": svc.runtime.approve_sender(body.platform, body.handle)}
         svc.runtime.block_sender(body.platform, body.handle)
         return {"ok": True}
+
+    @app.get("/notifications")
+    async def notifications_get() -> dict[str, Any]:
+        if svc.notifications is None or svc.runtime is None:
+            return {"ok": False, "error": "E_NO_RUNTIME"}
+        h = await svc.notifications.health()
+        import json as _json
+
+        return {"ok": True, "available": h.ok, "detail": h.detail, "apps": _json.loads(svc.runtime.state.get("notif_apps", "[]"))}
+
+    @app.post("/notifications")
+    async def notifications_set(body: NotifIn) -> dict[str, Any]:
+        if svc.runtime is None:
+            return {"ok": False, "error": "E_NO_RUNTIME"}
+        import json as _json
+
+        apps = sorted({a.strip() for a in body.apps if a.strip() and len(a) < 120})
+        svc.runtime.state.set("notif_apps", _json.dumps(apps))
+        return {"ok": True, "apps": apps}
 
     @app.post("/chat")
     async def chat(body: ChatIn) -> dict[str, Any]:

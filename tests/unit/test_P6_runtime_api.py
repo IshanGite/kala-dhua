@@ -135,7 +135,7 @@ def test_build_world_wires_connected_sources_and_writes_a_private_token_file(tmp
     vault.set(token_name("telegram", "read"), "123:abc")
     w = build_world(vault=vault, gateway=FakeGateway(), files=[str(tmp_path)])
     try:
-        assert set(w.runtime.runners) == {"telegram", "files"}
+        assert set(w.runtime.runners) == {"telegram", "files", "notifications"}
         assert w.token_file.read_text(encoding="utf-8") == w.guard.token
         assert json.dumps(w.runtime.status())  # serialisable for the window
     finally:
@@ -149,3 +149,16 @@ def test_the_window_page_is_served_without_a_token_but_holds_no_secret_and_loads
     assert r.status_code == 200 and "Ragnarok" in r.text and "S3CRET-guard-value" not in r.text
     assert "default-src 'none'" in r.text and "http://" not in r.text.split("<script>")[1] and "https://" not in r.text
     assert r.headers["x-frame-options"] == "DENY"
+
+
+def test_notification_apps_are_set_through_the_api_and_start_empty(world):
+    from ragnarok.connectors.notifications import Notifications, UnavailableSource
+
+    mem, keys, rt, reader, gw, idx = world
+    g = TokenGuard("tok")
+    app = create_app(g, 8765, Services(rt, Answerer(reader, idx, gw), Notifications(UnavailableSource("needs Full Disk Access"), [])))
+    c = TestClient(app, base_url="http://127.0.0.1:8765", headers={HEADER: "tok"})
+    r = c.get("/notifications").json()
+    assert r["available"] is False and "Full Disk Access" in r["detail"] and r["apps"] == []
+    assert c.post("/notifications", json={"apps": ["ru.keepcoder.Telegram", " ", "ru.keepcoder.Telegram"]}).json()["apps"] == ["ru.keepcoder.Telegram"]
+    assert c.get("/notifications").json()["apps"] == ["ru.keepcoder.Telegram"]

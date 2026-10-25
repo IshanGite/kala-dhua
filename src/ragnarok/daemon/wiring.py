@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import json
 import secrets
 from dataclasses import dataclass
 from pathlib import Path
 
 from ragnarok.config.paths import data_dir, db_path, ensure_dirs
+from ragnarok.connectors.notifications import Notifications, default_source
 from ragnarok.connectors.registry import build, connected
 from ragnarok.connectors.runner import ConnectorRunner
 from ragnarok.daemon.api import Services
@@ -64,7 +66,10 @@ def build_world(*, vault: SecretStore | None = None, gateway: Gateway | None = N
         runners[name] = ConnectorRunner(mem, queue, build(name, vault), COMPARTMENT, gateway=gw, index=index, require_pairing=name in PAIRED)
     if files:
         runners["files"] = ConnectorRunner(mem, queue, build("files", vault, folders=files), COMPARTMENT, gateway=gw, index=index)
-    runtime = Runtime(RuntimeState(mem), runners, interval_s=interval_s, governor=Governor(max_cpu))
+    state = RuntimeState(mem)
+    notif = Notifications(default_source(), lambda: json.loads(state.get("notif_apps", "[]")))
+    runners["notifications"] = ConnectorRunner(mem, queue, notif, COMPARTMENT, gateway=gw, index=index)
+    runtime = Runtime(state, runners, interval_s=interval_s, governor=Governor(max_cpu))
     guard = TokenGuard(secrets.token_urlsafe(32))
     token_file = root / "run" / "session.token"
     token_file.write_text(guard.token, encoding="utf-8")
@@ -72,7 +77,7 @@ def build_world(*, vault: SecretStore | None = None, gateway: Gateway | None = N
         token_file.chmod(0o600)
     except OSError:
         pass  # Windows: the per-user data directory ACL applies
-    return World(mem, reader, index, gw, runtime, Services(runtime, Answerer(reader, index, gw, COMPARTMENT)), guard, token_file)
+    return World(mem, reader, index, gw, runtime, Services(runtime, Answerer(reader, index, gw, COMPARTMENT), notif), guard, token_file)
 
 
 __all__ = ["World", "build_world", "data_dir"]
