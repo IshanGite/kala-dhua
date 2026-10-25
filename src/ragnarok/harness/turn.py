@@ -339,7 +339,7 @@ class Agent:
                 ans = await self.answerer.answer(request, general=False, history=history, context_hint=self._hint(request, history))
                 if ans.grounded:
                     return done("question", ans, "answered from your memory with citations")
-            return done("chat", await self.answerer._general(request, history), "ordinary conversation, not from your data")
+            return done("chat", await self.answerer._general(request, history if len(request.split()) > 3 else None), "ordinary conversation, not from your data")
         return None
 
     async def _recall(self, request: str, u: Any, history: list[tuple[str, str]] | None, done: Any) -> TurnResult:

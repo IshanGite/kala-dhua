@@ -60,3 +60,12 @@ def test_screen_phrases_match(t):
 @pytest.mark.parametrize("t", ["send an email to Ravi", "what did Ravi say yesterday"])
 def test_other_requests_do_not_match(t):
     assert not SCREEN_ASK.search(t)
+
+
+def test_black_capture_is_detected_as_missing_permission():
+    from ragnarok.harness.vision import looks_blank
+
+    b = io.BytesIO()
+    Image.new("RGB", (800, 500), (0, 0, 0)).save(b, "PNG")
+    assert looks_blank(b.getvalue())
+    assert not looks_blank(png())

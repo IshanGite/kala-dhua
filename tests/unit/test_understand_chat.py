@@ -76,3 +76,10 @@ async def test_empty_message_gets_a_friendly_reply():
     svc = ChatService(object())  # type: ignore[arg-type]
     r = await svc.submit("   ")
     assert r["ok"] and "Say something" in r["text"]
+
+
+def test_old_refusals_are_not_fed_back_to_the_chat_model():
+    from ragnarok.harness.answer import NO_CLAIM, clean_history
+
+    h = [("user", "hi"), ("assistant", NO_CLAIM), ("user", "how are you"), ("assistant", "Doing well, thanks!")]
+    assert clean_history(h) == [("user", "hi"), ("user", "how are you"), ("assistant", "Doing well, thanks!")]

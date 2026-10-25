@@ -49,6 +49,17 @@ def prepare(image: bytes, max_side: int = 768) -> str:
     return base64.b64encode(image).decode()
 
 
+def looks_blank(png: bytes) -> bool:
+    """True when the picture is (almost) a single dark colour: no real screen is that empty."""
+    try:
+        im = _decode(png)
+        im.thumbnail((64, 64))
+        lo, hi = im.convert("L").getextrema()
+        return hi < 12
+    except Exception:  # noqa: BLE001
+        return False
+
+
 class Vision:
     def __init__(self, gateway: Gateway, capture=capture_screen) -> None:  # noqa: ANN001
         self._gw, self._capture = gateway, capture
@@ -76,4 +87,8 @@ class Vision:
             png = self._capture()
         except ScreenUnavailable as exc:
             raise RagnarokError(str(exc), code="E_SCREEN") from exc
+        if looks_blank(png):  # without Screen Recording permission macOS hands back a black picture instead of an error: say so instead of describing a black screen
+            from ragnarok.platform.screen import MAC_HELP
+
+            raise RagnarokError("The capture came back black, so macOS is not letting this app see the screen. " + MAC_HELP.split(". ", 1)[1], code="E_SCREEN")
         return await self.ask(png, question, source="screen")

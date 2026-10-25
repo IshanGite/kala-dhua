@@ -120,6 +120,15 @@ PERSONA = ("You are Ragnarok, a friendly private AI assistant that lives on the 
            "If they ask about their own messages or data, say they can ask 'catch me up' or ask about a person or topic by name. If you do not know something, say so. Never invent facts about the user.")
 
 
+CANNED = ("I did not do anything", "If you want an action, say it as a command", "I did not quite get that", "Who should I message", "Which email address", "What should the email say", "I could not read anything useful",
+          "I don't have anything about that in memory", "The local model is not available", "Nothing is waiting for approval", "I cannot see the content", "I can't see your data", "unable to access", "cannot access", "can't access", "can't see", "cannot see")
+
+
+def clean_history(history: list[tuple[str, str]] | None) -> list[tuple[str, str]]:
+    """Earlier error-style replies must not be shown to the conversation model: a small model copies what it sees, and one old refusal would become every answer."""
+    return [(r, c) for r, c in (history or []) if not (r == "assistant" and any(m in c for m in CANNED))]
+
+
 def _echo(answer: str, question: str) -> bool:
     a, q = set(answer.lower().split()), set(question.lower().split())
     return bool(a) and len(a & q) / len(a) >= 0.8
@@ -186,7 +195,7 @@ class Answerer:
         """Ordinary conversation and general knowledge, clearly not from the user's data. The persona answers; false action claims are stripped sentence by sentence."""
         now = __import__("datetime").datetime.fromtimestamp(get_clock().now_ms() / 1000).astimezone().strftime("%A %d %B %Y, %H:%M")
         try:
-            out = await self._gw.chat(role=self._role, messages=[{"role": "system", "content": PERSONA + f" It is {now}."}, *[{"role": r, "content": c[:600]} for r, c in (history or [])[-8:]], {"role": "user", "content": question[:1500]}],
+            out = await self._gw.chat(role=self._role, messages=[{"role": "system", "content": PERSONA + f" It is {now}."}, *[{"role": r, "content": c[:600]} for r, c in clean_history(history)[-8:]], {"role": "user", "content": question[:1500]}],
                                       schema=None, max_tokens=220, deadline=get_clock().monotonic() + 40, priority=Priority.INTERACTIVE, seed=0, temperature=0.5)
         except ModelError as exc:
             return Answered(f"The local model is not available right now ({exc.code}). Reminders, calendar, time and searching your messages still work.", notes=["model_unavailable"])
