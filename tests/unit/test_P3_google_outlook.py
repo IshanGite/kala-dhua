@@ -159,3 +159,21 @@ async def test_outlook_mail_calendar_and_token_rotation(world):
 
 async def test_device_code_pending_returns_none():
     assert await device_code_poll("cid", "dc", new_client(httpx.MockTransport(ms_handler))) is None
+
+
+async def test_calendar_falls_back_to_a_time_window_when_google_says_updatedmin_is_too_old(world):
+    mem, keys = world
+    seen = []
+
+    def h(req):
+        seen.append(dict(req.url.params))
+        if "updatedMin" in req.url.params:
+            return httpx.Response(410, json={"error": {"message": "too far in the past"}})
+        return httpx.Response(200, json={"items": [{"id": "e1", "summary": "Standup", "updated": "u", "start": {"dateTime": "2026-10-28T10:00:00Z"}, "end": {"dateTime": "2026-10-28T10:30:00Z"}, "organizer": {"self": True}}]})
+
+    from ragnarok.connectors.base import Cursor
+
+    res = await Calendar(google_auth(h)).sync(Cursor({"updated_min": "2026-01-01T00:00:00Z"}))
+    assert len(res.refs) == 1 and "timeMin" in seen[-1] and "updatedMin" not in seen[-1]
+    first = await Calendar(google_auth(h)).sync(None)
+    assert "timeMin" in seen[-1] and len(first.refs) == 1

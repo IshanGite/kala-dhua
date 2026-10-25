@@ -173,12 +173,22 @@ class Calendar:
 
     async def sync(self, cursor: Cursor | None) -> SyncResult:
         now = datetime.fromtimestamp(get_clock().now_ms() / 1000, UTC)
-        updated_min = (cursor.value if cursor else {}).get("updated_min") or (now - timedelta(days=self._back)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        updated_min = (cursor.value if cursor else {}).get("updated_min")
+        t_min = (now - timedelta(days=self._back)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        t_max = (now + timedelta(days=self._ahead)).strftime("%Y-%m-%dT%H:%M:%SZ")
         refs: list[ItemRef] = []
+        # Google rejects updatedMin older than about three weeks (410): the first run, or a long gap, reads a time window instead.
+        use_updated = bool(updated_min)
         token = ""
         for _ in range(10):
-            d = (await self._a.get(self.API, singleEvents="true", updatedMin=updated_min, timeMax=(now + timedelta(days=self._ahead)).strftime("%Y-%m-%dT%H:%M:%SZ"),
-                                   maxResults=250, **({"pageToken": token} if token else {}))).json()
+            window = {"updatedMin": updated_min} if use_updated else {"timeMin": t_min}
+            try:
+                d = (await self._a.get(self.API, singleEvents="true", timeMax=t_max, maxResults=250, **window, **({"pageToken": token} if token else {}))).json()
+            except ConnectorError as exc:
+                if use_updated and "410" in str(exc):
+                    use_updated, token = False, ""
+                    continue
+                raise
             for e in d.get("items", []):
                 if e.get("status") == "cancelled":
                     continue
