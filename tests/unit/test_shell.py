@@ -85,9 +85,9 @@ def test_prompt_is_offered_once_per_edge():
     sh, main, _ = make(main_x=1440 - 390 - 5)
     sh._maybe_prompt()
     sh._maybe_prompt()
-    assert sum("showEdgeMenu" in x for x in main.log) == 1
+    assert sh.take_prompt()["prompt"] == "right" and sh.take_prompt()["prompt"] is None
     main.move(500, 90)
     sh._maybe_prompt()  # left the edge: forgotten
     main.move(1440 - 390 - 5, 90)
     sh._maybe_prompt()
-    assert sum("showEdgeMenu" in x for x in main.log) == 2
+    assert sh.take_prompt()["prompt"] == "right"

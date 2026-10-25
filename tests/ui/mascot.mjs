@@ -9,7 +9,7 @@ const vc = new VirtualConsole();
 vc.on("jsdomError", (e) => errors.push(String(e)));
 const dom = new JSDOM(html, { runScripts: "dangerously", url: "http://127.0.0.1:1/mascot#token=abc", pretendToBeVisual: true, virtualConsole: vc,
   beforeParse(w) {
-    w.fetch = (u, o) => { calls.push([u, o && o.method]); const body = u === "/approvals" ? { items: [{ id: "a1", headline: "Send this chat message" }] } : u === "/inbox" ? { items: [{ id: "r1", kind: "reminder", title: "Reminder: call mom" }] } : { ok: true };
+    w.fetch = (u, o) => { calls.push([u, o && o.method]); const body = u === "/shell/poll" ? { prompt: null, edge: "right", pinned: "right" } : u === "/approvals" ? { items: [{ id: "a1", headline: "Send this chat message" }] } : u === "/inbox" ? { items: [{ id: "r1", kind: "reminder", title: "Reminder: call mom" }] } : { ok: true };
       return Promise.resolve({ json: () => Promise.resolve(body) }); };
   } });
 const { window } = dom, doc = window.document;
@@ -31,7 +31,7 @@ stage.dispatchEvent(new window.MouseEvent("mousedown", { bubbles: true, screenX:
 doc.dispatchEvent(new window.MouseEvent("mousemove", { bubbles: true, screenX: 40, screenY: 10 }));
 doc.dispatchEvent(new window.MouseEvent("mouseup", { bubbles: true }));
 check("a drag moves the raven and does NOT restore the window", calls.some((c) => c[0] === "/shell/mascot/move") && calls.some((c) => c[0] === "/shell/mascot/dropped") && !calls.some((c) => c[0] === "/shell/restore"));
-window.setEdge("right");
+await sleep(1200);
 check("on the right edge the raven faces into the screen", doc.getElementById("bird").className === "flip");
 window.close();
 process.exit(ok ? 0 : 1);

@@ -389,6 +389,18 @@ def create_app(guard: TokenGuard | None = None, port: int = DEFAULT_PORT, servic
     async def shell_pin(edge: str | None = None) -> dict[str, Any]:
         return svc.shell.pin(edge) if svc.shell else {"ok": False, "error": "E_NO_WINDOW"}
 
+    @app.post("/shell/prompt")
+    async def shell_prompt(edge: str = "right") -> dict[str, Any]:
+        """Shows the window options (pin, split screen, desktops) as if the window had just been dragged to that edge."""
+        if not svc.shell:
+            return {"ok": False, "error": "E_NO_WINDOW"}
+        svc.shell.prompt_edge = edge if edge in ("left", "right", "top", "bottom") else "right"
+        return {"ok": True}
+
+    @app.get("/shell/poll")
+    async def shell_poll() -> dict[str, Any]:
+        return svc.shell.take_prompt() if svc.shell else {"available": False}
+
     @app.post("/shell/minimize")
     async def shell_minimize() -> dict[str, Any]:
         """Minimize the window; the raven waits where it was pinned until it is clicked."""

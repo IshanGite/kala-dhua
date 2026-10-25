@@ -113,7 +113,8 @@ textarea#q{flex:1;resize:none;max-height:140px;min-height:38px;line-height:1.4}
 .drop.on{display:grid}
 .sk{height:64px;border-radius:12px;background:linear-gradient(90deg,var(--chip),var(--panel),var(--chip));background-size:200% 100%;animation:sh 1.3s infinite;margin-bottom:10px}
 @keyframes sh{to{background-position:-200% 0}}
-.pop{position:absolute;left:12px;bottom:64px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px;box-shadow:0 8px 30px #0005;z-index:8;width:min(360px,calc(100% - 24px))}.pop .pt{font-weight:700;margin-bottom:6px}.pop .pb{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.pop select{width:100%;margin:4px 0;padding:6px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}</style>
+.pop{position:absolute;left:12px;bottom:64px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px;box-shadow:0 8px 30px #0005;z-index:8;width:min(360px,calc(100% - 24px))}.pop .pt{font-weight:700;margin-bottom:6px}.pop .pb{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.pop select{width:100%;margin:4px 0;padding:6px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}@media (max-width:480px){#live{display:none}#syncb{padding:0;width:34px;height:34px;font-size:0;position:relative}#syncb::before{content:"\21BB";font-size:17px}header{gap:7px;padding:9px 10px}h1{font-size:15px}.pill{padding:2px 7px}}
+</style>
 </head>
 <body>
 <header>
@@ -337,6 +338,7 @@ textarea#q{flex:1;resize:none;max-height:140px;min-height:38px;line-height:1.4}
   $("em_all").onclick=function(){emAll=!emAll;$("em_all").textContent="Show on every desktop: "+(emAll?"on":"off");shellCall("/shell/desktops?on="+emAll,null)};
   $("em_new").onclick=function(){shellCall("/shell/newdesktop","Moved to the next desktop")};
   $("em_no").onclick=emClose;
+  setInterval(function(){if(dead)return;api("/shell/poll").then(function(d){if(d&&d.prompt)window.showEdgeMenu(d.prompt)}).catch(function(){})},1200);
   $("pinb").onclick=function(){api("/shell/state").then(function(s){emAll=!!s.all_desktops;window.showEdgeMenu(s.near_edge||s.edge||"right")}).catch(function(){window.showEdgeMenu("right")})};
 
   /* ---------------- header, sources, live status ---------------- */

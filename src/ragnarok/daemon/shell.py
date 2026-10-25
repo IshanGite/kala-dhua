@@ -94,6 +94,7 @@ class Shell:
         self.pin_at: tuple[int, int] | None = None  # where the raven sits (top-left)
         self.edge = "right"
         self._prompted: tuple[str, float] | None = None
+        self.prompt_edge: str | None = None  # set when the window stops near an edge; the page picks it up by polling (the page's security policy forbids evaluate_js)
         self._timer: threading.Timer | None = None
         self._all_desktops = False
         self._home: Box | None = None  # where the window was before it was pinned
@@ -162,12 +163,14 @@ class Shell:
         if self._prompted and self._prompted[0] == edge:
             return  # already asked for this edge: not again until the window leaves it
         self._prompted = (edge, 0.0)
-        try:
-            self.main.evaluate_js(f"window.showEdgeMenu && window.showEdgeMenu('{edge}')")
-        except Exception as exc:  # noqa: BLE001
-            log("edge_prompt_failed", err=type(exc).__name__)
+        self.prompt_edge = edge
 
     # ------------------------------------------------------------------ actions
+    def take_prompt(self) -> dict[str, Any]:
+        """What the pages poll for: an edge to offer options for (once), and which edge the raven sits on (so it faces into the screen)."""
+        p, self.prompt_edge = self.prompt_edge, None
+        return {"prompt": p, "edge": self.edge, "pinned": self.pinned}
+
     def state(self) -> dict[str, Any]:
         try:
             b = self._main_box()
@@ -193,10 +196,6 @@ class Shell:
     def _show_mascot(self, x: int, y: int) -> None:
         self.mascot.move(int(x), int(y))
         self.mascot.show()
-        try:
-            self.mascot.evaluate_js(f"window.setEdge && window.setEdge('{self.edge}')")
-        except Exception:  # noqa: BLE001
-            pass
         if self._all_desktops:
             _mac_all_desktops("Muninn", True)
 
@@ -251,10 +250,6 @@ class Shell:
             self.edge = edge
             self.pin_at = self.mascot_spot(edge, b)
             self.mascot.move(*self.pin_at)
-            try:
-                self.mascot.evaluate_js(f"window.setEdge && window.setEdge('{edge}')")
-            except Exception:  # noqa: BLE001
-                pass
             if self._home is not None:
                 self._home = Box(self._home.x, self._home.y, self._home.w, self._home.h)
             self.pinned = edge if self._hidden_by_pin else self.pinned

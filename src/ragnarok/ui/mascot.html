@@ -66,7 +66,8 @@ svg{width:100%;height:100%;overflow:visible}
   try{history.replaceState(null,"",location.pathname+location.search)}catch(e){}
   var params=new URLSearchParams(location.search),stage=document.getElementById("stage"),bird=document.getElementById("bird"),bub=document.getElementById("bubble"),dot=document.getElementById("dot");
   function api(p,b){return fetch(p,b===undefined?{headers:H}:{method:"POST",headers:H,body:JSON.stringify(b)}).then(function(r){return r.json()})}
-  window.setEdge=function(edge){bird.className=(edge==="right"?"flip":"")};   // face into the screen
+  function setEdge(edge){bird.className=(edge==="right"?"flip":"")}   // face into the screen
+  setInterval(function(){api("/shell/poll").then(function(d){if(d.edge)setEdge(d.edge)}).catch(function(){})},1000);
   
   // idle life: look around, peck at a seed, preen, tilt the head, blink, and fall asleep when nothing has happened for a while
   var state="",last=Date.now(),sleeping=false,lid=document.getElementById("lid");
