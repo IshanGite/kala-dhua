@@ -174,13 +174,11 @@ class Answerer:
         """What is on the calendar for the asked day or range, straight from the calendar items: no model, nothing invented."""
         from datetime import datetime
 
-        from ragnarok.router.analysis import parse_time_range
+        from ragnarok.router.when import agenda_range
 
         now = get_clock().now_ms()
-        rng = parse_time_range(request, now)
-        if rng is None:
-            day = datetime.fromtimestamp(now / 1000).replace(hour=0, minute=0, second=0, microsecond=0)
-            rng = (int(day.timestamp() * 1000), int(day.timestamp() * 1000) + 86_400_000)
+        a0, a1 = agenda_range(request, datetime.fromtimestamp(now / 1000))
+        rng = (int(a0.timestamp() * 1000), int(a1.timestamp() * 1000))
         rows = self._r.items_between(("gcal", "outlook_cal"), rng[0], rng[1])
         label = datetime.fromtimestamp(rng[0] / 1000).strftime("%a %d %b")
         if not rows:

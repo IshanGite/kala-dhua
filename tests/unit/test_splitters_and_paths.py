@@ -46,3 +46,31 @@ def test_agenda_detection(text, agenda):
 
 def test_catchup_detection():
     assert is_catchup("catch me up on my emails") and is_catchup("what did I miss today") and not is_catchup("when is the budget review")
+
+
+from datetime import datetime  # noqa: E402
+
+from ragnarok.router.intent_rules import match_intent  # noqa: E402
+from ragnarok.router.when import agenda_range  # noqa: E402
+
+
+@pytest.mark.parametrize("text,skill", [
+    ("remind me to stretch tomorrow at 9am", "reminder.add"), ("what reminders do I have", "reminder.list"),
+    ("tell Ravi on telegram that I will be late", "chat.reply"), ("post in the discord general channel that hi", "chat.reply"),
+    ("reply to Dev's email saying yes", "mail.reply"), ("reply to Ravi on telegram saying ok", "chat.reply"),
+    ("send an email to a@b.com saying hi", "mail.send"), ("put a call on my calendar tomorrow at 4pm", "calendar.add"),
+    ("create a document in Drive called Plan saying hello", "drive.create"),
+    ("what is the budget review about", None), ("hello", None), ("how much is invoice 8812", None), ("send me the report", None),
+])
+def test_intent_rules(text, skill):
+    assert match_intent(text) == skill
+
+
+NOW = datetime(2026, 10, 25, 16, 30)  # Sunday
+
+
+@pytest.mark.parametrize("text,start", [("what is on my calendar tomorrow", datetime(2026, 10, 26)), ("show my agenda today", datetime(2026, 10, 25)),
+                                        ("do I have meetings on friday", datetime(2026, 10, 30)), ("my schedule next week", datetime(2026, 10, 26)),
+                                        ("what is on this week", datetime(2026, 10, 19)), ("what is on my calendar", datetime(2026, 10, 25))])
+def test_agenda_range(text, start):
+    assert agenda_range(text, NOW)[0] == start

@@ -125,6 +125,9 @@ class MemoryReader:
     def find_mail(self, source: str, who: str) -> dict[str, Any] | None:
         """The most recent message on a mail source whose sender (name or address) matches; carries what a threaded reply needs."""
         row = self._r.execute("SELECT native_id, title, thread_id, flags_json FROM items WHERE source=? AND lower(flags_json) LIKE ? ORDER BY coalesce(occurred_at,0) DESC LIMIT 1", (source, f"%{who.lower()}%")).fetchone()
+        if row is None:  # the name may be a signature in the text or the topic in the subject, not the From header
+            row = self._r.execute("SELECT i.native_id, i.title, i.thread_id, i.flags_json FROM items i WHERE i.source=? AND (lower(i.title) LIKE ? OR EXISTS "
+                                  "(SELECT 1 FROM chunks c WHERE c.item_id=i.id AND lower(c.text) LIKE ?)) ORDER BY coalesce(i.occurred_at,0) DESC LIMIT 1", (source, f"%{who.lower()}%", f"%{who.lower()}%")).fetchone()
         if row is None:
             return None
         import json as _json

@@ -38,7 +38,8 @@ RISK_FLOOR = {"none": 0, "low": 1, "high": 2}
 class Cascade:
     def __init__(self, *, gateway: Gateway, selector: SkillSelector, l1: DecisionBackend | None, l2: DecisionBackend | None, calibrator: Calibrator,
                  library: RouteLibrary | None = None, family_skills: dict[str, list[str]] | None = None, interactive_timeout_ms: int = 700, l2_timeout_ms: int | None = None, read_only_skills: set[str] | None = None,
-                 embed_accept: float | None = None, embed_margin: float = 0.05, general_below: float | None = None) -> None:
+                 embed_accept: float | None = None, embed_margin: float = 0.05, general_below: float | None = None, intent_rules: Any = None) -> None:
+        self._rules = intent_rules
         self._ro, self._e_hi, self._e_mg, self._e_lo = read_only_skills or set(), embed_accept, embed_margin, general_below
         self._gw, self._sel, self._l1, self._l2, self._cal, self._lib = gateway, selector, l1, l2, calibrator, library
         self._family_skills = family_skills or {}
@@ -91,6 +92,13 @@ class Cascade:
                 return done("L0", "learned", m.skills, len(m.skills) > 1, m.similarity, "route_library", route_id=m.route_id, route_nodes=m.nodes)
             sm = self._lib.match(sigvec, compartment, caller_trust, text, now_ms, states=("shadow",))
             shadow_id = sm.route_id if sm else None
+
+        # ---- deterministic intent rules: unambiguous wording selects the skill without a model
+        if self._rules is not None:
+            hit = self._rules(text)
+            if hit and hit in set(shortlist) | {s2 for v in self._family_skills.values() for s2 in v}:
+                notes.append(f"rule_{hit}")
+                return done("L1", "rule", [hit], False, 1.0, "rule", shadow_route_id=shadow_id)
 
         # ---- L1: Laya (calibrated, abstains below its threshold)
         fam = a1.get("skill_family")

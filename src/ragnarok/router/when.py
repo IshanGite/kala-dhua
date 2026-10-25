@@ -121,3 +121,25 @@ def split_chat(request: str) -> tuple[str, str, str]:
         target = t2.group(1)
     target = re.sub(r"\s+(?:on|in|via)\s+(?:telegram|discord|slack)\b.*$", "", target, flags=re.I).strip(" ,.;:-\"'#")
     return platform, target, text
+
+
+def agenda_range(text: str, now: datetime) -> tuple[datetime, datetime]:
+    """The day or span an agenda question is about, in local time: today (default), tomorrow, the day after, a weekday, this week, next week."""
+    low = text.lower()
+    start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    one = timedelta(days=1)
+    if "day after tomorrow" in low:
+        return start + 2 * one, start + 3 * one
+    if "tomorrow" in low:
+        return start + one, start + 2 * one
+    if "next week" in low:
+        mon = start + timedelta(days=7 - start.weekday())
+        return mon, mon + timedelta(days=7)
+    if "this week" in low or "the week" in low:
+        mon = start - timedelta(days=start.weekday())
+        return mon, mon + timedelta(days=7)
+    for i, name in enumerate(_DAYS):
+        if re.search(rf"\b{name}\b", low):
+            d = start + timedelta(days=(i - start.weekday()) % 7)
+            return d, d + one
+    return start, start + one

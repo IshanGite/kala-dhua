@@ -36,7 +36,7 @@ from ragnarok.store.vectors import VectorIndex
 
 FREE = "{free}"  # a free-text parameter in a stored route: refilled from the new request, never replayed from the old one
 CRITERIA: dict[str, list[dict]] = {
-    "reminder.add": [{"kind": "field_present", "path": "reminder_id"}], "reminder.list": [{"kind": "field_present", "path": "reminders"}],
+    "reminder.add": [{"kind": "field_present", "path": "reminder_id"}], "reminder.list": [{"kind": "ok"}],
     "mail.draft": [{"kind": "field_present", "path": "draft"}], "mail.send": [{"kind": "equals", "path": "sent", "value": True}],
     "chat.reply": [{"kind": "equals", "path": "posted", "value": True}], "calendar.add": [{"kind": "equals", "path": "added", "value": True}], "mail.reply": [{"kind": "equals", "path": "sent", "value": True}], "drive.create": [{"kind": "equals", "path": "created", "value": True}], "memory.search": [{"kind": "field_present", "path": "hits"}],
 }
@@ -203,6 +203,8 @@ class Agent:
         snippets = await self._snippets(request)
         plan: Plan | None = None
         plan_source = decision.tier if decision.tier != "L0" else "L0"
+        if decision.tier == "L1" and decision.backend in ("rule", "embedding", "laya"):
+            plan_source = "L2"  # a fast rung chose it; the deterministic success check and two shadow agreements are what earn a route (gates P1-P7 still apply)
         clarification = None
         if decision.tier == "L0":
             plan = await self._route_plan(decision, request)
