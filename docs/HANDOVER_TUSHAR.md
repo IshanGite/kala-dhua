@@ -9,7 +9,7 @@ Ragnarok: an always-on personal AI agent that runs entirely on the machine. Loca
 1. Install Python 3.12, `uv`, Git, and Ollama (ollama.com). Optional: Docker Desktop in **Linux containers** mode.
 2. `git clone https://github.com/IshanGite/kala-dhua` and `cd kala-dhua`.
 3. `uv sync --extra laya --extra window`.
-4. `ollama pull nomic-embed-text`, `ollama pull qwen3:0.6b`, `ollama pull qwen3:1.7b`, `ollama pull qwen3:4b` (about 4.7 GB in total; the 4B is only for planning and catch-up briefings).
+4. `ollama pull nomic-embed-text`, `ollama pull qwen3:0.6b`, `ollama pull qwen3:1.7b`, `ollama pull qwen3:4b` (about 4.7 GB in total; the 4B is only for planning and catch-up briefings), and `ollama pull qwen3-vl:2b` (1.9 GB, for explain-my-screen).
 5. `uv run ragnarok doctor` then `uv run ragnarok check`. Both should pass; tell Ishan if not.
 6. `models.lock` pins names and digests; a digest that differs on your machine is refused on purpose. Re-pin only if you change a model.
 
@@ -19,7 +19,9 @@ Ragnarok: an always-on personal AI agent that runs entirely on the machine. Loca
 - **Brain**: four-tier router (stored routes, command rules, Laya, embedding match, small arbiter, planner), route learning, deterministic multi-step decomposition, retries, one self-correcting re-plan, safe calculator, grounded answers with citations and a "Why?" trace.
 - **Always-on**: continuous ingestion, user-defined triggers, heads-ups, needs-attention flags, daily briefing, inbox, OS notifications (macOS), boot recovery (state back in 3.3 s after kill -9).
 - **Connectors**: Gmail, Calendar, Drive, Meet, Slack, Telegram, Discord (read); email send/reply/draft, calendar events, Drive documents, Telegram, Discord, Slack (writes, click-gated); Outlook coded, not yet run live.
-- **Window**: chat, Inbox, Messages (search, delete with preview and receipt, edit and export of remembered facts), Approvals, Activity, Sources (switch, briefing time, skills).
+- **Window**: chat (suggestions, Explain my screen, picture questions), Digest (contexts, timeline), Inbox, Approvals, Memory (search, delete with preview and receipt, edit and export), Activity, Sources (per-app health, notification permission guide, briefing time, skills).
+- **Live ingestion**: one polling task per source (`daemon/runtime.py`, `DEFAULT_INTERVALS`), Telegram long poll, backoff. Test scripts must set `RAGNAROK_SKIP_SOURCES=telegram` so they never consume real Telegram updates.
+- **Vision**: `harness/vision.py`, `platform/screen.py` (macOS `screencapture`; **Windows capture is yours**: implement `capture_screen()` for Windows and return PNG bytes), model `qwen3-vl:2b` (`ollama pull qwen3-vl:2b`).
 - **Tests**: 360+ unit and security tests, plus `node tests/ui/smoke.mjs` (16 browser-level checks; run `npm install` once in `tests/ui`).
 
 ## Yours: Windows-specific work, in this order

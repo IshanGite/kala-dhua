@@ -66,6 +66,15 @@ Automated: 414 tests pass, plus 16 browser-level checks of the window (chat, app
 Repository: 63 commits, about 12,600 lines of source, continuous integration on macOS and Windows.
 
 ==============================================================
+5B. NEW IN THE LAST DAY (all tested; live numbers in docs/evidence/)
+==============================================================
+LIVE INGESTION: every connected app is polled on its own loop, independently, so a slow or broken app never delays the others. Telegram uses long polling (messages arrive in well under a second), Slack, Discord and Gmail are checked every 4 seconds, with bursts right after activity and exponential backoff on errors. Measured: a new Gmail message is searchable in memory in about 6 to 7 seconds (docs/evidence/ingest_latency.json, includes Gmail's own delivery delay). The header of the window shows how many apps are healthy and when the newest item arrived.
+DIGEST: a new Digest tab and "catch me up" in chat group everything read into contexts across apps (an email thread, a chat channel and a notification about the same topic become one section), with a faithful summary, key points that cite the source items, a "needs you" flag, notifications grouped per app, and a timeline by day and part of the day. Summaries are built by code from the messages themselves; a small local model may rewrite them, and its rewrite is accepted only if every number and name in it appears in the sources. Messages that try to give the assistant instructions are held back and never quoted. Building it takes about 4 ms.
+EXPLAIN MY SCREEN AND PICTURE QUESTIONS: a local vision model (qwen3-vl 2B, pinned in models.lock) explains what is on the screen (3 second countdown, one capture, never stored) or answers questions about a picture you attach or paste. Only a typed or clicked request can trigger it, text inside the picture is treated as data (tested with a picture that says "ignore all previous instructions": it reports the text and does not obey). On the test invoice it answered in 2 seconds. macOS needs Screen Recording permission for the app that started Ragnarok; the window has a button that opens that setting.
+NEW WINDOW: Chat with suggestion chips, Digest, Inbox, Approvals, Memory, Activity, Sources; live refresh every few seconds; per-app health; a guide and a button for the notification permission (Full Disk Access).
+LAYA: see docs/evidence/laya_finetune.json for the local fine-tune result (measured on 30 requests that were not in training).
+
+==============================================================
 6. THE FIVE-MINUTE LIVE DEMO (in this order)
 ==============================================================
 1. Open the window. Point at the switch ("reading continuously"), the Inbox tab (things it noticed on its own) and Messages ("real messages from Gmail, Discord, Telegram, Slack, already ingested, searchable, deletable").
@@ -77,7 +86,8 @@ Repository: 63 commits, about 12,600 lines of source, continuous integration on 
 7. Chat: "every day at 8am catch me up on my emails" (a trigger), then "list my triggers".
 8. Chat: "remember that I prefer morning meetings", then "what do you know about me"; open Messages and show the Remembered list with Edit and Forget.
 9. Chat: "calculate 18 percent GST on 42500" (code, exact) and "run python to print the sum of 1 to 100" (shows the sandbox, 5050).
-10. Close with: "no cloud AI, everything local, nothing acts without a click, and we measured all of it."
+10. Open the Digest tab: contexts grouped across apps with a timeline; click "Explain my screen" (or paste a screenshot and ask a question about it).
+11. Close with: "no cloud AI, everything local, nothing acts without a click, and we measured all of it."
 Safe fallbacks if something misbehaves: "what can you do", "what is the time right now" and the Messages tab always work offline.
 
 ==============================================================

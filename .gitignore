@@ -30,3 +30,4 @@ profile.toml
 reports/
 .DS_Store
 Thumbs.db
+models-local/
