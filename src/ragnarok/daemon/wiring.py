@@ -133,7 +133,7 @@ def build_world(*, use_laya: bool = True, sandbox: bool = True, embed_rungs: boo
         return {sk: (ledger.get_skill(sk) or {}).get("tree_hash", "") for sk in skills}
 
     library = RouteLibrary(routes, skill_hashes=hashes)
-    cascade = Cascade(gateway=gw, selector=selector, l1=l1, l2=small, calibrator=calibrator, library=library, family_skills=FAMILY_SKILLS, l2_timeout_ms=2500, read_only_skills={"memory.search", "reminder.list"}, embed_accept=0.70 if embed_rungs else None, general_below=0.50 if embed_rungs else None, intent_rules=match_intent if rules else None)
+    cascade = Cascade(gateway=gw, selector=selector, l1=l1, l2=small, calibrator=calibrator, library=library, family_skills=FAMILY_SKILLS, l2_timeout_ms=2500, read_only_skills={"memory.search", "reminder.list"}, embed_accept=0.70 if embed_rungs else None, general_below=0.50 if embed_rungs else None, intent_rules=match_intent if rules else None, l2_skill_only=True)
     answerer = Answerer(reader, index, gw, COMPARTMENT)
     planner = Planner(gw, lambda n: _manifest(registry, n), Agent._now_text)
     agent = Agent(mem=mem, ledger=ledger, reader=reader, index=index, gateway=gw, cascade=cascade, planner=planner, executor=executor, registry=registry, library=library,

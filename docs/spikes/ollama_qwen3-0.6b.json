@@ -1,0 +1,1 @@
+{"model": "qwen3:0.6b", "n": 50, "schema_valid_rate": 1.0, "p50_ms": 681, "p95_ms": 735, "accuracy_over_valid": {"family": 0.58, "injection": 0.16, "risk": 0.3}}

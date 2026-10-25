@@ -1,0 +1,45 @@
+{
+ "corpus_messages": 2000,
+ "ingest_seconds": 49,
+ "retrieval_ms": {
+  "p50": 45.2,
+  "p95": 93.6,
+  "p99": 98.2,
+  "max": 100.1,
+  "n": 200
+ },
+ "recall_at_5": 1.0,
+ "classification_ms": {
+  "p50": 0.0,
+  "p95": 536.6,
+  "p99": 648.6,
+  "max": 860.1,
+  "n": 190
+ },
+ "classification_by_kind_ms": {
+  "question": {
+   "p50": 0.0,
+   "p95": 0.0,
+   "p99": 0.0,
+   "max": 0.0,
+   "n": 100
+  },
+  "command": {
+   "p50": 34.4,
+   "p95": 39.8,
+   "p99": 46.8,
+   "max": 47.8,
+   "n": 70
+  },
+  "ambiguous": {
+   "p50": 538.6,
+   "p95": 663.6,
+   "p99": 663.6,
+   "max": 860.1,
+   "n": 20
+  }
+ },
+ "gate_ms": 800,
+ "passes": true,
+ "note": "retrieval = embed + keyword + vector + rank; classification = full cascade route (L0 check, rules, Laya, embedding rung, small-model arbiter budget)"
+}

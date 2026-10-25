@@ -38,8 +38,9 @@ RISK_FLOOR = {"none": 0, "low": 1, "high": 2}
 class Cascade:
     def __init__(self, *, gateway: Gateway, selector: SkillSelector, l1: DecisionBackend | None, l2: DecisionBackend | None, calibrator: Calibrator,
                  library: RouteLibrary | None = None, family_skills: dict[str, list[str]] | None = None, interactive_timeout_ms: int = 700, l2_timeout_ms: int | None = None, read_only_skills: set[str] | None = None,
-                 embed_accept: float | None = None, embed_margin: float = 0.05, general_below: float | None = None, intent_rules: Any = None) -> None:
+                 embed_accept: float | None = None, embed_margin: float = 0.05, general_below: float | None = None, intent_rules: Any = None, l2_skill_only: bool = False) -> None:
         self._rules = intent_rules
+        self._l2_skill_only = l2_skill_only  # multi-step requests are split before routing, so the small arbiter only picks a skill: a shorter answer, about half the time
         self._ro, self._e_hi, self._e_mg, self._e_lo = read_only_skills or set(), embed_accept, embed_margin, general_below
         self._gw, self._sel, self._l1, self._l2, self._cal, self._lib = gateway, selector, l1, l2, calibrator, library
         self._family_skills = family_skills or {}
@@ -170,8 +171,10 @@ class Cascade:
         l2_deadline = t0 + self._l2_budget_s
         if self._l2 is not None and shortlist:
             q = Question("skill", "choice", "Which single skill should handle this? Empty if none fits or several are needed.", {s: s for s in shortlist})
-            ans = self._by_id(await self._guard(self._l2.decide(text, [q, Q_PLAN], deadline=get_clock().monotonic() + max(remaining, 0.05)), remaining))
+            ans = self._by_id(await self._guard(self._l2.decide(text, [q] if self._l2_skill_only else [q, Q_PLAN], deadline=get_clock().monotonic() + max(remaining, 0.05)), remaining))
             s, p = ans.get("skill"), ans.get("needs_plan")
+            if self._l2_skill_only and s is not None:
+                p = Answer("needs_plan", False, 1.0)
             if s and p and s.value and (not p.value or str(s.value) in self._ro) and self._cal.accepts("skill", self._l2.name, s):
                 return done("L2", "arbiter", [str(s.value)], False, s.probability, self._l2.name, shadow_route_id=shadow_id)
             if s is not None and p is not None and not s.value and not p.value and s.probability >= 0.7:

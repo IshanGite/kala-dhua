@@ -68,7 +68,7 @@ def decompose(request: str) -> Decomposed:
                 return Decomposed(None, clauses, f"clause {i} has no recipient address")
             if (uses_prev or not body) and last_read:
                 body = f"{{ref:{last_read}.summary}}"
-                subject = subject if subject and not PRON.fullmatch(subject.strip()) else "Summary"
+                subject = subject if subject and not PRON.search(subject) else "Summary"
             if not body:
                 return Decomposed(None, clauses, f"clause {i} has no body")
             send = bool(re.match(r"^\s*(?:please\s+)?(?:send|email|mail)\b", c, re.I))
