@@ -13,6 +13,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any
 
+from ragnarok.core.errors import ModelError
 from ragnarok.core.ids import sha256_hex
 from ragnarok.llm_gateway.client import Gateway, Priority
 from ragnarok.memory.reader import MemoryReader
@@ -117,10 +118,17 @@ async def retrieve(
         return out
 
     emb_task = gateway.embed([query], deadline=deadline, priority=priority)
-    qvecs, kw = await asyncio.gather(emb_task, asyncio.to_thread(keyword_block))
+    kw_task = asyncio.create_task(asyncio.to_thread(keyword_block))
+    emb_res, kw = await asyncio.gather(emb_task, kw_task, return_exceptions=True)  # never start a second keyword search while the first still holds the connection
+    if isinstance(kw, BaseException):
+        raise kw
+    degraded = isinstance(emb_res, ModelError)  # the embedding model is down: keyword and time-range search still work (NFR3.1)
+    if isinstance(emb_res, BaseException) and not degraded:
+        raise emb_res
+    qvecs = None if degraded else emb_res
     timings["embed_and_keyword"] = (time.perf_counter() - t0) * 1000
     t1 = time.perf_counter()
-    vec_hits = index.search(compartment, qvecs[0], k=30)
+    vec_hits = [] if degraded else index.search(compartment, qvecs[0], k=30)
 
     ranked: dict[tuple[str, str], float] = {}
     rows: dict[tuple[str, str], dict[str, Any]] = {}

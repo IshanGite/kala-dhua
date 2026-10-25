@@ -8,6 +8,7 @@ import secrets
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
+from typing import Any
 
 import yaml
 
@@ -71,6 +72,9 @@ class World:
     guard: TokenGuard
     token_file: Path
     agent: Agent | None = None
+    ledger: Ledger | None = None
+    broker: Broker | None = None
+    recovery: Any = None  # the boot recovery report (NFR3.2)
     selector: SkillSelector | None = None
     l1: object | None = None
 
@@ -159,7 +163,7 @@ def build_world(*, use_laya: bool = True, sandbox: bool = True, embed_rungs: boo
         _load_index(mem, reader, index)
 
     services = Services(runtime, answerer, notif, chat, reader, hub, proactive, mem, reindex)
-    w = World(mem, reader, index, gw, runtime, services, guard, token_file, agent, selector, l1)
+    w = World(mem, reader, index, gw, runtime, services, guard, token_file, agent, ledger, broker, None, selector, l1)
     w.registry = registry  # type: ignore[attr-defined]
     return w
 
@@ -172,7 +176,16 @@ def _manifest(registry: SkillRegistry, name: str):  # noqa: ANN202
 
 
 async def warm_up(world: World) -> None:
-    """Index the skill catalogue for shortlisting and preload Laya, off the request path."""
+    """Recover from a crash first (NFR3.2), then index the skill catalogue for shortlisting and preload Laya, off the request path."""
+    from ragnarok.harness.recovery import recover
+
+    if world.agent is not None and world.ledger is not None and world.broker is not None:
+        rep = await recover(world.ledger, world.agent.executor, world.broker, lambda _t: world.agent.ctx, run=False)  # state restored: nodes requeued, stale approvals expired
+        world.recovery = rep
+        if rep.resumed:
+            world.runtime._note("recovered", "tasks", "ok", resumed=len(rep.resumed), requeued=rep.requeued_nodes, ms=round(rep.restore_ms))
+            for tid in rep.resumed:  # finish the interrupted work in the background; anything needing a click asks again
+                asyncio.get_running_loop().create_task(world.agent.executor.run_task(tid, world.agent.ctx))
     reg = world.registry  # type: ignore[attr-defined]
     manifests = [m for r in world.agent.ledger.list_skills() if (m := _manifest(reg, r["skill_id"])) is not None] if world.agent else []
     from ragnarok.core.clock import get_clock

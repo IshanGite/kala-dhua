@@ -15,6 +15,7 @@ import jsonschema
 import numpy as np
 
 from ragnarok.core.clock import get_clock
+from ragnarok.core.errors import ModelError
 from ragnarok.harness.answer import (
     CAPABILITIES,
     CAPABILITY_ASK,
@@ -354,6 +355,9 @@ class Agent:
         decision = await self.cascade.route(request, compartment=self.ctx.compartment, caller_trust=trust, now_ms=now)
         mark("route", t_route)
         decision.memory_types = memory_types_hint(request)
+        if decision.intent_family == "unavailable" and self.answerer is not None:  # degrade: keyword search over memory, plain honesty otherwise
+            ans = await self._say(request, history=history, general=False) if not self._is_action_request(request) else Answered("The model server is not running, so I cannot work out that request right now. Reminders, agenda and time questions still work.")
+            return TurnResult("L3", decision, None, None, (time.perf_counter() - t0) * 1000, answer=ans, timings=tm)
         if decision.intent_family in ("memory", "general") and self.answerer is not None and decision.tier != "L0":
             ans = await self._say(request, history=history, general=decision.intent_family == "general")
             return TurnResult(decision.tier, decision, None, None, (time.perf_counter() - t0) * 1000, answer=ans)
@@ -419,7 +423,10 @@ class Agent:
         decision.trace.append("Result: " + ", ".join(f"{k}={v}" for k, v in outcome.node_states.items()))
         outcome = await self._reflect(request, decision, plan, outcome, snippets)
         t_learn = time.perf_counter()
-        learned = await self._learn(request, decision, plan, plan_source, outcome)
+        try:
+            learned = await self._learn(request, decision, plan, plan_source, outcome)
+        except ModelError:  # learning is a bonus: with the embedding model down the task still succeeded
+            learned = None
         mark("learn", t_learn)
         latency = (time.perf_counter() - t0) * 1000
         if self.routes is not None:
