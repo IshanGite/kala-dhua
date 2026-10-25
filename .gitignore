@@ -1,0 +1,32 @@
+# environments and caches
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+node_modules/
+dist/
+
+# runtime data: never commit (encrypted DB, blobs, logs, secrets)
+/data/
+*.db
+*.db-wal
+*.db-shm
+*.enc
+.env
+.env.*
+secrets/
+canary/
+
+# models and weights are never committed
+*.gguf
+*.safetensors
+*.bin
+
+# per-machine generated files
+profile.toml
+reports/
+.DS_Store
+Thumbs.db
