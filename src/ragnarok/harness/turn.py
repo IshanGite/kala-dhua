@@ -509,8 +509,9 @@ class Agent:
     async def _answer_intent(self, request: str, u: Any, history: list[tuple[str, str]] | None, trust: str, t0: float, tm: dict[str, int]) -> TurnResult | None:
         """Read-only paths chosen by the understanding model. None means 'not for me': the keyword paths below take over."""
         assert self.answerer is not None
-        if u.intent in ("chat", "unclear", "recall") and self.scrolls is not None and trust == "user_direct" and (sc := await self._scroll_turn(request, t0, tm)) is not None:
-            return sc  # a specialist scroll fits this message better than a general answer
+        sr = getattr(self, "_sroute", None)
+        if sr is not None and self.scrolls is not None and trust == "user_direct" and (sr.strong or u.intent in ("chat", "unclear", "recall")) and (sc := await self._scroll_turn(request, t0, tm, route=sr)) is not None:
+            return sc  # a specialist scroll fits this message better than a general answer (or a summary): almost exactly what it is for, or a conversational ask
         if not plausible(u.intent, request):  # the model read it as something the words do not support ('berlin time' as a summary request): treat it as conversation instead of showing the wrong thing
             u = Understanding("chat", u.person, u.source, u.topic)
         done = lambda fam, ans, trace: TurnResult("L1", RouteDecision(tier="L1", intent_family=fam, skills=[], plan_needed=False, risk_floor=0, memory_types=[], confidence=1.0, latency_ms=0.0,  # noqa: E731
@@ -564,7 +565,7 @@ class Agent:
         finally:
             self._clarify = saved
 
-    async def _scroll_turn(self, request: str, t0: float, tm: dict[str, int], *, explicit_only: bool = False) -> TurnResult | None:
+    async def _scroll_turn(self, request: str, t0: float, tm: dict[str, int], *, explicit_only: bool = False, route: Any = None) -> TurnResult | None:
         """Skill Scrolls (FR2.4): route by the headers only, load the one chosen scroll in full, and answer as that specialist. Text out only: nothing is sent or changed."""
         lib = self.scrolls.lib
         em = EXPLICIT_SCROLL.search(request)
@@ -573,7 +574,7 @@ class Agent:
             why = "has not been approved yet. Open Sources > Skill scrolls, read it, and approve it." if lib.status(named) == "pending" else "is switched off. You can turn it back on in Sources > Skill scrolls."
             dec = RouteDecision(tier="L1", intent_family="scroll", skills=[], plan_needed=False, risk_floor=0, memory_types=[], confidence=1.0, latency_ms=0.0, backend="scroll", trace=["Scrolls are untrusted until a person approves the exact text"])
             return TurnResult("L1", dec, None, None, (time.perf_counter() - t0) * 1000, answer=Answered(f"The scroll {named.name} {why}", notes=["scroll_not_approved"]), timings=tm)
-        r = await lib.route(request)
+        r = route or await lib.route(request)
         if r is None or (explicit_only and not r.explicit):
             return None
         text = re.sub(r"\b(?:use|run|apply|with)\s+(?:the\s+)?[a-z0-9-]+\s+(?:scroll|skill)\b(?:\s+(?:on|for|to))?\s*:?", "", request, flags=re.I).strip() or request
@@ -611,7 +612,7 @@ class Agent:
         if self._pending is not None:  # the last turn asked for a missing detail: a short plain reply completes that request
             prev, asked = self._pending
             self._pending = None
-            if time.monotonic() - asked < 240 and len(request.split()) <= 14 and match_intent(request) is None and not self._is_question(request) and not self._is_action_request(request):
+            if time.monotonic() - asked < 240 and len(request.split()) <= 8 and "@" not in request and match_intent(request) is None and not self._is_question(request) and not self._is_action_request(request):
                 request = f"{prev} {request}"
         tm: dict[str, int] = {}
         mark = lambda name, since: tm.__setitem__(name, round((time.perf_counter() - since) * 1000))  # noqa: E731
@@ -648,6 +649,9 @@ class Agent:
             return TurnResult("L1", dec, None, None, (time.perf_counter() - t0) * 1000, answer=Answered(CAPABILITIES))
         if self.scrolls is not None and trust == "user_direct" and EXPLICIT_SCROLL.search(request) and (sc := await self._scroll_turn(request, t0, tm, explicit_only=True)) is not None:
             return sc
+        self._sroute = None
+        if self.scrolls is not None and trust == "user_direct" and strong is None and not EXPLICIT_SCROLL.search(request):
+            self._sroute = await self.scrolls.lib.route(request)  # decided below, after the readings: a request to DO something is never turned into a text-only scroll
         self._said_action = False
         u, steps = None, []
         if self.answerer is not None and trust in ("user_direct", "agent") and request.strip():

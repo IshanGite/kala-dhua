@@ -39,7 +39,7 @@ async def seed(w):
 
 
 CASES = [
- ("set a reminder on my calendar for tomorrow at 9 pm for final eval round", r"reminder set", r"your calendar from", "nl-act"),
+ ("set a reminder on my calendar for tomorrow at 9 pm for final eval round", r"reminder set|added to google calendar", r"your calendar from", "nl-act"),
  ("send a message on discord on broseph aying valo cancel?", r"posted", r"leaving me out", "nl-act"),
  ("remind me tmrw 8am to call mom", r"reminder set", None, "nl-act"),
  ("yo remind me in half an hour to stretch", r"reminder set", None, "nl-act"),

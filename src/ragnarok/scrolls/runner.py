@@ -78,11 +78,11 @@ class ScrollRunner:
             return ScrollResult(f"The scroll {name} has not been approved yet. Open Sources > Skill scrolls, read it, and approve it.", name, ok=False)
         return await self.run_scroll(s, text, _depth=_depth, _seen=_seen)
 
-    async def run_scroll(self, s: Scroll, text: str, *, _depth: int = 0, _seen: tuple[str, ...] = ()) -> ScrollResult:
+    async def run_scroll(self, s: Scroll, text: str, *, _depth: int = 0, _seen: tuple[str, ...] = (), use_tools: bool = True) -> ScrollResult:
         """Runs a scroll object. Callers have checked approval; the dreaming phase also uses it to TEST a draft before proposing it (a draft is never used for a real request)."""
         name = s.name
         h, f = s.approx_tokens()
-        ctx = await self._context(s, text)
+        ctx = await self._context(s, text) if use_tools else ""  # a self-test is hermetic: it must not depend on what happens to be in memory
         user = (f"Context (data):\n<<<\n{ctx}\n>>>\n\n" if ctx else "") + f"Request:\n<<<\n{text[:3500]}\n>>>"
         notes: list[str] = []
         role = ROLE[s.min_model]
@@ -134,7 +134,7 @@ class ScrollRunner:
     async def test_scroll(self, s: Scroll) -> tuple[int, int, list[dict[str, Any]]]:
         passed, detail = 0, []
         for ex in s.examples:
-            res = await self.run_scroll(s, ex.input)
+            res = await self.run_scroll(s, ex.input, use_tools=False)
             low, words = res.text.lower(), len(res.text.split())
             problems = [f"missing '{c}'" for c in ex.contains if c.lower() not in low] + [f"contains '{c}'" for c in ex.not_contains if c.lower() in low]
             if ex.max_words and words > ex.max_words:

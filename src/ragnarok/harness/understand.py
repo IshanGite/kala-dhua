@@ -82,10 +82,16 @@ async def understand(gateway: Gateway, text: str, history: list[tuple[str, str]]
         last = next((c for r, c in reversed(history) if r == "user"), "")
         if last:
             ctx = f'(the previous user message was: "{last[:120]}")\n'
-    try:
-        out = await gateway.chat(role="arbiter", messages=[{"role": "system", "content": SYSTEM}, {"role": "user", "content": ctx + text[:600]}], schema=SCHEMA, max_tokens=60,
-                                 deadline=get_clock().monotonic() + 12, priority=Priority.INTERACTIVE, seed=0, temperature=0.0)
-    except ModelError:
+    out = None
+    for attempt in range(2):
+        try:
+            out = await gateway.chat(role="arbiter", messages=[{"role": "system", "content": SYSTEM}, {"role": "user", "content": ctx + text[:600]}], schema=SCHEMA, max_tokens=60,
+                                     deadline=get_clock().monotonic() + (12 if attempt == 0 else 25), priority=Priority.INTERACTIVE, seed=0, temperature=0.0)
+            break
+        except ModelError:
+            if attempt:
+                return None
+    if out is None:
         return None
     d = out.parsed or {}
     intent = d.get("intent")

@@ -24,7 +24,8 @@ from ragnarok.llm_gateway.client import Gateway, Priority
 from ragnarok.scrolls.format import Scroll, ScrollError, parse
 
 ROUTE_MIN = 0.62  # cosine similarity to the closest trigger sentence needed before a scroll takes a message
-ROUTE_MARGIN = 0.04  # and how far ahead of the runner-up it must be
+ROUTE_MARGIN = 0.04
+ROUTE_STRONG = 0.75  # a message this close to a scroll's own example takes it even when it also looks like a summary or a lookup  # and how far ahead of the runner-up it must be
 EXPLICIT = re.compile(r"\b(?:use|run|apply|with)\s+(?:the\s+)?([a-z][a-z0-9-]{2,40})\s+(?:scroll|skill)\b|\bscroll\s+([a-z][a-z0-9-]{2,40})\b", re.I)
 
 
@@ -34,6 +35,7 @@ class Route:
     score: float
     runner_up: float
     explicit: bool = False
+    strong: bool = False
 
 
 class ScrollLibrary:
@@ -232,13 +234,15 @@ class ScrollLibrary:
         if self._gw is None:
             return None
         try:
-            q = (await self._gw.embed([request[:600]], deadline=get_clock().monotonic() + 5, priority=Priority.INTERACTIVE))[0]
-            q = q / max(float(np.linalg.norm(q)), 1e-9)
+            head = re.split(r"[:\n]", request.strip(), maxsplit=1)[0][:200]  # 'summarize these meeting notes: <pasted notes>': the ask is the part before the paste
+            cands = [request[:600]] + ([head] if head and head != request.strip()[:600] and len(head) >= 8 else [])
+            qs = await self._gw.embed(cands, deadline=get_clock().monotonic() + 5, priority=Priority.INTERACTIVE)
+            qs = qs / np.maximum(np.linalg.norm(qs, axis=1, keepdims=True), 1e-9)
             scores: list[tuple[float, str]] = []
             for s in usable.values():
                 mat = await self._matrix(s)
-                if mat is not None and mat.shape[1] == q.shape[0]:
-                    scores.append((float(np.max(mat @ q)), s.name))
+                if mat is not None and mat.shape[1] == qs.shape[1]:
+                    scores.append((float(np.max(mat @ qs.T)), s.name))
         except Exception as exc:  # noqa: BLE001 - routing is an optimisation, never a failure
             log("scroll_route_failed", err=type(exc).__name__)
             return None
@@ -248,4 +252,4 @@ class ScrollLibrary:
         second = scores[1][0] if len(scores) > 1 else 0.0
         if scores[0][0] - second < ROUTE_MARGIN and second >= ROUTE_MIN:
             return None  # two scrolls fit equally well: better to answer normally than to pick one at random
-        return Route(scores[0][1], scores[0][0], second)
+        return Route(scores[0][1], scores[0][0], second, strong=scores[0][0] >= ROUTE_STRONG)

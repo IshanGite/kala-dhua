@@ -9,6 +9,8 @@ triggers:
   - help me choose between two options
   - which option is better
   - weigh up these two choices
+  - should I pick this or that
+  - which is better, option A or option B
   - pros and cons of
   - should I choose this or that
   - compare these two options

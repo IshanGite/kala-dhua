@@ -118,10 +118,16 @@ async def parse_steps(gateway: Gateway, text: str) -> list[Step]:
     from datetime import datetime
 
     stamp = datetime.fromtimestamp(get_clock().now_ms() / 1000).astimezone().strftime("%A %Y-%m-%d %H:%M")
-    try:
-        out = await gateway.chat(role="arbiter", messages=[{"role": "system", "content": STEPS_SYSTEM + f"\nNow: {stamp}."}, {"role": "user", "content": text[:900]}], schema=STEPS_SCHEMA, max_tokens=420,
-                                 deadline=get_clock().monotonic() + 20, priority=Priority.INTERACTIVE, seed=0, temperature=0.0)
-    except ModelError:
+    out = None
+    for attempt in range(2):  # one retry: a model that was just swapped in can miss the first deadline
+        try:
+            out = await gateway.chat(role="arbiter", messages=[{"role": "system", "content": STEPS_SYSTEM + f"\nNow: {stamp}."}, {"role": "user", "content": text[:900]}], schema=STEPS_SCHEMA, max_tokens=420,
+                                     deadline=get_clock().monotonic() + (20 if attempt == 0 else 30), priority=Priority.INTERACTIVE, seed=0, temperature=0.0)
+            break
+        except ModelError:
+            if attempt:
+                return []
+    if out is None:
         return []
     steps: list[Step] = []
     for d in ((out.parsed or {}).get("steps") or [])[:4]:
