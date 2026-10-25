@@ -41,7 +41,7 @@ tab("chat");
 check("after the click the event is reported as added", await waitFor(() => /Added to Google Calendar: call with Priya/.test(doc.getElementById("log").textContent)));
 
 tab("msg");
-check("Messages lists what was read, with an open-in-app link", await waitFor(() => /signed contract/.test(doc.getElementById("msgs").textContent) && [...doc.querySelectorAll("#msgs a")].some((a) => a.href.startsWith("https://mail.google.com"))));
+check("Memory lists what was read, with an open-in-app link", await waitFor(() => /signed contract/.test(doc.getElementById("msgs").textContent) && [...doc.querySelectorAll("#msgs a")].some((a) => a.href.startsWith("https://mail.google.com"))));
 const del = [...doc.querySelectorAll("#msgs .row")].find((r) => /standup/.test(r.textContent));
 if (del) click([...del.querySelectorAll("button")].find((b) => b.textContent === "Delete"));
 const confirm = await waitFor(() => [...doc.querySelectorAll("#msgs button")].find((b) => b.textContent === "Delete permanently"));
@@ -51,7 +51,14 @@ check("after confirming, the message is gone and the receipt says verified", awa
 
 tab("inb");
 check("the Inbox shows what the agent noticed on its own", await waitFor(() => /Needs your attention: Dev/.test(doc.getElementById("ibox").textContent)));
-check("the Inbox badge counts unread items", await waitFor(() => /\(\d+\)/.test(doc.getElementById("ibadge").textContent)));
+check("the Inbox badge counts unread items", await waitFor(() => /^\d+$/.test(doc.getElementById("ibadge").textContent)));
+tab("dig");
+check("the Digest groups what was read into contexts with summaries", await waitFor(() => doc.querySelectorAll("#digbox .card").length >= 2 && /contract/i.test(doc.getElementById("digbox").textContent)));
+check("the Digest flags what needs you and counts apps", await waitFor(() => /Needs you/.test(doc.getElementById("digbox").textContent) && /item\(s\) from \d+ app/.test(doc.getElementById("digbox").textContent)));
+click([...doc.querySelectorAll("#view button")].find((b) => b.dataset.v === "tl"));
+check("the Digest timeline lists entries by day", await waitFor(() => /Today/.test(doc.getElementById("digbox").textContent) && doc.querySelectorAll("#digbox .tl").length >= 2));
+click([...doc.querySelectorAll("#range button")].find((b) => b.dataset.h === "168"));
+check("the range chips reload the Digest", await waitFor(() => /week|7 days|168|Today/.test(doc.getElementById("digbox").textContent)));
 tab("src");
 check("Sources shows skills and proactive settings", await waitFor(() => /reminder.add/.test(doc.getElementById("src").textContent) && doc.getElementById("briefat")));
 const sw = doc.getElementById("sw"); click(sw);

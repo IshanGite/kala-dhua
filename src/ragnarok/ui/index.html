@@ -6,63 +6,113 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; img-src data:">
 <title>Ragnarok</title>
 <style>
-:root{--bg:#f6f5f2;--panel:#fff;--ink:#1c1b19;--mute:#6e6b64;--line:#e4e1d9;--accent:#1f5f4a;--accent-ink:#fff;--warn:#a65b00;--bad:#a42d2d;--chip:#edeae1}
-@media (prefers-color-scheme:dark){:root{--bg:#17181a;--panel:#1f2124;--ink:#ecebe7;--mute:#9a978f;--line:#2e3034;--accent:#5fbf9d;--accent-ink:#0c1a14;--warn:#e0a24a;--bad:#e27a7a;--chip:#2a2d30}}
+:root{--bg:#f4f3ef;--panel:#fff;--ink:#1b1a18;--mute:#6b6862;--line:#e3e0d8;--accent:#1f5f4a;--accent2:#e6f1ec;--accent-ink:#fff;--warn:#a65b00;--warn2:#fbf0dc;--bad:#a42d2d;--chip:#edeae1;--shadow:0 1px 2px #0001,0 4px 14px #0000000a;--r:12px}
+@media (prefers-color-scheme:dark){:root{--bg:#141517;--panel:#1d1f22;--ink:#ecebe7;--mute:#9b9890;--line:#2c2e32;--accent:#5fbf9d;--accent2:#1c2b25;--accent-ink:#0c1a14;--warn:#e0a24a;--warn2:#2e2616;--bad:#e27a7a;--chip:#2a2d30;--shadow:0 1px 2px #0006}}
 *{box-sizing:border-box}html,body{height:100%;margin:0}
-body{background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;display:flex;flex-direction:column}
-header{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--panel);border-bottom:1px solid var(--line)}
-h1{font-size:15px;margin:0;font-weight:650;letter-spacing:.2px;flex:1}
-.dot{width:9px;height:9px;border-radius:50%;background:var(--mute)}.dot.on{background:var(--accent)}.dot.off{background:var(--warn)}
-.sw{position:relative;width:42px;height:24px;border-radius:12px;background:var(--line);border:0;cursor:pointer;padding:0}
+body{background:var(--bg);color:var(--ink);font:14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;display:flex;flex-direction:column;-webkit-font-smoothing:antialiased}
+header{display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line)}
+h1{font-size:16px;margin:0;font-weight:700;letter-spacing:.2px}
+.grow{flex:1;min-width:0}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--mute);flex:none}.dot.on{background:var(--accent);box-shadow:0 0 0 0 var(--accent);animation:pulse 2.2s infinite}.dot.off{background:var(--warn)}
+@keyframes pulse{0%{box-shadow:0 0 0 0 #1f5f4a55}70%{box-shadow:0 0 0 7px #1f5f4a00}100%{box-shadow:0 0 0 0 #1f5f4a00}}
+.sw{position:relative;width:42px;height:24px;border-radius:12px;background:var(--line);border:0;cursor:pointer;padding:0;flex:none}
 .sw::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:var(--panel);transition:left .15s;box-shadow:0 1px 2px #0004}
 .sw[aria-checked=true]{background:var(--accent)}.sw[aria-checked=true]::after{left:21px}
-nav{display:flex;background:var(--panel);border-bottom:1px solid var(--line)}
-nav button{flex:1;padding:9px 0;border:0;background:none;color:var(--mute);font:inherit;cursor:pointer;border-bottom:2px solid transparent}
+nav{display:flex;gap:2px;padding:0 8px;background:var(--panel);border-bottom:1px solid var(--line);overflow-x:auto}
+nav button{padding:10px 12px;border:0;background:none;color:var(--mute);font:inherit;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}
+nav button:hover{color:var(--ink)}
 nav button[aria-selected=true]{color:var(--ink);border-bottom-color:var(--accent);font-weight:600}
+.bdg{display:inline-block;min-width:18px;padding:0 5px;margin-left:3px;border-radius:9px;background:var(--accent);color:var(--accent-ink);font-size:11px;text-align:center}.bdg:empty{display:none}
 main{flex:1;overflow:hidden;display:flex;flex-direction:column;min-height:0}
 section{display:none;flex:1;min-height:0;flex-direction:column}section.show{display:flex}
-#log,#feed,#src{flex:1;overflow:auto;padding:12px 14px}
-.msg{max-width:92%;padding:8px 11px;border-radius:12px;margin:0 0 9px;white-space:pre-wrap;word-wrap:break-word}
-.me{background:var(--accent);color:var(--accent-ink);margin-left:auto;border-bottom-right-radius:3px}
-.bot{background:var(--panel);border:1px solid var(--line);border-bottom-left-radius:3px}
+.pad{flex:1;overflow:auto;padding:14px 16px}
+.bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 16px 0}
+.msg{max-width:88%;padding:9px 13px;border-radius:14px;margin:0 0 10px;white-space:pre-wrap;word-wrap:break-word;box-shadow:var(--shadow)}
+.me{background:var(--accent);color:var(--accent-ink);margin-left:auto;border-bottom-right-radius:4px}
+.bot{background:var(--panel);border:1px solid var(--line);border-bottom-left-radius:4px}
+.bot.wait{color:var(--mute)}
 .cites{margin-top:6px;display:flex;flex-wrap:wrap;gap:4px}.chip{background:var(--chip);color:var(--mute);border-radius:9px;padding:1px 8px;font-size:11.5px}
-.sys{color:var(--mute);font-size:12.5px;text-align:center;margin:4px 0 10px}
-form{display:flex;gap:8px;padding:10px 12px;background:var(--panel);border-top:1px solid var(--line)}
-input[type=text]{flex:1;padding:9px 11px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:inherit}
-input:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
-.btn{padding:8px 13px;border-radius:9px;border:1px solid var(--line);background:var(--panel);color:var(--ink);font:inherit;cursor:pointer}
+.sug{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:16px;padding:6px 12px;font:inherit;font-size:13px;cursor:pointer}
+.sug:hover{border-color:var(--accent);background:var(--accent2)}
+.hello{text-align:center;color:var(--mute);margin:18px 0 14px}.hello b{display:block;color:var(--ink);font-size:18px;margin-bottom:4px}
+.sugs{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:14px}
+form{display:flex;gap:8px;padding:10px 12px;background:var(--panel);border-top:1px solid var(--line);align-items:center}
+input[type=text],input[type=time],textarea{flex:1;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:inherit}
+input:focus-visible,button:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.btn{padding:8px 13px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--ink);font:inherit;cursor:pointer}
+.btn:hover{border-color:var(--accent)}.btn:disabled{opacity:.5;cursor:default}
 .btn.pri{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
-.row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line)}.row .grow{flex:1;min-width:0}
-.small{font-size:12px;color:var(--mute)}.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:10px}
-h2{font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:var(--mute);margin:14px 0 6px;font-weight:600}
-.ok{color:var(--accent)}.err{color:var(--bad)}
+.btn.icon{padding:8px 10px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button{border:0;background:var(--panel);color:var(--mute);padding:6px 11px;font:inherit;cursor:pointer}
+.seg button[aria-pressed=true]{background:var(--accent);color:var(--accent-ink)}
+.row{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--line)}
+.small{font-size:12px;color:var(--mute)}.err{color:var(--bad)}.ok{color:var(--accent)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;margin-bottom:10px;box-shadow:var(--shadow)}
+.card.need{border-left:4px solid var(--warn)}
+.card h3{margin:0 0 2px;font-size:14.5px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.tag{font-size:11px;border-radius:8px;padding:1px 7px;background:var(--chip);color:var(--mute);font-weight:500}
+.tag.warn{background:var(--warn2);color:var(--warn);font-weight:600}
+.tag.src{background:var(--accent2);color:var(--accent)}
+.sum{margin:6px 0}
+.pts{margin:6px 0 0;padding-left:18px}.pts li{margin:2px 0}
+.items{margin-top:8px;border-top:1px dashed var(--line);padding-top:6px}
+.it{padding:5px 0;font-size:13px;display:flex;gap:8px}.it .n{color:var(--mute);width:22px;flex:none}
+.link{color:var(--accent);cursor:pointer;background:none;border:0;padding:0;font:inherit;font-size:12.5px;text-decoration:underline}
+h2{font-size:11.5px;text-transform:uppercase;letter-spacing:.7px;color:var(--mute);margin:16px 0 8px;font-weight:650}
+.overview{background:var(--accent2);border-radius:var(--r);padding:10px 14px;margin-bottom:12px}
+.tl-day{font-weight:700;margin:14px 0 4px}.tl-part{font-size:11.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--mute);margin:8px 0 2px}
+.tl{display:flex;gap:10px;padding:4px 0 4px 12px;border-left:2px solid var(--line);font-size:13px}.tl .t{color:var(--mute);width:42px;flex:none}
+.live{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:var(--mute)}.live.good{background:var(--accent)}.live.bad{background:var(--bad)}
+.spin{display:inline-block;width:12px;height:12px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;vertical-align:-2px;margin-right:6px}
+@keyframes sp{to{transform:rotate(360deg)}}
+.hint{background:var(--warn2);border-radius:var(--r);padding:10px 14px;margin-bottom:10px}
+.shot{max-height:150px;border-radius:10px;border:1px solid var(--line);margin-bottom:6px;display:block}
 </style>
 </head>
 <body>
 <header>
   <span id="dot" class="dot" title="status"></span>
   <h1>Ragnarok</h1>
-  <span class="small" id="state">connecting</span>
+  <span class="grow small"><span id="state">connecting</span><span id="live"></span></span>
+  <button id="syncb" class="btn" title="Check every connected app right now">Sync now</button>
   <button id="sw" class="sw" role="switch" aria-checked="true" aria-label="Always-on ingestion"></button>
 </header>
 <nav role="tablist">
   <button role="tab" aria-selected="true" data-t="chat">Chat</button>
-  <button role="tab" aria-selected="false" data-t="inb">Inbox <span id="ibadge" class="small"></span></button>
-  <button role="tab" aria-selected="false" data-t="msg">Messages</button>
-  <button role="tab" aria-selected="false" data-t="appr">Approvals <span id="badge" class="small"></span></button>
+  <button role="tab" aria-selected="false" data-t="dig">Digest</button>
+  <button role="tab" aria-selected="false" data-t="inb">Inbox <span id="ibadge" class="bdg"></span></button>
+  <button role="tab" aria-selected="false" data-t="appr">Approvals <span id="badge" class="bdg"></span></button>
+  <button role="tab" aria-selected="false" data-t="msg">Memory</button>
   <button role="tab" aria-selected="false" data-t="act">Activity</button>
   <button role="tab" aria-selected="false" data-t="src">Sources</button>
 </nav>
 <main>
   <section id="chat" class="show">
-    <div id="log" aria-live="polite"><p class="sys">Ask about anything it has read. It answers only from your memory and cites where.</p></div>
-    <form id="f"><input id="q" type="text" autocomplete="off" placeholder="Ask your memory" aria-label="Message" maxlength="4000"><button class="btn pri" type="submit">Send</button></form>
+    <div id="log" class="pad" aria-live="polite">
+      <div class="hello" id="hello"><b>What would you like to know?</b>I answer from what you have connected, and every action waits for your click.</div>
+      <div class="sugs" id="sugs"></div>
+    </div>
+    <form id="f"><button type="button" class="btn icon" id="shotb" title="Explain what is on my screen (3 second countdown)">Explain my screen</button><button type="button" class="btn icon" id="attb" title="Ask a question about a picture">Picture</button><input type="file" id="file" accept="image/png,image/jpeg,image/webp" style="display:none"><input id="q" type="text" autocomplete="off" placeholder="Ask anything, or tell me what to do" aria-label="Message" maxlength="4000"><button class="btn pri" type="submit">Send</button></form>
   </section>
-  <section id="inb"><div style="padding:10px 14px 0;display:flex;gap:8px;align-items:center"><span class="small grow" style="flex:1">What I noticed on my own: meetings, things that need you, your briefing, your triggers.</span><button class="btn" id="idis">Clear all</button></div><div id="ibox" style="flex:1;overflow:auto;padding:8px 14px"></div></section>
-  <section id="msg"><div style="padding:10px 14px 0"><input id="mq" type="text" placeholder="Search what has been read" aria-label="Search messages" maxlength="200" style="width:100%;padding:8px 10px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--ink)"></div><div style="padding:6px 14px"><div class="small" style="font-weight:600">Remembered</div><div id="facts"></div><div class="row"><button class="btn" id="exj">Export JSON</button><button class="btn" id="exm">Export Markdown</button><span class="small" id="exs"></span></div></div><div id="msgs" style="flex:1;overflow:auto;padding:8px 14px"></div></section>
-  <section id="appr"><div id="cards" style="flex:1;overflow:auto;padding:12px 14px"></div></section>
-  <section id="act"><div id="feed"></div></section>
-  <section id="src"><div id="srcbox"></div></section>
+  <section id="dig">
+    <div class="bar">
+      <div class="seg" id="range"><button data-h="1">Hour</button><button data-h="24" aria-pressed="true">Today</button><button data-h="72">3 days</button><button data-h="168">Week</button></div>
+      <div class="seg" id="view"><button data-v="ctx" aria-pressed="true">Contexts</button><button data-v="tl">Timeline</button></div>
+      <span class="grow"></span><span class="small" id="digstamp"></span>
+    </div>
+    <div class="bar" id="srcf"></div>
+    <div class="pad" id="digbox"></div>
+  </section>
+  <section id="inb"><div class="bar"><span class="small grow">What I noticed on my own: meetings, things that need you, your briefing, your triggers.</span><button class="btn" id="idis">Clear all</button></div><div class="pad" id="ibox"></div></section>
+  <section id="appr"><div class="pad" id="cards"></div></section>
+  <section id="msg">
+    <div class="bar"><input id="mq" type="text" placeholder="Search everything that has been read" aria-label="Search messages" maxlength="200"></div>
+    <div class="pad"><h2 style="margin-top:4px">Remembered about you</h2><div id="facts"></div><div class="row"><button class="btn" id="exj">Export JSON</button><button class="btn" id="exm">Export Markdown</button><span class="small" id="exs"></span></div>
+    <h2>Everything read</h2><div id="msgs"></div></div>
+  </section>
+  <section id="act"><div class="pad" id="feed"></div></section>
+  <section id="src"><div class="pad" id="srcbox"></div></section>
 </main>
 <script>
 (function(){
@@ -71,43 +121,84 @@ h2{font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:var(--mute)
   var H={"x-ragnarok-token":tok,"content-type":"application/json"};
   function api(p,body){return fetch(p,body===undefined?{headers:H}:{method:"POST",headers:H,body:JSON.stringify(body)}).then(function(r){return r.json()})}
   function el(t,c,x){var e=document.createElement(t);if(c)e.className=c;if(x!==undefined)e.textContent=x;return e}
+  function $(i){return document.getElementById(i)}
+  function ago(ts){if(!ts)return"never";var s=Math.max(0,(Date.now()-ts)/1000|0);return s<5?"just now":s<60?s+"s ago":s<3600?(s/60|0)+"m ago":s<86400?(s/3600|0)+"h ago":(s/86400|0)+"d ago"}
+  var cur="chat";
   var tabs=document.querySelectorAll("nav button");
-  tabs.forEach(function(b){b.onclick=function(){tabs.forEach(function(o){o.setAttribute("aria-selected",o===b)});document.querySelectorAll("section").forEach(function(s){s.classList.toggle("show",s.id===b.dataset.t)})}});
-  var log=document.getElementById("log"),q=document.getElementById("q");
-  function add(cls,text,cites){var m=el("div","msg "+cls,text);if(cites&&cites.length){var c=el("div","cites");cites.forEach(function(x){c.appendChild(el("span","chip","["+x.n+"] "+(x.citation||x.kind||"memory")))});m.appendChild(c)}log.appendChild(m);log.scrollTop=log.scrollHeight;return m}
+  function goto(t){cur=t;tabs.forEach(function(o){o.setAttribute("aria-selected",o.dataset.t===t)});document.querySelectorAll("section").forEach(function(s){s.classList.toggle("show",s.id===t)});
+    if(t==="dig")loadDigest();if(t==="inb")loadInbox();if(t==="msg"){loadMsgs();loadFacts()}if(t==="appr")pullCards();if(t==="src")refresh()}
+  tabs.forEach(function(b){b.onclick=function(){goto(b.dataset.t)}});
+
+  /* ---------------- chat ---------------- */
+  var log=$("log"),q=$("q");
+  var SUGS=["Catch me up on today","What needs my attention?","Explain my screen","What did I ask you today?","What's on my calendar tomorrow?"];
+  SUGS.forEach(function(s){var b=el("button","sug",s);b.type="button";b.onclick=function(){if(s==="Explain my screen")explainScreen();else send(s)};$("sugs").appendChild(b)});
+  function intro(){var h=$("hello");if(h){h.remove();$("sugs").remove()}}
+  function add(cls,text,cites){intro();var m=el("div","msg "+cls,text);if(cites&&cites.length){var c=el("div","cites");cites.forEach(function(x){c.appendChild(el("span","chip","["+x.n+"] "+(x.citation||x.kind||"memory")))});m.appendChild(c)}log.appendChild(m);log.scrollTop=log.scrollHeight;return m}
+  function waiting(text){var m=add("bot wait","");m.appendChild(el("span","spin"));m.appendChild(document.createTextNode(text||"Working on it..."));return m}
+  function setWait(w,t){w.textContent="";w.appendChild(el("span","spin"));w.appendChild(document.createTextNode(t))}
   function show(w,d){w.remove();var t=d.ok===false?"The agent is not ready ("+(d.error||"error")+").":d.text;var m=add("bot",t,d.citations);
     if(d.ok!==false&&d.tier){var meta=el("div","small",d.tier+" via "+d.backend+(d.ms?" - "+d.ms+" ms":"")+(d.learned==="promoted"?" - learned a route":d.learned==="route_used"?" - stored route":"")+"  ");
       if(d.why&&d.why.length){var wl=el("a","small","Why?");wl.href="#";var pre=el("div","small",d.why.join("\n"));pre.style.cssText="white-space:pre-wrap;display:none;margin-top:4px;border-left:2px solid var(--line);padding-left:8px";wl.onclick=function(ev){ev.preventDefault();pre.style.display=pre.style.display==="none"?"block":"none"};meta.appendChild(wl);m.appendChild(meta);m.appendChild(pre)}else m.appendChild(meta)}}
-  function poll(w,job,n){api("/chat/"+job).then(function(d){if(d.pending&&n<400){if(d.text)w.firstChild.textContent=d.text+" (still waiting - see the Approvals tab)";setTimeout(function(){poll(w,job,n+1)},1000)}else show(w,d)}).catch(function(){w.remove();add("bot","Lost contact with the agent.")})}
-  document.getElementById("f").onsubmit=function(e){e.preventDefault();var t=q.value.trim();if(!t)return;q.value="";add("me",t);var w=add("bot","Working on it...");
-    api("/chat",{text:t}).then(function(d){if(d.pending){w.firstChild.textContent=(d.text?d.text+" ":"")+"Waiting for your OK - check the Approvals tab.";poll(w,d.job,0)}else show(w,d)}).catch(function(){w.remove();add("bot","Could not reach the agent.")})};
-  var sw=document.getElementById("sw");
+  function poll(w,job,n){api("/chat/"+job).then(function(d){if(d.pending&&n<400){setWait(w,(d.text?d.text+" ":"")+"Waiting for your OK - see the Approvals tab.");setTimeout(function(){poll(w,job,n+1)},1000)}else show(w,d)}).catch(function(){w.remove();add("bot","Lost contact with the agent.")})}
+  function send(t){t=(t||"").trim();if(!t)return;goto("chat");add("me",t);var w=waiting();
+    api("/chat",{text:t}).then(function(d){if(d.pending){setWait(w,(d.text?d.text+" ":"")+"Waiting for your OK - check the Approvals tab.");poll(w,d.job,0)}else show(w,d)}).catch(function(){w.remove();add("bot","Could not reach the agent.")})}
+  $("f").onsubmit=function(e){e.preventDefault();var t=q.value;q.value="";send(t)};
+  function vision(body,label,thumb){goto("chat");var m=add("me",label);if(thumb){var im=el("img","shot");im.src=thumb;m.insertBefore(im,m.firstChild)}var w=waiting(body.image_b64?"Looking at the picture...":"Looking at your screen...");
+    api("/vision",body).then(function(r){w.remove();if(r.ok)add("bot",r.answer);else add("bot",r.error==="E_SCREEN"?r.detail+" You can also use Picture and choose a screenshot yourself.":(r.detail||"I could not do that ("+r.error+")."))}).catch(function(){w.remove();add("bot","Could not reach the agent.")})}
+  function explainScreen(){var t=q.value.trim();q.value="";var b=$("shotb"),n=3;b.disabled=true;var tick=function(){if(n>0){b.textContent="Capturing in "+n+"...";n--;setTimeout(tick,1000)}else{b.textContent="Explain my screen";b.disabled=false}};tick();
+    var w=waiting("Switch to the window you want explained. Looking in 3 seconds...");api("/vision",{question:t||null,delay_s:3}).then(function(r){w.remove();add("bot",r.ok?r.answer:(r.detail||"I could not do that ("+r.error+")."));if(r.error==="E_SCREEN")showScreenHelp()}).catch(function(){w.remove();add("bot","Could not reach the agent.")})}
+  function showScreenHelp(){var b=el("button","btn","Open Screen Recording settings");b.onclick=function(){api("/system/open?pane=screen",{})};var m=add("bot","");m.appendChild(b)}
+  $("shotb").onclick=explainScreen;
+  $("attb").onclick=function(){$("file").click()};
+  $("file").onchange=function(){var f=this.files[0];this.value="";if(!f)return;if(f.size>10*1024*1024){add("bot","That picture is larger than 10 MB.");return}
+    var rd=new FileReader();rd.onload=function(){var d=rd.result,t=q.value.trim();q.value="";vision({question:t||null,image_b64:String(d).split(",")[1]},t||"What is in this picture?",String(d))};rd.readAsDataURL(f)};
+  q.addEventListener("paste",function(ev){var its=(ev.clipboardData||{}).items||[];for(var i=0;i<its.length;i++){if(its[i].type.indexOf("image/")===0){ev.preventDefault();var f=its[i].getAsFile(),rd=new FileReader();rd.onload=function(){var d=rd.result,t=q.value.trim();q.value="";vision({question:t||null,image_b64:String(d).split(",")[1]},t||"What is in this picture?",String(d))};rd.readAsDataURL(f);return}}});
+
+  /* ---------------- header, sources, live status ---------------- */
+  var sw=$("sw");
   sw.onclick=function(){var on=sw.getAttribute("aria-checked")!=="true";api("/toggle",{enabled:on}).then(refresh)};
-  function ago(ts){var s=Math.max(0,(Date.now()-ts)/1000|0);return s<60?s+"s ago":s<3600?(s/60|0)+"m ago":(s/3600|0)+"h ago"}
+  $("syncb").onclick=function(){var b=$("syncb");b.disabled=true;b.textContent="Syncing...";api("/tick",{}).then(function(){b.disabled=false;b.textContent="Sync now";refresh();if(cur==="dig")loadDigest(true)})};
+  var lastNew=0;
+  function srcState(s){return s.ok===null||s.ok===undefined?["waiting","live"]:s.ok?["live","live good"]:["problem: "+(s.code||"error"),"live bad"]}
+  function renderSources(rt){var box=$("srcbox");var keep=box.scrollTop;box.textContent="";
+    box.appendChild(el("h2","","Connected apps (checked continuously)"));
+    var names=Object.keys(rt.sources||{});
+    if(!names.length)box.appendChild(el("p","small","No sources connected yet. Run: ragnarok connect <name>"));
+    names.forEach(function(n){var s=rt.sources[n],st=srcState(s),r=el("div","row"),g=el("div","grow");var t=el("div","");t.appendChild(el("span",st[1]));t.appendChild(document.createTextNode(n));g.appendChild(t);
+      var ln=s.last_new?("last new "+ago(s.last_new)):"nothing new yet";
+      g.appendChild(el("div","small "+(s.ok===false?"err":""),s.ok===null||s.ok===undefined?"waiting for the first check":s.ok?("checked "+ago(s.at)+" - "+ln+" - every "+(s.interval<1?"moment":s.interval+"s")):("problem: "+(s.code||"error")+" - retrying")));
+      r.appendChild(g);box.appendChild(r)});
+    box.appendChild(el("h2","","Desktop notifications"));var nb=el("div","card");nb.id="notifcard";box.appendChild(nb);loadNotif();
+    box.appendChild(el("h2","","Daily briefing"));
+    var st=el("div","card");st.appendChild(el("div","small","Time of your daily briefing (empty = off)."));
+    var bt=el("input");bt.type="time";bt.id="briefat";bt.style.cssText="margin-top:6px;max-width:150px";st.appendChild(bt);
+    var sv=el("button","btn","Save");sv.style.marginLeft="8px";sv.onclick=function(){var v=bt.value;api("/proactive",v?{briefing_at:v}:{briefing_off:true}).then(function(){sv.textContent="Saved";setTimeout(function(){sv.textContent="Save"},1200)})};st.appendChild(sv);
+    api("/inbox").then(function(d){if(d.settings&&d.settings.briefing_at)bt.value=d.settings.briefing_at});box.appendChild(st);
+    box.appendChild(el("h2","","Skills"));
+    var sk=el("div","card");var skl=el("div");skl.id="skl";sk.appendChild(skl);
+    var rp=el("input");rp.type="text";rp.placeholder="Folder of a skill to register";rp.style.cssText="width:100%;margin-top:8px";sk.appendChild(rp);
+    var rb=el("button","btn","Register");rb.style.marginTop="6px";var rmsg=el("div","small");rb.onclick=function(){if(!rp.value.trim())return;api("/skills/register",{path:rp.value.trim()}).then(function(r){rmsg.textContent=r.ok?("Registered "+r.name+(r.blocked?" - BLOCKED by the install scan":" - turn it on below")):("Not registered: "+(r.detail||r.error));loadSkills()})};sk.appendChild(rb);sk.appendChild(rmsg);
+    box.appendChild(sk);loadSkills();box.scrollTop=keep}
+  function loadNotif(){api("/notifications").then(function(d){var c=$("notifcard");if(!c)return;c.textContent="";
+      if(d.available){c.appendChild(el("div","ok","Allowed. Notifications from the apps you list are read and grouped in the Digest."))}
+      else{var h=el("div","hint");h.appendChild(el("div","","I can not read notifications yet."));h.appendChild(el("div","small",(d.detail||"macOS has not allowed it")+". Allow Full Disk Access for the app that started Ragnarok (for example Terminal), then quit and start it again."));
+        var ob=el("button","btn pri","Open Privacy settings");ob.style.marginTop="8px";ob.onclick=function(){api("/system/open?pane=files",{})};h.appendChild(ob);c.appendChild(h)}
+      c.appendChild(el("div","small","Apps to read (one per line, for example Slack, WhatsApp, Mail):"));
+      var ta=el("textarea");ta.rows=3;ta.style.cssText="width:100%;margin-top:4px";ta.value=(d.apps||[]).join("\n");c.appendChild(ta);
+      var sv=el("button","btn","Save apps");sv.style.marginTop="6px";sv.onclick=function(){api("/notifications",{apps:ta.value.split("\n")}).then(function(){sv.textContent="Saved";setTimeout(function(){sv.textContent="Save apps"},1200)})};c.appendChild(sv)}).catch(function(){})}
   function refresh(){
     api("/status").then(function(d){
       var rt=d.runtime||{},on=!!rt.enabled;sw.setAttribute("aria-checked",on);
-      document.getElementById("dot").className="dot "+(on?"on":"off");document.getElementById("state").textContent=on?"reading continuously":"paused";
-      var box=document.getElementById("srcbox");box.textContent="";
-      var names=Object.keys(rt.sources||{});
-      if(!names.length)box.appendChild(el("p","small","No sources connected yet. Run: ragnarok connect <name>"));
-      names.forEach(function(n){var s=rt.sources[n],r=el("div","row"),g=el("div","grow");g.appendChild(el("div","",n));
-        g.appendChild(el("div","small "+(s.ok===false?"err":""),s.ok===null?"waiting for first sync":s.ok?("last sync "+ago(s.at)+" - "+(s.ingested||0)+" new"):("problem: "+s.code)));
-        r.appendChild(g);r.appendChild(el("span",s.ok?"ok":s.ok===false?"err":"small",s.ok?"OK":s.ok===false?"!":"..."));box.appendChild(r)});
-      var st=el("div","card");st.style.marginTop="12px";st.appendChild(el("div","","Proactive"));var hint=el("div","small","Daily briefing time (empty = off) and system notifications.");st.appendChild(hint);
-      var bt=el("input");bt.type="time";bt.id="briefat";bt.style.cssText="margin-top:6px;padding:6px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)";st.appendChild(bt);
-      var sv=el("button","btn","Save");sv.style.marginLeft="8px";sv.onclick=function(){var v=bt.value;api("/proactive",v?{briefing_at:v}:{briefing_off:true}).then(function(){sv.textContent="Saved";setTimeout(function(){sv.textContent="Save"},1200)})};st.appendChild(sv);
-      api("/inbox").then(function(d){if(d.settings&&d.settings.briefing_at)bt.value=d.settings.briefing_at});box.appendChild(st);
-      var sk=el("div","card");sk.style.marginTop="12px";sk.appendChild(el("div","","Skills"));var skl=el("div");skl.id="skl";sk.appendChild(skl);
-      var rp=el("input");rp.type="text";rp.placeholder="Folder of a skill to register";rp.style.cssText="width:100%;margin-top:8px;padding:6px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)";sk.appendChild(rp);
-      var rb=el("button","btn","Register");rb.style.marginTop="6px";var rmsg=el("div","small");rb.onclick=function(){if(!rp.value.trim())return;api("/skills/register",{path:rp.value.trim()}).then(function(r){rmsg.textContent=r.ok?("Registered "+r.name+(r.blocked?" - BLOCKED by the install scan":" - turn it on below")):("Not registered: "+(r.detail||r.error));loadSkills()})};sk.appendChild(rb);sk.appendChild(rmsg);
-      box.appendChild(sk);loadSkills();
-      var b=document.createElement("div");var sync=el("button","btn","Sync now");sync.onclick=function(){sync.disabled=true;sync.textContent="Syncing...";api("/tick",{}).then(function(){sync.disabled=false;sync.textContent="Sync now";refresh()})};b.style.marginTop="12px";b.appendChild(sync);box.appendChild(b);
+      $("dot").className="dot "+(on?"on":"off");$("state").textContent=on?"reading continuously":"paused";
+      var srcs=rt.sources||{},names=Object.keys(srcs),bad=names.filter(function(n){return srcs[n].ok===false}),newest=0;names.forEach(function(n){if((srcs[n].last_new||0)>newest)newest=srcs[n].last_new});lastNew=newest;
+      $("live").textContent=names.length?(" - "+(names.length-bad.length)+"/"+names.length+" apps healthy"+(newest?" - newest item "+ago(newest):"")):"";
+      if(cur==="src")renderSources(rt);
       renderFeed(rt.held||[]);
-    }).catch(function(){document.getElementById("state").textContent="offline"});
+    }).catch(function(){$("state").textContent="offline"});
     api("/activity").then(function(d){window.__items=d.items||[];renderFeed(window.__held||[])}).catch(function(){});
   }
-  function renderFeed(held){window.__held=held;var f=document.getElementById("feed");f.textContent="";
+  function renderFeed(held){window.__held=held;var f=$("feed");f.textContent="";
     if(held.length){f.appendChild(el("h2","","Waiting for you"));held.forEach(function(h){var c=el("div","card");c.appendChild(el("div","",h.platform+": new sender "+h.handle));c.appendChild(el("div","small","Unknown senders are held until you approve them."));
       var row=el("div","row");var a=el("button","btn pri","Approve"),bl=el("button","btn","Block");
       a.onclick=function(){api("/pairing",{platform:h.platform,handle:h.handle,action:"approve"}).then(refresh)};bl.onclick=function(){api("/pairing",{platform:h.platform,handle:h.handle,action:"block"}).then(refresh)};
@@ -115,47 +206,84 @@ h2{font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:var(--mute)
     f.appendChild(el("h2","","Recent activity"));var items=window.__items||[];if(!items.length)f.appendChild(el("p","small","Nothing yet."));
     items.forEach(function(i){var r=el("div","row"),g=el("div","grow");var line=i.kind==="reminder"?("Reminder: "+i.text):i.kind==="ingested"?("Read "+i.ingested+" new from "+i.source+(i.held?(", "+i.held+" held"):"")):i.kind==="error"?(i.source+": "+i.code):i.kind==="toggle"?("Switched "+i.code):i.kind==="paired"?(i.source+" sender "+i.code):(i.source+" "+i.code);
       g.appendChild(el("div",i.kind==="error"?"err":"",line));g.appendChild(el("div","small",ago(i.ts)));r.appendChild(g);f.appendChild(r)})}
-  function renderCards(items){var box=document.getElementById("cards");box.textContent="";document.getElementById("badge").textContent=items.length?("("+items.length+")"):"";
+
+  /* ---------------- digest ---------------- */
+  var hours=24,view="ctx",srcSel={},lastFp="",lastDig=null;
+  function segs(id,attr,fn){var b=$(id).querySelectorAll("button");b.forEach(function(x){x.onclick=function(){b.forEach(function(o){o.setAttribute("aria-pressed",o===x)});fn(x.dataset[attr])}})}
+  segs("range","h",function(h){hours=+h;lastFp="";loadDigest()});segs("view","v",function(v){view=v;if(lastDig)renderDigest(lastDig)});
+  function loadDigest(force){var s=Object.keys(srcSel).filter(function(k){return srcSel[k]});
+    api("/digest?hours="+hours+(s.length?"&sources="+encodeURIComponent(s.join(",")):"")).then(function(d){if(!force&&d.fingerprint===lastFp&&lastDig)return;lastFp=d.fingerprint;lastDig=d;renderDigest(d)}).catch(function(){})}
+  var openSec={};
+  function renderDigest(d){var box=$("digbox"),keep=box.scrollTop;box.textContent="";$("digstamp").textContent="updated "+ago(d.generated_at);
+    var f=$("srcf");f.textContent="";(d.sources||[]).forEach(function(s){var b=el("button","sug",s);b.type="button";b.style.opacity=srcSel[s]?1:.6;if(srcSel[s])b.style.borderColor="var(--accent)";b.onclick=function(){srcSel[s]=!srcSel[s];lastFp="";loadDigest()};f.appendChild(b)});
+    box.appendChild(el("div","overview",d.overview));
+    if(!d.sections.length){box.appendChild(el("p","small","Nothing in this period yet. New messages appear here within seconds of arriving."));return}
+    if(view==="tl"){(d.timeline||[]).forEach(function(day){box.appendChild(el("div","tl-day",day.day));day.parts.forEach(function(p){box.appendChild(el("div","tl-part",p.name));p.entries.forEach(function(e){var r=el("div","tl");r.appendChild(el("span","t",e.time));var g=el("div","");var h=el("div","");h.appendChild(el("span","tag src",e.source));h.appendChild(document.createTextNode(" "+(e.author?e.author+": ":"")+e.title));g.appendChild(h);g.appendChild(el("div","small",e.snippet));r.appendChild(g);box.appendChild(r)})})});box.scrollTop=keep;return}
+    d.sections.forEach(function(s){var c=el("div","card"+(s.needs_action?" need":""));var h=el("h3","");h.appendChild(document.createTextNode(s.title));if(s.needs_action)h.appendChild(el("span","tag warn","Needs you"));s.sources.forEach(function(x){h.appendChild(el("span","tag src",x))});h.appendChild(el("span","tag",s.count+" item"+(s.count===1?"":"s")));c.appendChild(h);
+      c.appendChild(el("div","small",ago(s.end)+(s.start!==s.end?" - since "+ago(s.start):"")));
+      c.appendChild(el("div","sum",s.summary));
+      if(s.points&&s.points.length){var ul=el("ul","pts");s.points.forEach(function(p){ul.appendChild(el("li","",p.text+(p.cite?" ["+p.cite+"]":"")))});c.appendChild(ul)}
+      (s.warnings||[]).forEach(function(w){c.appendChild(el("div","small err",w))});
+      var row=el("div","row");row.style.borderBottom="0";var tg=el("button","link",openSec[s.id]?"Hide items":"Show "+s.count+" item"+(s.count===1?"":"s"));
+      var ask=el("button","link","Ask about this");ask.onclick=function(){q.value="Tell me more about "+s.title+": ";goto("chat");q.focus()};
+      var items=el("div","items");items.style.display=openSec[s.id]?"block":"none";
+      s.items.forEach(function(it){var r=el("div","it");r.appendChild(el("span","n","["+it.n+"]"));var g=el("div","");g.appendChild(el("div","small",it.source+(it.author?" - "+it.author:"")+" - "+ago(it.ts)));g.appendChild(el("div","",it.snippet));if(it.link){var a=el("a","small","Open in "+it.source);a.href=it.link;a.target="_blank";a.rel="noopener noreferrer";g.appendChild(a)}r.appendChild(g);items.appendChild(r)});
+      tg.onclick=function(){openSec[s.id]=!openSec[s.id];items.style.display=openSec[s.id]?"block":"none";tg.textContent=openSec[s.id]?"Hide items":"Show "+s.count+" item"+(s.count===1?"":"s")};
+      row.appendChild(tg);row.appendChild(ask);c.appendChild(row);c.appendChild(items);box.appendChild(c)});
+    box.scrollTop=keep}
+
+  /* ---------------- approvals ---------------- */
+  function renderCards(items){var box=$("cards");box.textContent="";$("badge").textContent=items.length?String(items.length):"";
     if(!items.length){box.appendChild(el("p","small","Nothing waiting. Anything that sends, posts or changes something outside this computer appears here first, and only goes after you click Approve."));return}
-    items.forEach(function(c){var d=el("div","card");d.appendChild(el("div","",c.headline||c.skill));
-      (c.fields||[]).forEach(function(f){var r=el("div","small",f.name+": "+String(f.value).slice(0,400));r.style.whiteSpace="pre-wrap";d.appendChild(r)});
+    items.forEach(function(c){var d=el("div","card need");d.appendChild(el("h3","",c.headline||c.skill));
+      (c.fields||[]).forEach(function(f){var r=el("div","small",f.name+": "+String(f.value).slice(0,600));r.style.whiteSpace="pre-wrap";d.appendChild(r)});
       if(c.tainted)d.appendChild(el("div","small err","Based on content received from outside - check it carefully."));
       (c.warnings||[]).forEach(function(w){d.appendChild(el("div","small err",w))});
-      var typed=null;if(c.stepup){d.appendChild(el("div","small","Type "+c.stepup.phrase+" to confirm."));typed=el("input");typed.type="text";typed.style.cssText="width:100%;margin-top:6px;padding:6px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)";d.appendChild(typed)}
-      var row=el("div","row"),a=el("button","btn pri","Approve"),n=el("button","btn","Deny");
+      var typed=null;if(c.stepup){d.appendChild(el("div","small","Type "+c.stepup.phrase+" to confirm."));typed=el("input");typed.type="text";typed.style.cssText="width:100%;margin-top:6px";d.appendChild(typed)}
+      var row=el("div","row"),a=el("button","btn pri","Approve"),n=el("button","btn","Deny");row.style.borderBottom="0";
       a.onclick=function(){a.disabled=n.disabled=true;api("/approvals/"+c.id,{action:"approve",phrase:typed?typed.value:null}).then(function(r){if(r.ok===false){d.appendChild(el("div","small err","Not approved: "+(r.error||"refused")));a.disabled=n.disabled=false}else pullCards()})};
       n.onclick=function(){a.disabled=n.disabled=true;api("/approvals/"+c.id,{action:"deny"}).then(pullCards)};
       row.appendChild(a);row.appendChild(n);d.appendChild(row);box.appendChild(d)})}
-  function pullCards(){api("/approvals").then(function(d){renderCards(d.items||[])}).catch(function(){})}
-  function loadMsgs(){var q=document.getElementById("mq").value.trim();api("/messages?limit=60"+(q?"&q="+encodeURIComponent(q):"")).then(function(d){var b=document.getElementById("msgs");b.textContent="";var it=d.items||[];
-      if(!it.length)b.appendChild(el("p","small",q?"Nothing matches.":"Nothing has been read yet. Connected sources are polled every minute."));
+  var cardSig="";
+  function pullCards(){api("/approvals").then(function(d){var it=d.items||[],sig=it.map(function(x){return x.id}).join(",");$("badge").textContent=it.length?String(it.length):"";if(sig===cardSig&&cur!=="appr")return;if(sig===cardSig&&box_has_input())return;cardSig=sig;renderCards(it)}).catch(function(){})}
+  function box_has_input(){var a=document.activeElement;return a&&$("cards").contains(a)}
+
+  /* ---------------- memory ---------------- */
+  function loadMsgs(){var qv=$("mq").value.trim();api("/messages?limit=60"+(qv?"&q="+encodeURIComponent(qv):"")).then(function(d){var b=$("msgs");if(b.querySelector(".card"))return;b.textContent="";var it=d.items||[];
+      if(!it.length)b.appendChild(el("p","small",qv?"Nothing matches.":"Nothing has been read yet. Connected apps are checked continuously."));
       it.forEach(function(m){var r=el("div","row"),g=el("div","grow");g.appendChild(el("div","small",m.source+" - "+(m.title||m.kind)+" - "+ago(m.ts)+(m.trust==="received"?" - from outside":"")));g.appendChild(el("div","",m.preview||""));var dl=el("button","btn","Delete");dl.style.marginTop="4px";dl.onclick=function(){delPreview(m,g,dl)};if(m.deep_link){var l=el("a","small","Open in "+m.source);l.href=m.deep_link;l.target="_blank";l.rel="noopener noreferrer";g.appendChild(l);g.appendChild(document.createTextNode(" "))}g.appendChild(dl);r.appendChild(g);b.appendChild(r)})}).catch(function(){})}
   function delPreview(m,g,btn){btn.disabled=true;api("/memory/delete/preview",{item_ids:[m.id]}).then(function(p){btn.disabled=false;var box=el("div","card");box.appendChild(el("div","small",p.summary||"Permanently delete this?"));
       var row=el("div","row"),ok=el("button","btn pri","Delete permanently"),no=el("button","btn","Cancel");no.onclick=function(){box.remove()};
       ok.onclick=function(){ok.disabled=true;api("/memory/delete",{item_ids:[m.id],token:p.token}).then(function(r){box.textContent="";box.appendChild(el("div","small",r.ok?("Deleted. Verification scan found "+r.residual+" traces left."):("Not deleted: "+(r.error||"refused"))));setTimeout(loadMsgs,1200)})};
       row.appendChild(ok);row.appendChild(no);box.appendChild(row);g.appendChild(box)})}
-  function loadSkills(){api("/skills").then(function(d){var l=document.getElementById("skl");if(!l)return;l.textContent="";(d.items||[]).forEach(function(s){var r=el("div","row"),g=el("div","grow");g.appendChild(el("div","",s.name+(s.builtin?"  (built in)":"")));g.appendChild(el("div","small","risk "+s.tier+" - "+(s.permissions.join(", ")||"no permissions")+(s.blocked?" - BLOCKED by install scan":"")));r.appendChild(g);
+  function loadSkills(){api("/skills").then(function(d){var l=$("skl");if(!l)return;l.textContent="";(d.items||[]).forEach(function(s){var r=el("div","row"),g=el("div","grow");g.appendChild(el("div","",s.name+(s.builtin?"  (built in)":"")));g.appendChild(el("div","small","risk "+s.tier+" - "+(s.permissions.join(", ")||"no permissions")+(s.blocked?" - BLOCKED by install scan":"")));r.appendChild(g);
       if(!s.builtin||!s.enabled){var bt=el("button","btn",s.enabled?"Turn off":"Turn on");bt.disabled=!!s.blocked;bt.onclick=function(){bt.disabled=true;(s.enabled?api("/skills/"+s.name+"/disable",{}):api("/skills/"+s.name+"/enable",{})).then(function(){setTimeout(loadSkills,500)})};r.appendChild(bt)}
       else r.appendChild(el("span","ok small","on"));l.appendChild(r)})}).catch(function(){})}
-  function loadFacts(){api("/memory/facts").then(function(d){var b=document.getElementById("facts");b.textContent="";var it=d.items||[];if(!it.length){b.appendChild(el("div","small","Nothing remembered yet. Say: remember that I prefer morning meetings."));return}
+  function loadFacts(){api("/memory/facts").then(function(d){var b=$("facts");if(b.querySelector("input"))return;b.textContent="";var it=d.items||[];if(!it.length){b.appendChild(el("div","small","Nothing remembered yet. Say: remember that I prefer morning meetings."));return}
       it.slice(0,8).forEach(function(f){var r=el("div","row"),g=el("div","grow");g.appendChild(el("div","small",f.kind+" - from "+f.trust+" - "+f.evidence+" evidence"));var txt=f.kind==="preference"?("you "+f.predicate+" "+f.value):f.kind==="attribute"?("your "+f.predicate+": "+f.value):f.value;g.appendChild(el("div","",txt));
-        var ed=el("button","btn","Edit");ed.onclick=function(){if(g.querySelector("input"))return;var inp=el("input");inp.type="text";inp.value=f.value;inp.style.cssText="width:100%;margin-top:6px;padding:6px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)";
+        var ed=el("button","btn","Edit");ed.onclick=function(){if(g.querySelector("input"))return;var inp=el("input");inp.type="text";inp.value=f.value;inp.style.cssText="width:100%;margin-top:6px";
           var sv=el("button","btn pri","Save");sv.onclick=function(){if(inp.value.trim())api("/memory/facts/"+f.id,{value:inp.value.trim()}).then(loadFacts)};g.appendChild(inp);g.appendChild(sv)};
         var dl=el("button","btn","Forget");dl.onclick=function(){api("/memory/delete/preview",{fact_ids:[f.id]}).then(function(p){var box=el("div","card");box.appendChild(el("div","small",p.summary||"Forget this permanently?"));var rr=el("div","row"),ok=el("button","btn pri","Forget permanently"),no=el("button","btn","Cancel");no.onclick=function(){box.remove()};
           ok.onclick=function(){api("/memory/delete",{fact_ids:[f.id],token:p.token}).then(loadFacts)};rr.appendChild(ok);rr.appendChild(no);box.appendChild(rr);g.appendChild(box)})};
-        var row=el("div","row");row.appendChild(ed);row.appendChild(dl);g.appendChild(row);r.appendChild(g);b.appendChild(r)})}).catch(function(){})}
-  document.getElementById("exj").onclick=function(){var s=document.getElementById("exs");s.textContent="Exporting...";api("/memory/export?fmt=json",{}).then(function(r){s.textContent=r.ok?("Saved "+r.items+" items, "+r.facts+" facts to "+r.path):"Export failed"})};
-  document.getElementById("exm").onclick=function(){var s=document.getElementById("exs");s.textContent="Exporting...";api("/memory/export?fmt=md",{}).then(function(r){s.textContent=r.ok?("Saved to "+r.path):"Export failed"})};
-  var mt;document.getElementById("mq").oninput=function(){clearTimeout(mt);mt=setTimeout(loadMsgs,300)};
-  tabs.forEach(function(b){b.addEventListener("click",function(){if(b.dataset.t==="msg"){loadMsgs();loadFacts()}})});setInterval(function(){if(document.getElementById("msg").classList.contains("show")&&!document.getElementById("mq").value)loadMsgs()},5000);
+        var row=el("div","row");row.style.borderBottom="0";row.appendChild(ed);row.appendChild(dl);g.appendChild(row);r.appendChild(g);b.appendChild(r)})}).catch(function(){})}
+  $("exj").onclick=function(){var s=$("exs");s.textContent="Exporting...";api("/memory/export?fmt=json",{}).then(function(r){s.textContent=r.ok?("Saved "+r.items+" items, "+r.facts+" facts to "+r.path):"Export failed"})};
+  $("exm").onclick=function(){var s=$("exs");s.textContent="Exporting...";api("/memory/export?fmt=md",{}).then(function(r){s.textContent=r.ok?("Saved to "+r.path):"Export failed"})};
+  var mt;$("mq").oninput=function(){clearTimeout(mt);mt=setTimeout(loadMsgs,300)};
+
+  /* ---------------- inbox ---------------- */
   var KIND={attention:"Needs you",heads_up:"Heads-up",briefing:"Briefing",alert:"Alert",reminder:"Reminder",scheduled:"Scheduled"};
-  function loadInbox(){api("/inbox").then(function(d){var it=d.items||[],b=document.getElementById("ibox");b.textContent="";document.getElementById("ibadge").textContent=it.length?("("+it.length+")"):"";
+  function loadInbox(){api("/inbox").then(function(d){var it=d.items||[],b=$("ibox");$("ibadge").textContent=it.length?String(it.length):"";if(cur!=="inb")return;b.textContent="";
       if(!it.length)b.appendChild(el("p","small","Nothing new. Try: every day at 8am catch me up on my emails, or: when I get an email from Dev, tell me."));
-      it.forEach(function(m){var c=el("div","card");c.appendChild(el("div","small",(KIND[m.kind]||m.kind)+" - "+ago(m.ts)+(m.source?" - "+m.source:"")));c.appendChild(el("div","",m.title));var bd=el("div","small",m.body);bd.style.whiteSpace="pre-wrap";c.appendChild(bd);
-        var row=el("div","row");if(m.link){var l=el("a","small","Open");l.href=m.link;l.target="_blank";l.rel="noopener noreferrer";row.appendChild(l)}var x=el("button","btn","Dismiss");x.onclick=function(){api("/inbox/dismiss?item_id="+encodeURIComponent(m.id),{}).then(loadInbox)};row.appendChild(x);c.appendChild(row);b.appendChild(c)})}).catch(function(){})}
-  document.getElementById("idis").onclick=function(){api("/inbox/dismiss",{}).then(loadInbox)};
-  tabs.forEach(function(b){b.addEventListener("click",function(){if(b.dataset.t==="inb")loadInbox()})});setInterval(loadInbox,5000);
-  refresh();pullCards();loadInbox();setInterval(refresh,4000);setInterval(pullCards,1500);
+      it.forEach(function(m){var c=el("div","card"+(m.kind==="attention"||m.kind==="alert"?" need":""));c.appendChild(el("div","small",(KIND[m.kind]||m.kind)+" - "+ago(m.ts)+(m.source?" - "+m.source:"")));c.appendChild(el("div","",m.title));var bd=el("div","small",m.body);bd.style.whiteSpace="pre-wrap";c.appendChild(bd);
+        var row=el("div","row");row.style.borderBottom="0";if(m.link){var l=el("a","small","Open");l.href=m.link;l.target="_blank";l.rel="noopener noreferrer";row.appendChild(l)}var x=el("button","btn","Dismiss");x.onclick=function(){api("/inbox/dismiss?item_id="+encodeURIComponent(m.id),{}).then(loadInbox)};row.appendChild(x);c.appendChild(row);b.appendChild(c)})}).catch(function(){})}
+  $("idis").onclick=function(){api("/inbox/dismiss",{}).then(loadInbox)};
+
+  /* ---------------- live refresh ---------------- */
+  refresh();pullCards();loadInbox();
+  setInterval(refresh,3000);setInterval(pullCards,1500);setInterval(loadInbox,4000);
+  setInterval(function(){if(cur==="dig")loadDigest()},4000);
+  setInterval(function(){if(cur==="msg"&&!$("mq").value)loadMsgs()},5000);
+  document.addEventListener("keydown",function(e){if(e.key==="/"&&document.activeElement.tagName!=="INPUT"&&document.activeElement.tagName!=="TEXTAREA"){e.preventDefault();goto("chat");q.focus()}});
 })();
 </script>
 </body>

@@ -298,6 +298,18 @@ def create_app(guard: TokenGuard | None = None, port: int = DEFAULT_PORT, servic
             return {"sections": [], "timeline": [], "overview": "The digest is not available.", "items": 0}
         return svc.digest.build(max(0.25, min(hours, 24 * 30)), sources={s for s in sources.split(",") if s} if sources else None, topic=topic[:80] if topic else None)
 
+    @app.post("/system/open")
+    async def system_open(pane: str) -> dict[str, Any]:
+        """Opens one fixed System Settings page the app needs (never a path or URL from the caller)."""
+        import subprocess
+        import sys as _sys
+
+        panes = {"files": "Privacy_AllFiles", "screen": "Privacy_ScreenCapture", "notifications": "Privacy_AllFiles"}
+        if pane not in panes or _sys.platform != "darwin":
+            return {"ok": False, "error": "E_UNSUPPORTED"}
+        subprocess.run(["open", f"x-apple.systempreferences:com.apple.preference.security?{panes[pane]}"], check=False, timeout=10)  # noqa: S603, S607
+        return {"ok": True}
+
     @app.post("/vision")
     async def vision(body: VisionIn) -> dict[str, Any]:
         """Typed or clicked by the user only. The picture is used once and never stored; the answer is words, and nothing is executed from it."""
