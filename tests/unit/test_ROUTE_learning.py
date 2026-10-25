@@ -310,3 +310,15 @@ async def test_interactive_timeout_uses_the_embedding_candidate_within_budget(wo
     elapsed = (time.perf_counter() - t0) * 1000
     assert elapsed < 1500 and d.tier in ("L2", "L3")
     assert d.low_confidence or d.tier == "L3"
+
+
+def test_fitted_laya_calibration_file_loads_and_an_unsure_answer_abstains():
+    from pathlib import Path
+
+    from ragnarok.router.calibration import Calibrator
+    from ragnarok.router.types import Answer
+
+    cal = Calibrator.from_file(Path(__file__).resolve().parents[2] / "evidence" / "laya_calibration.json")
+    assert {"skill_family", "injection", "risk_precheck"} <= {k[0] for k in cal.table}
+    unsure = Answer("skill_family", "mail", 0.3, {"mail": 0.3, "files": 0.3, "notes": 0.4})
+    assert not cal.accepts("skill_family", "laya", unsure)

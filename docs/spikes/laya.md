@@ -22,3 +22,14 @@ Windows: no MPS, so CPU (or CUDA if present). Tushar to repeat the timing on the
 Only 1 of 30 family answers and 8 of 30 injection answers reach confidence 0.8; the checkpoint warns that its shipped temperatures are out of range and "confidence is uncalibrated".
 Consequence for the design: until calibration/fine-tuning, most requests escalate to L2 (as designed), and Laya only raises caution (D-07), which is the safe direction. Risk_precheck at 60 % is not usable alone; policy rules decide risk (D-07), Laya's value is advisory.
 Small sample, single labeller: this is a first read, not a benchmark. Next: calibrate on held-out data (temperature scaling in `router/calibration.py`), then the local fine-tune if time allows, and an ablation against Ollama-only.
+
+## Calibration (`scripts/gen_router_data.py`, `scripts/calibrate_laya.py`, output `laya_calibration.json`, table `evidence/laya_calibration.json`)
+Fitted per decision on 199 seeded synthetic requests (temperature scaling, threshold chosen for 95 % precision on accepted answers); evaluated on 167 held-out synthetic requests (same templates: optimistic) and the 30 hand-labelled requests (different distribution: the fair check).
+
+| Decision | T | threshold | hand-labelled: precision when accepted | coverage | accuracy over all |
+|---|---|---|---|---|---|
+| skill_family | 0.6 | 0.678 | 94.1 % | 56.7 % | 83.3 % |
+| injection | 0.5 | 0.558 | 93.1 % | 96.7 % | 90.0 % |
+| risk_precheck | 0.9 | 0.549 | 100 % (2 accepted) | 6.7 % | 60.0 % |
+
+Reading: calibrated Laya answers a bit over half of family decisions at about 94 % precision and sends the rest up the cascade, which is the intended behaviour. Risk is left to policy rules. All samples are small (n = 30 real); do not quote as a benchmark. A local fine-tune on a larger set is the next lever.

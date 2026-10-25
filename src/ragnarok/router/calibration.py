@@ -5,8 +5,10 @@ reach a target precision on held-out examples. Below the threshold the decision 
 
 from __future__ import annotations
 
+import json
 import math
 from dataclasses import dataclass
+from pathlib import Path
 
 from ragnarok.router.backends.base import temper
 from ragnarok.router.types import Answer
@@ -64,6 +66,13 @@ class Calibrator:
 
     def accepts(self, decision: str, backend: str, a: Answer) -> bool:
         return self.adjust(decision, backend, a).probability >= self._get(decision, backend).threshold
+
+    @classmethod
+    def from_file(cls, path: Path) -> Calibrator:
+        """The table written by scripts/calibrate_laya.py: {"decision/backend": {"temperature": t, "threshold": th}}."""
+        raw = json.loads(Path(path).read_text(encoding="utf-8"))
+        table = {tuple(k.split("/", 1)): Calib(float(v["temperature"]), float(v["threshold"])) for k, v in raw.items()}
+        return cls(table)  # type: ignore[arg-type]
 
     def set(self, decision: str, backend: str, temperature: float, threshold: float) -> None:
         self.table[(decision, backend)] = Calib(temperature, threshold)

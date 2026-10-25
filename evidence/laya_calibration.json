@@ -1,0 +1,14 @@
+{
+ "skill_family/laya": {
+  "temperature": 0.6,
+  "threshold": 0.6782468131411098
+ },
+ "injection/laya": {
+  "temperature": 0.5,
+  "threshold": 0.5583994585951626
+ },
+ "risk_precheck/laya": {
+  "temperature": 0.9,
+  "threshold": 0.5485080521565727
+ }
+}

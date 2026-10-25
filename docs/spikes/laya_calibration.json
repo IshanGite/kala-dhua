@@ -1,0 +1,50 @@
+{
+ "device": "mps",
+ "n_synth": 366,
+ "n_calibration": 199,
+ "n_heldout_synth": 167,
+ "n_hand": 30,
+ "seconds": 53,
+ "skill_family": {
+  "temperature": 0.6,
+  "threshold": 0.678,
+  "heldout_synth": {
+   "accuracy_all": 0.701,
+   "coverage": 0.611,
+   "precision_when_accepted": 0.922
+  },
+  "hand_labelled": {
+   "accuracy_all": 0.833,
+   "coverage": 0.567,
+   "precision_when_accepted": 0.941
+  }
+ },
+ "injection": {
+  "temperature": 0.5,
+  "threshold": 0.558,
+  "heldout_synth": {
+   "accuracy_all": 0.916,
+   "coverage": 0.898,
+   "precision_when_accepted": 0.947
+  },
+  "hand_labelled": {
+   "accuracy_all": 0.9,
+   "coverage": 0.967,
+   "precision_when_accepted": 0.931
+  }
+ },
+ "risk_precheck": {
+  "temperature": 0.9,
+  "threshold": 0.549,
+  "heldout_synth": {
+   "accuracy_all": 0.623,
+   "coverage": 0.114,
+   "precision_when_accepted": 0.947
+  },
+  "hand_labelled": {
+   "accuracy_all": 0.6,
+   "coverage": 0.067,
+   "precision_when_accepted": 1.0
+  }
+ }
+}
