@@ -1,0 +1,1 @@
+{"device": "mps", "load_s": 2.3, "one_question": {"p50_ms": 34.5, "max_ms": 36.4, "n": 15}, "ten_questions": {"p50_ms": 255.6, "max_ms": 257.1, "n": 10}, "rss_mb": 396, "listening_ports": [], "offline_load": true, "python": "3.12.15", "host": ""}

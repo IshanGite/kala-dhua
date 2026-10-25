@@ -50,11 +50,26 @@ def from_laya(result: dict[str, Any], questions: list[Question]) -> list[Answer]
     return out
 
 
+def best_device() -> str:
+    """Spike 9 (docs/spikes/laya.md): MPS is ~2x faster than CPU on Apple silicon; CUDA where present; CPU everywhere else (Windows default)."""
+    try:
+        import torch
+
+        if torch.cuda.is_available():
+            return "cuda"
+        if torch.backends.mps.is_available():
+            return "mps"
+    except ImportError:
+        pass
+    return "cpu"
+
+
 class LayaBackend:
     name = "laya"
 
-    def __init__(self, agent: Any | None = None, *, model_id: str = "convaiinnovations/laya", subfolder: str = "typed-decisions") -> None:
+    def __init__(self, agent: Any | None = None, *, model_id: str = "convaiinnovations/laya", subfolder: str = "typed-decisions", device: str | None = None) -> None:
         self._agent = agent
+        self.device = device
         self.model_id, self.subfolder = model_id, subfolder
         self._lock: asyncio.Lock | None = None
 
@@ -77,7 +92,7 @@ class LayaBackend:
                         import laya
                     except ImportError as exc:
                         raise ModelError("laya is not installed (uv sync --extra laya)", code="E_LAYA_MISSING") from exc
-                    return laya.load(self.model_id, subfolder=self.subfolder)
+                    return laya.load(self.model_id, subfolder=self.subfolder, device=self.device or best_device())
 
                 self._agent = await asyncio.to_thread(load)
         return self._agent
