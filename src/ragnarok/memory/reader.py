@@ -106,6 +106,11 @@ class MemoryReader:
     def facts_by_state(self, comp_id: str, state: str) -> list[dict[str, Any]]:
         return [dict(r) for r in self._r.execute("SELECT * FROM facts WHERE compartment_id=? AND state=?", (comp_id, state))]
 
+    def find_conversation(self, source: str, name: str) -> dict[str, Any] | None:
+        """The most recent conversation on a platform whose title matches a name: native_id is 'chat:message' for chat sources."""
+        row = self._r.execute("SELECT native_id, title FROM items WHERE source=? AND title LIKE ? ORDER BY coalesce(occurred_at,0) DESC LIMIT 1", (source, f"%{name}%")).fetchone()
+        return dict(row) if row else None
+
     def chunk_text(self, chunk_id: str) -> str | None:
         r = self._r.execute("SELECT text FROM chunks WHERE id=?", (chunk_id,)).fetchone()
         return r[0] if r else None

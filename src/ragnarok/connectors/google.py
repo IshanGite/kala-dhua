@@ -11,8 +11,10 @@ The refresh token is the read token; sending mail or writing events uses a diffe
 from __future__ import annotations
 
 import base64
+import re
 import tempfile
 from datetime import UTC, datetime, timedelta
+from email.message import EmailMessage
 from email.utils import parseaddr
 from pathlib import Path
 from typing import Any
@@ -114,6 +116,25 @@ def parse_gmail(msg: dict[str, Any]) -> dict[str, Any]:
             "date": int(msg["internalDate"]) if msg.get("internalDate") else None}
 
 
+_ADDR = re.compile(r"^[^@\s<>\",;]+@[^@\s<>\",;]+\.[^@\s<>\",;]+$")
+
+
+def valid_address(addr: str) -> bool:
+    return bool(_ADDR.match(addr or "")) and not any(c in addr for c in "\r\n")
+
+
+def build_raw(to: str, subject: str, body: str) -> str:
+    """A plain-text email as the base64url string Gmail wants. Header values lose line breaks, so a subject can never inject a header."""
+    if not valid_address(to):
+        raise ValueError("not a valid recipient address")
+    m = EmailMessage()
+    m["To"] = to
+    m["Subject"] = " ".join(subject.split())[:200] or "(no subject)"
+    m["Auto-Submitted"] = "auto-generated"
+    m.set_content(body)
+    return base64.urlsafe_b64encode(m.as_bytes()).decode()
+
+
 class Gmail:
     name = "gmail"
     API = "https://gmail.googleapis.com/gmail/v1/users/me"
@@ -149,6 +170,12 @@ class Gmail:
         flags = {"auth_ok": p["auth_ok"], "from": p["from"], "attachments": p["attachments"]}
         return RawItem(source=self.name, native_id=ref.native_id, text=p["text"], trust="received", title=p["subject"] or None, kind="message", visibility="private",
                        thread_id=p["thread"], occurred_at=p["date"], html_hidden=p["hidden"], strip_quotes=True, author=p["from_name"] or p["from"], flags=flags)
+
+    async def send(self, write_auth: GoogleAuth, to: str, subject: str, body: str) -> str:
+        r = await request(write_auth.http, "POST", f"{self.API}/messages/send", headers={"Authorization": f"Bearer {await write_auth.token()}"}, json={"raw": build_raw(to, subject, body)})
+        if r.status_code >= 300:
+            raise ConnectorError(f"gmail send {r.status_code}", code="E_GOOGLE")
+        return str(r.json().get("id", ""))
 
     def actions(self) -> list[ActionSpec]:
         return [ActionSpec("mail.send", "Send an email", {"to": "string", "subject": "string", "body": "string"}, tier=3)]

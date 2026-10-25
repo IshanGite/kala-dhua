@@ -1,0 +1,79 @@
+{
+  "name": "mail.draft",
+  "version": "0.1.0",
+  "description": "Use when the user wants an email written or a reply drafted but not sent.",
+  "entrypoint": {
+    "type": "native",
+    "action": "mail.draft"
+  },
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "to": {
+        "type": "string",
+        "maxLength": 200
+      },
+      "subject": {
+        "type": "string",
+        "maxLength": 200
+      },
+      "body": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 5000
+      }
+    },
+    "required": [
+      "to",
+      "body"
+    ],
+    "additionalProperties": false
+  },
+  "permissions": [
+    {
+      "permission": "mail.draft"
+    }
+  ],
+  "side_effects": "reversible",
+  "dry_run": true,
+  "examples": [
+    {
+      "params": {
+        "to": "priya@acme.com",
+        "subject": "Invoice",
+        "body": "Hi Priya, attached is the invoice."
+      },
+      "note": "draft an email to Priya about the invoice"
+    },
+    {
+      "params": {
+        "to": "priya@acme.com",
+        "subject": "Invoice",
+        "body": "Hi Priya, attached is the invoice."
+      },
+      "note": "write a reply to the vendor but do not send it"
+    },
+    {
+      "params": {
+        "to": "priya@acme.com",
+        "subject": "Invoice",
+        "body": "Hi Priya, attached is the invoice."
+      },
+      "note": "prepare a follow-up email for Dev"
+    },
+    {
+      "params": {
+        "to": "priya@acme.com",
+        "subject": "Invoice",
+        "body": "Hi Priya, attached is the invoice."
+      },
+      "note": "compose a message to the finance team"
+    }
+  ],
+  "param_roles": {
+    "free": [
+      "subject",
+      "body"
+    ]
+  }
+}

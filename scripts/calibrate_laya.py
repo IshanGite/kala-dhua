@@ -14,13 +14,13 @@ import laya  # noqa: E402
 
 from ragnarok.router.backends.laya import best_device, from_laya, to_laya_spec  # noqa: E402
 from ragnarok.router.calibration import Calibrator, fit_temperature, fit_threshold  # noqa: E402
-from ragnarok.router.cascade import Q_FAMILY, Q_INJECT, Q_RISK  # noqa: E402
+from ragnarok.router.cascade import Q_FAMILY, Q_INJECT, Q_PLAN, Q_RISK  # noqa: E402
 
-QS = [("skill_family", Q_FAMILY, "family"), ("injection", Q_INJECT, "injection"), ("risk_precheck", Q_RISK, "risk")]
+QS = [("skill_family", Q_FAMILY, "family"), ("injection", Q_INJECT, "injection"), ("risk_precheck", Q_RISK, "risk"), ("needs_plan", Q_PLAN, "plan")]
 spec = to_laya_spec([q for _, q, _ in QS])
 agent = laya.load("convaiinnovations/laya", subfolder="typed-decisions", device=best_device())
 synth = [json.loads(line) for line in Path("evidence/router_synth.jsonl").read_text(encoding="utf-8").splitlines()]
-hand = [dict(text=t, family=f, injection=i, risk=r) for t, f, i, r in json.loads(Path("docs/spikes/laya_eval_set.json").read_text(encoding="utf-8"))]
+hand = [dict(text=t, family=f, injection=i, risk=r, plan=('yes' if ' and ' in t and any(w in t for w in (' then ', ' and email', ' and send')) else 'no')) for t, f, i, r in json.loads(Path("docs/spikes/laya_eval_set.json").read_text(encoding="utf-8"))]
 
 
 def run(rows):
@@ -32,11 +32,13 @@ def run(rows):
 
 
 def truth(name, r):
-    return {"injection": "true" if r["injection"] == "yes" else "false"}.get(name, r["family"] if name == "skill_family" else r["risk"])
+    if name in ("injection", "needs_plan"):
+        return "true" if r["injection" if name == "injection" else "plan"] == "yes" else "false"
+    return r["family"] if name == "skill_family" else r["risk"]
 
 
 def label(name, a):
-    return ("true" if a.value else "false") if name == "injection" else str(a.value)
+    return ("true" if a.value else "false") if name in ("injection", "needs_plan") else str(a.value)
 
 
 t0 = time.time()

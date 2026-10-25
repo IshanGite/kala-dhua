@@ -1,0 +1,40 @@
+{
+  "name": "reminder.list",
+  "version": "0.1.0",
+  "description": "Use when the user asks what reminders or to-dos are open.",
+  "entrypoint": {
+    "type": "native",
+    "action": "reminder.list"
+  },
+  "parameters": {
+    "type": "object",
+    "properties": {},
+    "required": [],
+    "additionalProperties": false
+  },
+  "permissions": [
+    {
+      "permission": "memory.read"
+    }
+  ],
+  "side_effects": "none",
+  "dry_run": false,
+  "examples": [
+    {
+      "params": {},
+      "note": "what reminders do I have"
+    },
+    {
+      "params": {},
+      "note": "show my to-do list"
+    },
+    {
+      "params": {},
+      "note": "what is on my list for today"
+    },
+    {
+      "params": {},
+      "note": "list my open reminders"
+    }
+  ]
+}

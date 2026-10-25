@@ -1,0 +1,83 @@
+{
+  "name": "mail.send",
+  "version": "0.1.0",
+  "description": "Use when the user asks to send an email or reply to an email now.",
+  "entrypoint": {
+    "type": "native",
+    "action": "mail.send"
+  },
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "to": {
+        "type": "string",
+        "maxLength": 200
+      },
+      "subject": {
+        "type": "string",
+        "maxLength": 200
+      },
+      "body": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 5000
+      }
+    },
+    "required": [
+      "to",
+      "subject",
+      "body"
+    ],
+    "additionalProperties": false
+  },
+  "permissions": [
+    {
+      "permission": "mail.send"
+    }
+  ],
+  "side_effects": "irreversible",
+  "dry_run": true,
+  "examples": [
+    {
+      "params": {
+        "to": "priya@acme.com",
+        "subject": "Invoice",
+        "body": "Hi Priya, here is the invoice."
+      },
+      "note": "send an email to priya@acme.com saying the invoice is attached"
+    },
+    {
+      "params": {
+        "to": "priya@acme.com",
+        "subject": "Invoice",
+        "body": "Hi Priya, here is the invoice."
+      },
+      "note": "email Dev that the meeting moved"
+    },
+    {
+      "params": {
+        "to": "priya@acme.com",
+        "subject": "Invoice",
+        "body": "Hi Priya, here is the invoice."
+      },
+      "note": "reply to the vendor email and send it now"
+    },
+    {
+      "params": {
+        "to": "priya@acme.com",
+        "subject": "Invoice",
+        "body": "Hi Priya, here is the invoice."
+      },
+      "note": "forward this to the finance team by email"
+    }
+  ],
+  "param_roles": {
+    "recipients": [
+      "to"
+    ],
+    "free": [
+      "subject",
+      "body"
+    ]
+  }
+}

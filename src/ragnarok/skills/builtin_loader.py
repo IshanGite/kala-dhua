@@ -7,7 +7,9 @@ from pathlib import Path
 from ragnarok.skills.registry import Registered, SkillRegistry
 
 BUILTIN_DIR = Path(__file__).parent / "builtin"
+NATIVE_DIR = Path(__file__).parent / "native"
 
 
 def register_builtins(registry: SkillRegistry) -> list[Registered]:
-    return [registry.register(d, builtin=True) for d in sorted(BUILTIN_DIR.iterdir()) if (d / "manifest.json").exists()]
+    dirs = [d for root in (BUILTIN_DIR, NATIVE_DIR) for d in sorted(root.iterdir()) if (d / "manifest.json").exists()]
+    return [registry.register(d, builtin=True) for d in dirs]

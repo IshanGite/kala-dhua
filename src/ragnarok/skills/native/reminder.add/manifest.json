@@ -1,0 +1,79 @@
+{
+  "name": "reminder.add",
+  "version": "0.1.0",
+  "description": "Use when the user asks to be reminded of something at a time, or to remember a to-do.",
+  "entrypoint": {
+    "type": "native",
+    "action": "reminder.add"
+  },
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "text": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 300,
+        "description": "what to be reminded of, without the time words"
+      },
+      "when": {
+        "type": "string",
+        "maxLength": 80,
+        "description": "the time exactly as the user said it, e.g. 'tomorrow at 5pm' or 'in 2 hours'; empty if no time was given"
+      }
+    },
+    "required": [
+      "text"
+    ],
+    "additionalProperties": false
+  },
+  "permissions": [
+    {
+      "permission": "note.write"
+    }
+  ],
+  "side_effects": "reversible",
+  "dry_run": true,
+  "examples": [
+    {
+      "params": {
+        "text": "call the bank",
+        "when": "tomorrow at 5pm"
+      },
+      "note": "remind me to call the bank tomorrow at 5pm"
+    },
+    {
+      "params": {
+        "text": "call the bank",
+        "when": "tomorrow at 5pm"
+      },
+      "note": "set a reminder to buy milk in 2 hours"
+    },
+    {
+      "params": {
+        "text": "call the bank",
+        "when": "tomorrow at 5pm"
+      },
+      "note": "remind me about the dentist on Friday morning"
+    },
+    {
+      "params": {
+        "text": "call the bank",
+        "when": "tomorrow at 5pm"
+      },
+      "note": "note that I need to renew the permit"
+    },
+    {
+      "params": {
+        "text": "call the bank",
+        "when": "tomorrow at 5pm"
+      },
+      "note": "add a to-do to send the report today"
+    }
+  ],
+  "param_roles": {
+    "free": [
+      "text",
+      "when"
+    ]
+  }
+}

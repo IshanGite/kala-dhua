@@ -43,8 +43,8 @@ def describe_skills(manifests: list[Manifest]) -> str:
 
 
 class Planner:
-    def __init__(self, gateway: Gateway, manifest_of: Callable[[str], Manifest | None]) -> None:
-        self._gw, self._manifest_of = gateway, manifest_of
+    def __init__(self, gateway: Gateway, manifest_of: Callable[[str], Manifest | None], now_text: Callable[[], str] | None = None) -> None:
+        self._gw, self._manifest_of, self._now = gateway, manifest_of, now_text
 
     async def _call(self, messages: list[dict[str, str]], schema: dict[str, Any], deadline: float) -> dict[str, Any]:
         res = await self._gw.chat(role="planner", messages=messages, schema=schema, max_tokens=900, deadline=deadline, priority=Priority.TRIGGERED, seed=0, temperature=0.0)
@@ -53,7 +53,8 @@ class Planner:
     async def plan(self, request: str, shortlist: list[Manifest], *, snippets: list[str], deadline: float) -> PlanResult:
         calls = 0
         ctx = "\n".join(snippets[:8])
-        user = f"Skills:\n{describe_skills(shortlist)}\n\nContext (trust-tagged):\n{ctx}\n\nRequest: {request}"
+        when = f"Current local time: {self._now()}. Write times as ISO 8601 local date-time.\n\n" if self._now else ""
+        user = f"{when}Skills:\n{describe_skills(shortlist)}\n\nContext (trust-tagged):\n{ctx}\n\nRequest: {request}"
         try:
             outline = await self._call([{"role": "system", "content": SYSTEM}, {"role": "user", "content": user + "\n\nFirst give a short outline of at most 6 steps."}], OUTLINE_SCHEMA, deadline)
             calls += 1

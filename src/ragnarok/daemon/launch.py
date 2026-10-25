@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import threading
 import time
@@ -12,13 +13,14 @@ import uvicorn
 from fastapi import FastAPI
 
 from ragnarok.daemon.api import DEFAULT_HOST, create_app
-from ragnarok.daemon.wiring import World
+from ragnarok.daemon.wiring import World, warm_up
 
 
 def make_api(world: World, port: int) -> FastAPI:
     @contextlib.asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         world.runtime.start()
+        asyncio.get_running_loop().create_task(warm_up(world))
         yield
         await world.runtime.stop()
 

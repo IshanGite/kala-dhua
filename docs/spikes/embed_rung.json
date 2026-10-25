@@ -1,0 +1,116 @@
+{
+ "n_tool": 235,
+ "n_general": 15,
+ "grid": [
+  {
+   "sim>=": 0.55,
+   "margin>=": 0.0,
+   "accepted_tool": 168,
+   "tool_correct": 89,
+   "general_wrongly_accepted": 2,
+   "precision_on_tool": 0.53
+  },
+  {
+   "sim>=": 0.55,
+   "margin>=": 0.05,
+   "accepted_tool": 59,
+   "tool_correct": 40,
+   "general_wrongly_accepted": 1,
+   "precision_on_tool": 0.678
+  },
+  {
+   "sim>=": 0.55,
+   "margin>=": 0.1,
+   "accepted_tool": 26,
+   "tool_correct": 19,
+   "general_wrongly_accepted": 0,
+   "precision_on_tool": 0.731
+  },
+  {
+   "sim>=": 0.6,
+   "margin>=": 0.0,
+   "accepted_tool": 93,
+   "tool_correct": 55,
+   "general_wrongly_accepted": 0,
+   "precision_on_tool": 0.591
+  },
+  {
+   "sim>=": 0.6,
+   "margin>=": 0.05,
+   "accepted_tool": 46,
+   "tool_correct": 31,
+   "general_wrongly_accepted": 0,
+   "precision_on_tool": 0.674
+  },
+  {
+   "sim>=": 0.6,
+   "margin>=": 0.1,
+   "accepted_tool": 24,
+   "tool_correct": 18,
+   "general_wrongly_accepted": 0,
+   "precision_on_tool": 0.75
+  },
+  {
+   "sim>=": 0.65,
+   "margin>=": 0.0,
+   "accepted_tool": 44,
+   "tool_correct": 34,
+   "general_wrongly_accepted": 0,
+   "precision_on_tool": 0.773
+  },
+  {
+   "sim>=": 0.65,
+   "margin>=": 0.05,
+   "accepted_tool": 27,
+   "tool_correct": 21,
+   "general_wrongly_accepted": 0,
+   "precision_on_tool": 0.778
+  },
+  {
+   "sim>=": 0.65,
+   "margin>=": 0.1,
+   "accepted_tool": 14,
+   "tool_correct": 11,
+   "general_wrongly_accepted": 0,
+   "precision_on_tool": 0.786
+  },
+  {
+   "sim>=": 0.7,
+   "margin>=": 0.0,
+   "accepted_tool": 10,
+   "tool_correct": 10,
+   "general_wrongly_accepted": 0,
+   "precision_on_tool": 1.0
+  },
+  {
+   "sim>=": 0.7,
+   "margin>=": 0.05,
+   "accepted_tool": 9,
+   "tool_correct": 9,
+   "general_wrongly_accepted": 0,
+   "precision_on_tool": 1.0
+  },
+  {
+   "sim>=": 0.7,
+   "margin>=": 0.1,
+   "accepted_tool": 6,
+   "tool_correct": 6,
+   "general_wrongly_accepted": 0,
+   "precision_on_tool": 1.0
+  }
+ ],
+ "general_below": {
+  "0.45": {
+   "general_caught": 4,
+   "tool_wrongly_below": 10
+  },
+  "0.5": {
+   "general_caught": 11,
+   "tool_wrongly_below": 21
+  },
+  "0.55": {
+   "general_caught": 13,
+   "tool_wrongly_below": 67
+  }
+ }
+}

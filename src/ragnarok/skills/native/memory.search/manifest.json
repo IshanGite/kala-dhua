@@ -1,0 +1,73 @@
+{
+  "name": "memory.search",
+  "version": "0.1.0",
+  "description": "Use when the user asks what was said, decided or received before, or to find something in their own messages, mail or notes.",
+  "entrypoint": {
+    "type": "native",
+    "action": "memory.search"
+  },
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 300
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "permissions": [
+    {
+      "permission": "memory.read"
+    }
+  ],
+  "side_effects": "none",
+  "dry_run": false,
+  "examples": [
+    {
+      "params": {
+        "query": "harbour permit"
+      },
+      "note": "what did Ravi say about the permit"
+    },
+    {
+      "params": {
+        "query": "harbour permit"
+      },
+      "note": "find the email about the Orion launch"
+    },
+    {
+      "params": {
+        "query": "harbour permit"
+      },
+      "note": "what was said in the general channel yesterday"
+    },
+    {
+      "params": {
+        "query": "harbour permit"
+      },
+      "note": "who told me the invoice was due"
+    },
+    {
+      "params": {
+        "query": "harbour permit"
+      },
+      "note": "do I have any messages from Priya"
+    },
+    {
+      "params": {
+        "query": "harbour permit"
+      },
+      "note": "search my messages for the vendor delay"
+    }
+  ],
+  "param_roles": {
+    "free": [
+      "query"
+    ]
+  }
+}

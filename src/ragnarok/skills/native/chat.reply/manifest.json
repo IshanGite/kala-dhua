@@ -1,0 +1,94 @@
+{
+  "name": "chat.reply",
+  "version": "0.1.0",
+  "description": "Use when the user asks to message, reply to or tell someone on Telegram, Discord or Slack.",
+  "entrypoint": {
+    "type": "native",
+    "action": "chat.reply"
+  },
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "platform": {
+        "type": "string",
+        "enum": [
+          "telegram",
+          "discord",
+          "slack"
+        ]
+      },
+      "target": {
+        "type": "string",
+        "description": "the person or channel name as it appears in the conversation",
+        "minLength": 1,
+        "maxLength": 120
+      },
+      "text": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 2000
+      }
+    },
+    "required": [
+      "platform",
+      "target",
+      "text"
+    ],
+    "additionalProperties": false
+  },
+  "permissions": [
+    {
+      "permission": "chat.post"
+    }
+  ],
+  "side_effects": "irreversible",
+  "dry_run": true,
+  "examples": [
+    {
+      "params": {
+        "platform": "telegram",
+        "target": "Ravi",
+        "text": "I will be late"
+      },
+      "note": "tell Ravi on telegram that I will be late"
+    },
+    {
+      "params": {
+        "platform": "telegram",
+        "target": "Ravi",
+        "text": "I will be late"
+      },
+      "note": "message the team on Discord that the build is done"
+    },
+    {
+      "params": {
+        "platform": "telegram",
+        "target": "Ravi",
+        "text": "I will be late"
+      },
+      "note": "reply to Asha on Slack saying yes"
+    },
+    {
+      "params": {
+        "platform": "telegram",
+        "target": "Ravi",
+        "text": "I will be late"
+      },
+      "note": "send a Telegram message to Meera that I am on my way"
+    },
+    {
+      "params": {
+        "platform": "telegram",
+        "target": "Ravi",
+        "text": "I will be late"
+      },
+      "note": "post in the Discord server that standup moved"
+    }
+  ],
+  "param_roles": {
+    "free": [
+      "target",
+      "text"
+    ]
+  }
+}

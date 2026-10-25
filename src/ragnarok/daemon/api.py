@@ -12,7 +12,9 @@ from pydantic import BaseModel, Field
 
 from ragnarok import __version__
 from ragnarok.connectors.notifications import Notifications
+from ragnarok.daemon.approvals import ApprovalHub
 from ragnarok.daemon.auth import LocalOnlyMiddleware, TokenGuard
+from ragnarok.daemon.chat import ChatService
 from ragnarok.daemon.runtime import Runtime
 from ragnarok.harness.answer import Answerer
 
@@ -25,6 +27,8 @@ class Services:
     runtime: Runtime | None = None
     answerer: Answerer | None = None
     notifications: Notifications | None = None
+    chat: ChatService | None = None
+    hub: ApprovalHub | None = None
 
 
 class ChatIn(BaseModel):
@@ -37,6 +41,11 @@ class ToggleIn(BaseModel):
 
 class NotifIn(BaseModel):
     apps: list[str] = Field(max_length=50)
+
+
+class DecideIn(BaseModel):
+    action: str = Field(pattern="^(approve|deny)$")
+    phrase: str | None = Field(default=None, max_length=60)
 
 
 class PairIn(BaseModel):
@@ -116,8 +125,27 @@ def create_app(guard: TokenGuard | None = None, port: int = DEFAULT_PORT, servic
         svc.runtime.state.set("notif_apps", _json.dumps(apps))
         return {"ok": True, "apps": apps}
 
+    @app.get("/approvals")
+    async def approvals() -> dict[str, Any]:
+        return {"items": svc.hub.pending() if svc.hub else []}
+
+    @app.post("/approvals/{approval_id}")
+    async def decide(approval_id: str, body: DecideIn) -> dict[str, Any]:
+        if svc.hub is None:
+            return {"ok": False, "error": "E_NO_AGENT"}
+        try:
+            return {"ok": svc.hub.decide(approval_id, body.action == "approve", typed_phrase=body.phrase)}
+        except Exception as exc:  # noqa: BLE001 - the broker refuses with a code; show it, do not crash
+            return {"ok": False, "error": getattr(exc, "code", "E_APPROVAL")}
+
+    @app.get("/chat/{job_id}")
+    async def chat_poll(job_id: str) -> dict[str, Any]:
+        return svc.chat.poll(job_id) if svc.chat else {"ok": False, "error": "E_NO_AGENT"}
+
     @app.post("/chat")
     async def chat(body: ChatIn) -> dict[str, Any]:
+        if svc.chat is not None:
+            return await svc.chat.submit(body.text)
         if svc.answerer is None:
             return {"ok": False, "error": "E_NO_AGENT"}
         a = await svc.answerer.answer(body.text)

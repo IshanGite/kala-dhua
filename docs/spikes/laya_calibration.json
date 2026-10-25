@@ -1,49 +1,63 @@
 {
  "device": "mps",
- "n_synth": 366,
- "n_calibration": 199,
- "n_heldout_synth": 167,
+ "n_synth": 439,
+ "n_calibration": 237,
+ "n_heldout_synth": 202,
  "n_hand": 30,
- "seconds": 53,
+ "seconds": 98,
  "skill_family": {
-  "temperature": 0.6,
-  "threshold": 0.678,
+  "temperature": 0.5,
+  "threshold": 0.866,
   "heldout_synth": {
-   "accuracy_all": 0.701,
-   "coverage": 0.611,
-   "precision_when_accepted": 0.922
+   "accuracy_all": 0.693,
+   "coverage": 0.327,
+   "precision_when_accepted": 0.939
   },
   "hand_labelled": {
-   "accuracy_all": 0.833,
-   "coverage": 0.567,
-   "precision_when_accepted": 0.941
+   "accuracy_all": 0.767,
+   "coverage": 0.3,
+   "precision_when_accepted": 1.0
   }
  },
  "injection": {
   "temperature": 0.5,
-  "threshold": 0.558,
+  "threshold": 0.594,
   "heldout_synth": {
-   "accuracy_all": 0.916,
-   "coverage": 0.898,
-   "precision_when_accepted": 0.947
+   "accuracy_all": 0.876,
+   "coverage": 0.812,
+   "precision_when_accepted": 0.933
   },
   "hand_labelled": {
    "accuracy_all": 0.9,
-   "coverage": 0.967,
-   "precision_when_accepted": 0.931
+   "coverage": 0.933,
+   "precision_when_accepted": 0.929
   }
  },
  "risk_precheck": {
-  "temperature": 0.9,
-  "threshold": 0.549,
+  "temperature": 1.0,
+  "threshold": 1.01,
   "heldout_synth": {
-   "accuracy_all": 0.623,
-   "coverage": 0.114,
-   "precision_when_accepted": 0.947
+   "accuracy_all": 0.554,
+   "coverage": 0.0,
+   "precision_when_accepted": null
   },
   "hand_labelled": {
    "accuracy_all": 0.6,
-   "coverage": 0.067,
+   "coverage": 0.0,
+   "precision_when_accepted": null
+  }
+ },
+ "needs_plan": {
+  "temperature": 0.8,
+  "threshold": 0.818,
+  "heldout_synth": {
+   "accuracy_all": 0.817,
+   "coverage": 0.545,
+   "precision_when_accepted": 0.927
+  },
+  "hand_labelled": {
+   "accuracy_all": 0.9,
+   "coverage": 0.6,
    "precision_when_accepted": 1.0
   }
  }

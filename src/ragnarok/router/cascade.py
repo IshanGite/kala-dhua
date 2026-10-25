@@ -24,9 +24,9 @@ from ragnarok.router.slots import detect, signature
 from ragnarok.router.types import Answer, Question, RouteDecision
 
 FAMILY_DESC = {
-    "mail": "email: reading, drafting, replying, sending", "calendar": "meetings, scheduling, events", "files": "files and documents in the workspace",
-    "notes": "short notes and reminders", "code": "running small calculations or scripts", "chat": "Slack, Telegram or Discord messages",
-    "memory": "what the user did or said before", "system": "status and settings of the assistant",
+    "mail": "writing, drafting, replying to or sending an email", "calendar": "meetings, scheduling, events", "files": "files and documents in the workspace",
+    "notes": "setting reminders, to-dos and short notes", "code": "running small calculations or scripts", "chat": "sending or replying to a message on Slack, Telegram or Discord",
+    "memory": "looking up what was said, received or decided before in messages, mail or notes", "system": "status and settings of the assistant",
 }
 Q_FAMILY = Question("skill_family", "choice", "Which kind of task is this?", FAMILY_DESC)
 Q_PLAN = Question("needs_plan", "noul", "Does this request need several steps or several tools?")
@@ -37,10 +37,13 @@ RISK_FLOOR = {"none": 0, "low": 1, "high": 2}
 
 class Cascade:
     def __init__(self, *, gateway: Gateway, selector: SkillSelector, l1: DecisionBackend | None, l2: DecisionBackend | None, calibrator: Calibrator,
-                 library: RouteLibrary | None = None, family_skills: dict[str, list[str]] | None = None, interactive_timeout_ms: int = 700) -> None:
+                 library: RouteLibrary | None = None, family_skills: dict[str, list[str]] | None = None, interactive_timeout_ms: int = 700, l2_timeout_ms: int | None = None, read_only_skills: set[str] | None = None,
+                 embed_accept: float | None = None, embed_margin: float = 0.05, general_below: float | None = None) -> None:
+        self._ro, self._e_hi, self._e_mg, self._e_lo = read_only_skills or set(), embed_accept, embed_margin, general_below
         self._gw, self._sel, self._l1, self._l2, self._cal, self._lib = gateway, selector, l1, l2, calibrator, library
         self._family_skills = family_skills or {}
         self._budget_s = interactive_timeout_ms / 1000
+        self._l2_budget_s = (l2_timeout_ms if l2_timeout_ms is not None else interactive_timeout_ms) / 1000  # the small arbiter is measured at ~1.3 s (docs/adr/003)
 
     async def _guard(self, coro: Awaitable[Any], timeout: float) -> Any:
         try:
@@ -63,7 +66,10 @@ class Cascade:
         embed_task = self._gw.embed([text, sig_text], deadline=clock_deadline + 5, priority=Priority.INTERACTIVE)
         qvecs, l1_answers = await asyncio.gather(embed_task, l1_task if l1_task else asyncio.sleep(0, result=None))
         qvec, sigvec = qvecs[0], qvecs[1]
-        shortlist = [n for n, _ in self._sel.top(qvec, 5)]
+        scored = self._sel.top(qvec, 5)
+        shortlist = [n for n, _ in scored]
+        top_sim = scored[0][1] if scored else 0.0
+        margin = (scored[0][1] - scored[1][1]) if len(scored) > 1 else top_sim
 
         def done(tier: str, family: str, skills: list[str], plan_needed: bool, conf: float, backend: str, **kw: Any) -> RouteDecision:
             return RouteDecision(tier=tier, intent_family=family, skills=skills, plan_needed=plan_needed,  # type: ignore[arg-type]
@@ -104,15 +110,26 @@ class Cascade:
         else:
             notes.append("L1_abstained" if fam else "L1_unavailable")
 
+        # ---- embedding rung (measured: docs/spikes/embed_rung.json): a very close match needs no model; a distant one means no tool fits
+        if shortlist and self._e_hi is not None and top_sim >= self._e_hi and margin >= self._e_mg:
+            notes.append(f"embedding_match_{top_sim:.2f}")
+            return done("L1", "embedding", [shortlist[0]], False, top_sim, "embedding", shadow_route_id=shadow_id)
+        if self._e_lo is not None and top_sim < self._e_lo:
+            notes.append(f"nothing_fits_{top_sim:.2f}")
+            return done("L1", "general", [], False, 1.0 - top_sim, "embedding", shadow_route_id=shadow_id)
+
         # ---- L2: small Ollama arbiter, constrained JSON over the shortlist only
-        remaining = self._budget_s - (time.perf_counter() - t0)
+        remaining = self._l2_budget_s - (time.perf_counter() - t0)
+        l2_deadline = t0 + self._l2_budget_s
         if self._l2 is not None and shortlist:
             q = Question("skill", "choice", "Which single skill should handle this? Empty if none fits or several are needed.", {s: s for s in shortlist})
             ans = self._by_id(await self._guard(self._l2.decide(text, [q, Q_PLAN], deadline=get_clock().monotonic() + max(remaining, 0.05)), remaining))
             s, p = ans.get("skill"), ans.get("needs_plan")
-            if s and p and s.value and not p.value and self._cal.accepts("skill", self._l2.name, s):
+            if s and p and s.value and (not p.value or str(s.value) in self._ro) and self._cal.accepts("skill", self._l2.name, s):
                 return done("L2", "arbiter", [str(s.value)], False, s.probability, self._l2.name, shadow_route_id=shadow_id)
-            if (get_clock().monotonic() > clock_deadline) and s is None:
+            if s is not None and p is not None and not s.value and not p.value and s.probability >= 0.7:
+                return done("L2", "general", [], False, s.probability, self._l2.name, shadow_route_id=shadow_id)  # no tool fits: just talk
+            if (time.perf_counter() > l2_deadline) and s is None:
                 notes.append("timeout_fallback_to_embedding_candidate")
                 return done("L2", "embedding", shortlist[:1], False, 0.3, "embedding", low_confidence=True, shadow_route_id=shadow_id)
 

@@ -13,6 +13,7 @@ import psutil
 from ragnarok.connectors.runner import ConnectorRunner, CycleReport
 from ragnarok.core.clock import get_clock
 from ragnarok.core.logging import log
+from ragnarok.memory.commitments import Commitments
 from ragnarok.memory.runtime_state import RuntimeState
 
 PAIRED = {"telegram"}  # sources where an unknown sender is held until the user approves
@@ -29,8 +30,10 @@ class Governor:
 
 
 class Runtime:
-    def __init__(self, state: RuntimeState, runners: dict[str, ConnectorRunner], *, interval_s: float = 60.0, governor: Governor | None = None) -> None:
+    def __init__(self, state: RuntimeState, runners: dict[str, ConnectorRunner], *, interval_s: float = 60.0, governor: Governor | None = None, commitments: Commitments | None = None) -> None:
         self.state, self.runners, self.interval = state, runners, interval_s
+        self.commitments = commitments
+        self.reminders: deque[dict[str, Any]] = deque(maxlen=50)
         self.governor = governor or Governor()
         self.activity: deque[dict[str, Any]] = deque(maxlen=200)
         self.last: dict[str, dict[str, Any]] = {}
@@ -48,8 +51,20 @@ class Runtime:
     def _note(self, kind: str, source: str, code: str, **counts: int) -> None:
         self.activity.appendleft({"ts": get_clock().now_ms(), "kind": kind, "source": source, "code": code, **counts})
 
+    def fire_reminders(self) -> list[dict[str, Any]]:
+        """Due reminders fire whether or not ingestion is switched on: they are the user's own words, not read from anywhere."""
+        if self.commitments is None:
+            return []
+        due = self.commitments.fire_due()
+        for d in due:
+            item = {"ts": get_clock().now_ms(), "kind": "reminder", "source": "reminder", "code": "due", "text": d["what"]}
+            self.reminders.appendleft(item)
+            self.activity.appendleft(item)
+        return due
+
     async def tick(self) -> dict[str, CycleReport]:
         out: dict[str, CycleReport] = {}
+        self.fire_reminders()
         if not self.enabled:
             return out
         for name, runner in self.runners.items():
@@ -103,4 +118,4 @@ class Runtime:
 
     def status(self) -> dict[str, Any]:
         return {"enabled": self.enabled, "interval_s": self.interval, "sources": {n: self.last.get(n, {"ok": None}) for n in self.runners},
-                "held": [{"platform": p, "handle": h} for p, h in self.state.held_senders()]}
+                "held": [{"platform": p, "handle": h} for p, h in self.state.held_senders()], "reminders": list(self.reminders)[:5]}
