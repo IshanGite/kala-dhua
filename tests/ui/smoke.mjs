@@ -19,7 +19,13 @@ const say = async (text) => { doc.getElementById("q").value = text; doc.getEleme
 
 check("page loads and shows the agent state", await waitFor(() => /reading continuously|paused/.test(doc.getElementById("state").textContent)));
 await say("remind me to call mom tomorrow at 8am");
-check("a reminder command is answered in the chat", await waitFor(() => /Reminder set: call mom/.test(doc.getElementById("log").textContent)));
+check("while the calendar copy waits for a click, the chat already says the reminder is set", await waitFor(() => /Reminder set: call mom/.test(doc.getElementById("log").textContent) && /Approvals tab/.test(doc.getElementById("log").textContent), 12000));
+tab("appr");
+const rc = await waitFor(() => [...doc.querySelectorAll("#cards .card")].find((c) => /calendar/i.test(c.textContent)));
+check("the calendar copy of the reminder shows as an approval card", rc);
+if (rc) click([...rc.querySelectorAll("button")].find((b) => b.textContent === "Approve"));
+tab("chat");
+check("after the click the reminder reply is complete", await waitFor(() => /Added to Google Calendar: call mom/.test(doc.getElementById("log").textContent), 12000));
 check("the reply has a Why? panel that opens", await waitFor(() => { const a = [...doc.querySelectorAll("#log a")].find((x) => x.textContent === "Why?"); if (!a) return false; click(a); return /built-in rule for reminder.add/.test(doc.getElementById("log").textContent); }));
 await say("what did Ishan say about the standup");
 check("a question is answered from memory with a citation chip", await waitFor(() => /standup moved to ten/.test(doc.getElementById("log").textContent) && doc.querySelector("#log .chip")));

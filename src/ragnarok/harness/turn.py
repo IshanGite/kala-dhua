@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import re
 import time
+from collections.abc import Callable
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -50,6 +52,7 @@ from ragnarok.skills.manifest import Manifest
 from ragnarok.skills.registry import SkillRegistry
 from ragnarok.store.vectors import VectorIndex
 
+PROGRESS: ContextVar[Callable[[str], None] | None] = ContextVar("progress", default=None)  # the chat sets it so a waiting task can report what is done so far
 FREE = "{free}"  # a free-text parameter in a stored route: refilled from the new request, never replayed from the old one
 CRITERIA: dict[str, list[dict]] = {
     "reminder.add": [{"kind": "field_present", "path": "reminder_id"}], "reminder.list": [{"kind": "ok"}],
@@ -433,6 +436,8 @@ class Agent:
         mark("plan", t0 + (tm.get("log", 0) + tm.get("route", 0)) / 1000)
         t_exec = time.perf_counter()
         tid = self.executor.start_task(request, plan, self.ctx, plan_meta={"tier": decision.tier, "route_id": decision.route_id})
+        if (cb := PROGRESS.get()) is not None:
+            cb(tid)
         outcome = await self.executor.run_task(tid, self.ctx)
         mark("run", t_exec)
         for n in plan.nodes:

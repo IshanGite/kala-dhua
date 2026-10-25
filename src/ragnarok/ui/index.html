@@ -78,9 +78,9 @@ h2{font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:var(--mute)
   function show(w,d){w.remove();var t=d.ok===false?"The agent is not ready ("+(d.error||"error")+").":d.text;var m=add("bot",t,d.citations);
     if(d.ok!==false&&d.tier){var meta=el("div","small",d.tier+" via "+d.backend+(d.ms?" - "+d.ms+" ms":"")+(d.learned==="promoted"?" - learned a route":d.learned==="route_used"?" - stored route":"")+"  ");
       if(d.why&&d.why.length){var wl=el("a","small","Why?");wl.href="#";var pre=el("div","small",d.why.join("\n"));pre.style.cssText="white-space:pre-wrap;display:none;margin-top:4px;border-left:2px solid var(--line);padding-left:8px";wl.onclick=function(ev){ev.preventDefault();pre.style.display=pre.style.display==="none"?"block":"none"};meta.appendChild(wl);m.appendChild(meta);m.appendChild(pre)}else m.appendChild(meta)}}
-  function poll(w,job,n){api("/chat/"+job).then(function(d){if(d.pending&&n<400){setTimeout(function(){poll(w,job,n+1)},1000)}else show(w,d)}).catch(function(){w.remove();add("bot","Lost contact with the agent.")})}
+  function poll(w,job,n){api("/chat/"+job).then(function(d){if(d.pending&&n<400){if(d.text)w.firstChild.textContent=d.text+" (still waiting - see the Approvals tab)";setTimeout(function(){poll(w,job,n+1)},1000)}else show(w,d)}).catch(function(){w.remove();add("bot","Lost contact with the agent.")})}
   document.getElementById("f").onsubmit=function(e){e.preventDefault();var t=q.value.trim();if(!t)return;q.value="";add("me",t);var w=add("bot","Working on it...");
-    api("/chat",{text:t}).then(function(d){if(d.pending){w.firstChild.textContent="Waiting - if it needs your OK, check the Approvals tab...";poll(w,d.job,0)}else show(w,d)}).catch(function(){w.remove();add("bot","Could not reach the agent.")})};
+    api("/chat",{text:t}).then(function(d){if(d.pending){w.firstChild.textContent=(d.text?d.text+" ":"")+"Waiting for your OK - check the Approvals tab.";poll(w,d.job,0)}else show(w,d)}).catch(function(){w.remove();add("bot","Could not reach the agent.")})};
   var sw=document.getElementById("sw");
   sw.onclick=function(){var on=sw.getAttribute("aria-checked")!=="true";api("/toggle",{enabled:on}).then(refresh)};
   function ago(ts){var s=Math.max(0,(Date.now()-ts)/1000|0);return s<60?s+"s ago":s<3600?(s/60|0)+"m ago":(s/3600|0)+"h ago"}

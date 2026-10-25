@@ -9,7 +9,7 @@ from typing import Any
 
 from ragnarok.core.ids import new_id
 from ragnarok.core.logging import log
-from ragnarok.harness.turn import Agent, TurnResult
+from ragnarok.harness.turn import PROGRESS, Agent, TurnResult
 
 QUICK_S = 4.0
 
@@ -20,6 +20,7 @@ class Job:
     text: str
     state: str = "running"  # running | done | error
     reply: dict[str, Any] = field(default_factory=dict)
+    task_id: str | None = None
 
 
 FRIENDLY = {
@@ -32,6 +33,42 @@ FRIENDLY = {
 }
 
 
+def node_line(st: str, res: dict[str, Any], err: str) -> str:
+    """One plain sentence for one finished (or waiting) step."""
+    if st == "succeeded":
+        if "reminder_id" in res:
+            return f"Reminder set: {res['text']} ({res['when']})." + (" That time has already passed, so it will fire right away." if res.get("past") else "")
+        if "draft" in res:
+            where = "in your Gmail drafts" if res.get("in_gmail") else "locally (connect Google write access to put it in Gmail)"
+            return f"Draft to {res['draft']['to']} saved {where}: {res['draft']['body'][:200]}"
+        if res.get("added"):
+            return f"Added to Google Calendar: {res['title']} ({res['when']})."
+        if res.get("created"):
+            return f"Created in Google Drive: {res['title']}." + (f" {res['link']}" if res.get("link") else "")
+        if res.get("sent"):
+            return "Email sent" + (f" to {res['to']}." if res.get("to") else ".")
+        if res.get("posted"):
+            return f"Message posted to {res.get('to', 'the chat')}."
+        if "stdout" in res:
+            out = str(res["stdout"]).strip()
+            return ("Ran in the sandbox. Output:\n" + out[:1500]) if out else "Ran in the sandbox. It printed nothing."
+        if "events" in res and "summary" in res:
+            return str(res["summary"])
+        if "hits" in res:
+            return f"Found {len(res['hits'])} match(es) in memory."
+        if "reminders" in res:
+            rs = res["reminders"]
+            return "Open reminders: " + ("; ".join(r["text"] for r in rs) if rs else "none.")
+        return "Done."
+    if st == "awaiting_approval":
+        return "Waiting for your OK in the Approvals tab."
+    if st in ("pending", "running"):
+        return "Working on the next step..."
+    if st in ("denied", "blocked", "skipped"):
+        return FRIENDLY.get(err, f"Not done ({st}): {err or 'a rule or you stopped it'}.")
+    return FRIENDLY.get(err or "unknown", f"Could not finish ({st}): {err or 'unknown'}.")
+
+
 def summarize(turn: TurnResult) -> dict[str, Any]:
     """A plain-words reply from what the turn did. Never includes more than the user's own request and the action results."""
     meta = {"why": turn.decision.trace + [f"Time: {turn.latency_ms:.0f} ms" + (f" ({', '.join(f'{k} {v}' for k, v in turn.timings.items())})" if turn.timings else "")], "timings": turn.timings, "tier": turn.tier, "backend": turn.decision.backend, "ms": round(turn.latency_ms), "learned": turn.learned, "route_id": turn.decision.route_id}
@@ -42,39 +79,7 @@ def summarize(turn: TurnResult) -> dict[str, Any]:
     o = turn.outcome
     if o is None:
         return {"text": "I could not work out what to do with that.", "citations": [], **meta}
-    lines = []
-    for nid, st in o.node_states.items():
-        res = o.results.get(nid) or {}
-        if st == "succeeded":
-            if "reminder_id" in res:
-                lines.append(f"Reminder set: {res['text']} ({res['when']})." + (" That time has already passed, so it will fire right away." if res.get("past") else ""))
-            elif "draft" in res:
-                where = "in your Gmail drafts" if res.get("in_gmail") else "locally (connect Google write access to put it in Gmail)"
-                lines.append(f"Draft to {res['draft']['to']} saved {where}: {res['draft']['body'][:200]}")
-            elif res.get("added"):
-                lines.append(f"Added to Google Calendar: {res['title']} ({res['when']}).")
-            elif res.get("created"):
-                lines.append(f"Created in Google Drive: {res['title']}." + (f" {res['link']}" if res.get("link") else ""))
-            elif res.get("sent"):
-                lines.append("Email sent" + (f" to {res['to']}." if res.get("to") else "."))
-            elif res.get("posted"):
-                lines.append(f"Message posted to {res.get('to', 'the chat')}.")
-            elif "stdout" in res:
-                out = str(res["stdout"]).strip()
-                lines.append(("Ran in the sandbox. Output:\n" + out[:1500]) if out else "Ran in the sandbox. It printed nothing.")
-            elif "hits" in res:
-                lines.append(f"Found {len(res['hits'])} match(es) in memory.")
-            elif "reminders" in res:
-                rs = res["reminders"]
-                lines.append("Open reminders: " + ("; ".join(r["text"] for r in rs) if rs else "none."))
-            else:
-                lines.append("Done.")
-        elif st in ("denied", "blocked", "skipped"):
-            code = o.errors.get(nid, "")
-            lines.append(FRIENDLY.get(code, f"Not done ({st}): {code or 'a rule or you stopped it'}."))
-        else:
-            code = o.errors.get(nid, "unknown")
-            lines.append(FRIENDLY.get(code, f"Could not finish ({st}): {code}."))
+    lines = [node_line(st, o.results.get(nid) or {}, o.errors.get(nid, "")) for nid, st in o.node_states.items()]
     return {"text": " ".join(lines) or f"Task {o.state}.", "citations": [], "state": o.state, **meta}
 
 
@@ -109,7 +114,20 @@ class ChatService:
         """The last decisions with the reasons the agent gave itself, newest first (NFR4.1)."""
         return [{"job": j.id, "text": j.text[:120], "state": j.state, "why": j.reply.get("why", []), "tier": j.reply.get("tier"), "backend": j.reply.get("backend")} for j in list(self.jobs.values())[-max(1, min(limit, 100)):][::-1]]
 
+    def interim(self, job: Job) -> dict[str, Any]:
+        """While a task waits for a click, say what is already done and what is waiting: the user should never stare at 'working'."""
+        if not job.task_id:
+            return {}
+        import json as _json
+
+        lines = []
+        for n in self._agent.ledger.nodes_of(job.task_id):
+            res = _json.loads(n["result_json"]) if n["result_json"] else {}
+            lines.append(node_line(n["state"], res, n["error_code"] or ""))
+        return {"text": " ".join(lines), "citations": []}
+
     async def _run(self, job: Job) -> None:
+        PROGRESS.set(lambda tid: setattr(job, "task_id", tid))
         try:
             job.reply = summarize(await self._agent.handle(job.text, history=list(self.history)))
             self.history += [("user", job.text), ("assistant", job.reply.get("text", "")[:600])]
@@ -136,11 +154,11 @@ class ChatService:
         try:
             await asyncio.wait_for(asyncio.shield(task), timeout=QUICK_S)
         except TimeoutError:
-            return {"ok": True, "pending": True, "job": job.id}
+            return {"ok": True, "pending": True, "job": job.id, **self.interim(job)}
         return {"ok": True, "pending": False, "job": job.id, "state": job.state, **job.reply}
 
     def poll(self, job_id: str) -> dict[str, Any]:
         job = self.jobs.get(job_id)
         if job is None:
             return {"ok": False, "error": "E_NO_JOB"}
-        return {"ok": True, "pending": job.state == "running", "job": job.id, "state": job.state, **job.reply}
+        return {"ok": True, "pending": job.state == "running", "job": job.id, "state": job.state, **(job.reply if job.state != "running" else self.interim(job))}
