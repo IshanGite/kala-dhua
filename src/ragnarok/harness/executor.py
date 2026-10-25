@@ -59,6 +59,7 @@ class TaskOutcome:
     node_states: dict[str, str]
     errors: dict[str, str] = field(default_factory=dict)
     results: dict[str, Any] = field(default_factory=dict)
+    min_trust: str = "user_direct"
 
 
 def resolve_refs(value: Any, results: dict[str, Any]) -> Any:
@@ -127,7 +128,7 @@ class Executor:
         state = "succeeded" if final and all(s in ("succeeded", "skipped") for s in final.values()) else ("partial" if ok else "failed")
         self._l.set_task_state(task_id, state)
         self._l.record_decision("task_finished", task_id=task_id, outcome={"state": state, "errors": errors})
-        return TaskOutcome(task_id, state, final, errors, results)
+        return TaskOutcome(task_id, state, final, errors, results, lowest(n["min_trust"] for n in self._l.nodes_of(task_id)))
 
     @staticmethod
     def _deps(node: dict, prefix: str) -> list[str]:
@@ -164,6 +165,7 @@ class Executor:
         self._l.set_node_state(nid, "running", attempt=True)
         params = resolve_refs(json.loads(node["params_json"]), results)
         node_trust = self._node_trust(node, trust, ctx, prefix)
+        self._l.set_node_trust(nid, node_trust)
         try:
             reg = self._reg.verify_runnable(skill)
         except SkillNotRunnable as exc:

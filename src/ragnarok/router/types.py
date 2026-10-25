@@ -39,4 +39,7 @@ class RouteDecision:
     route_id: str | None = None
     low_confidence: bool = False
     injection_flag: bool = False
+    route_nodes: list[dict[str, Any]] | None = None
+    shadow_route_id: str | None = None
+    shortlist: list[str] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)

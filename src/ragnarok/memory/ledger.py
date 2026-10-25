@@ -87,6 +87,9 @@ class Ledger:
 
         self._m.with_tx(op)
 
+    def set_node_trust(self, node_id: str, trust: str) -> None:
+        self._m.with_tx(lambda c: c.execute("UPDATE task_nodes SET min_trust=? WHERE id=?", (trust, node_id)))
+
     def nodes_of(self, task_id: str) -> list[dict[str, Any]]:
         return self._m.with_tx(lambda c: [dict(r) for r in c.execute("SELECT * FROM task_nodes WHERE task_id=? ORDER BY ord", (task_id,))])
 
