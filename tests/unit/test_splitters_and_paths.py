@@ -116,3 +116,34 @@ def test_typed_confirmation_never_approves_anything():
 
     out = asyncio.run(ChatService(Boom(), Hub()).submit("do it"))
     assert "Approvals tab" in out["text"] and out["state"] == "done"
+
+
+def test_explicit_dates_in_reminders():
+    from datetime import datetime
+
+    from ragnarok.router.when import parse_when, split_reminder
+
+    now = datetime(2026, 10, 25, 19, 30)
+    assert split_reminder("set a reminder on 25 oct 7 pm for gym") == ("gym", "on 25 oct 7 pm")
+    assert parse_when("on 25 oct 7 pm", now) == datetime(2026, 10, 25, 19, 0)
+    assert parse_when("on 3rd november at 9am", now) == datetime(2026, 11, 3, 9, 0)
+    assert parse_when("on 1/11 at 10am", now) == datetime(2026, 11, 1, 10, 0)
+    assert split_reminder("remind me oct 30 5pm to call mom") == ("call mom", "oct 30 5pm")
+
+
+def test_capability_and_complaint_detection():
+    from ragnarok.harness.answer import CAPABILITY_ASK, COMPLAINT
+
+    assert CAPABILITY_ASK.search("what can you do") and CAPABILITY_ASK.search("who are you") and not CAPABILITY_ASK.search("what did Ravi say")
+    assert COMPLAINT.search("there was no reminder on calander") and COMPLAINT.search("it didn't work") and not COMPLAINT.search("remind me to call")
+
+
+def test_agenda_for_an_explicit_date():
+    from datetime import datetime
+
+    from ragnarok.router.when import agenda_range
+
+    now = datetime(2026, 10, 25, 19, 30)
+    assert agenda_range("what is on my calendar on 27 oct", now)[0] == datetime(2026, 10, 27)
+    assert agenda_range("anything on oct 30", now)[0] == datetime(2026, 10, 30)
+    assert agenda_range("my schedule on 3rd november", now)[0] == datetime(2026, 11, 3)

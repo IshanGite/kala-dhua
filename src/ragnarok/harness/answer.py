@@ -77,9 +77,24 @@ def guarded(text: str) -> tuple[str, bool]:
     return (WITHHELD, True) if scan(text, "prompt").injection_suspected else (text, False)
 
 
+CAPABILITIES = (
+    "Here is what I can do, when you give me a clear command:\n"
+    "- Remember and answer from your connected apps: Gmail, Google Calendar, Drive, Meet, Discord, Telegram, Slack (ask: 'what did Ravi say', 'what is on my calendar tomorrow', 'catch me up').\n"
+    "- Set reminders (they also go on your Google Calendar after you approve): 'remind me to call the bank tomorrow at 5pm'.\n"
+    "- Add calendar events: 'put a call with Priya on my calendar tomorrow at 4pm'.\n"
+    "- Email: 'send an email to name@example.com saying ...', 'reply to Dev's email saying ...', 'draft an email to ...'.\n"
+    "- Chat apps: 'tell Ravi on telegram that I will be late', 'post in the discord general channel that ...'.\n"
+    "- Google Drive: 'create a document in Drive called Plan saying ...'.\n"
+    "Anything that sends, posts or changes something outside this computer waits for your click in the Approvals tab. I never act on text I read in your mail or messages.")
+CAPABILITY_ASK = re.compile(r"\b(what can you do|what (?:are|r) you able|can you (?:set|add|put|create|send|do)\b.*\?|are you able to|help me with|what are your (?:features|abilities|capabilities)|how do i use you)\b|^\s*(?:who are you|what are you)\b", re.I)
+COMPLAINT = re.compile(r"\b(there was no|there is no|wasn'?t (?:there|created|set|sent|added)|didn'?t (?:work|show|appear|happen|get|send|set|add)|not (?:there|showing|created|added|sent)|nothing (?:happened|appeared|came)|did(?:n'?t| not) see)\b", re.I)
+
+
 GENERAL_SYSTEM = ("You are a small local assistant running on the user's own computer, with no internet. In this reply you cannot see their data and you cannot DO anything: "
                   "you cannot send, post, remind, schedule or change anything. Never say or imply that you did, will do, or need approval for an action. "
-                  "If the user seems to want an action, say plainly that you did not do it and ask them to phrase it as a command. Answer briefly. If unsure, say so.")
+                  "If the user seems to want an action, say plainly that you did not do it and ask them to phrase it as a command. Answer briefly. If unsure, say so.\n\n"
+                  "The REAL assistant around you CAN do these when the user gives a clear command (so never say it cannot): set reminders, add Google Calendar events, send and reply to email, post to Telegram, Discord and Slack, create Google Drive documents, and answer from the user's connected apps. "
+                  "If the user says an action did not happen, apologise briefly and tell them to repeat it as a command and check the Approvals tab.")
 
 
 def _echo(answer: str, question: str) -> bool:

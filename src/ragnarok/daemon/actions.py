@@ -59,7 +59,8 @@ class Actions:
         if dry_run:
             return {"would_remind": p["text"], "when": shown}
         rid = self._c.add(self._comp, p["text"], due)
-        return {"reminder_id": rid, "text": p["text"], "when": shown, "due_at": due}
+        past = bool(due and due <= get_clock().now_ms())
+        return {"reminder_id": rid, "text": p["text"], "when": shown, "due_at": due, "past": past}
 
     async def reminder_remove(self, p: dict[str, Any], ctx: ExecContext, *, dry_run: bool) -> dict[str, Any]:
         self._c.remove(p["reminder_id"])

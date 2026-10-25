@@ -9,12 +9,23 @@ from __future__ import annotations
 import re
 import time
 from dataclasses import dataclass, field
+from typing import Any
 
 import jsonschema
 import numpy as np
 
 from ragnarok.core.clock import get_clock
-from ragnarok.harness.answer import Answered, Answerer, is_agenda, is_catchup, is_smalltalk, source_recall
+from ragnarok.harness.answer import (
+    CAPABILITIES,
+    CAPABILITY_ASK,
+    COMPLAINT,
+    Answered,
+    Answerer,
+    is_agenda,
+    is_catchup,
+    is_smalltalk,
+    source_recall,
+)
 from ragnarok.harness.executor import ExecContext, Executor, TaskOutcome
 from ragnarok.harness.plan import Plan, PlanNode, validate_plan
 from ragnarok.harness.planner import Planner
@@ -57,7 +68,8 @@ class TurnResult:
 
 class Agent:
     def __init__(self, *, mem: MemoryService, ledger: Ledger, reader: MemoryReader, index: VectorIndex, gateway: Gateway, cascade: Cascade, planner: Planner,
-                 executor: Executor, registry: SkillRegistry, library: RouteLibrary | None, routes: RoutesStore | None, ctx: ExecContext, answerer: Answerer | None = None, fast_refuse: bool = False) -> None:
+                 executor: Executor, registry: SkillRegistry, library: RouteLibrary | None, routes: RoutesStore | None, ctx: ExecContext, answerer: Answerer | None = None, fast_refuse: bool = False, calendar_mirror: Any = None) -> None:
+        self._mirror = calendar_mirror  # callable -> bool: is Google write access connected, so reminders also go on the calendar
         self.answerer = answerer
         self.fast_refuse = fast_refuse  # the daemon sets it: one unresolved action is refused at once instead of spending the slow planner on it
         self.mem, self.ledger, self.reader, self.index, self.gw = mem, ledger, reader, index, gateway
@@ -148,7 +160,10 @@ class Agent:
             from ragnarok.router.when import split_reminder
 
             what, when = split_reminder(text)
-            return Plan(nodes=[PlanNode(id="n1", goal=text[:200], skill=skill, params={"text": what, "when": when}, criteria=CRITERIA[skill])])
+            nodes = [PlanNode(id="n1", goal=text[:200], skill=skill, params={"text": what, "when": when}, criteria=CRITERIA[skill])]
+            if when and self._mirror is not None and self._mirror() and self._manifest("calendar.add") is not None:
+                nodes.append(PlanNode(id="n2", goal="put it on the calendar", skill="calendar.add", params={"title": what, "when": when}, criteria=CRITERIA["calendar.add"]))  # needs its own click
+            return Plan(nodes=nodes)
         if skill == "calendar.add":
             from ragnarok.router.when import parse_when, split_event
 
@@ -190,8 +205,17 @@ class Agent:
     async def _route_plan(self, d: RouteDecision, request: str) -> Plan | None:
         nodes = d.route_nodes or []
         if any(FREE in str(n.get("params")) for n in nodes):
-            if len(nodes) != 1:
+            if {n["skill"] for n in nodes} == {"reminder.add", "calendar.add"}:  # the reminder-on-calendar pair is refilled by code from the new request
+                from ragnarok.router.when import split_reminder
+
+                what, when = split_reminder(request)
+                nodes = [{**n, "params": ({"text": what, "when": when} if n["skill"] == "reminder.add" else {"title": what, "when": when})} for n in nodes]
+            elif len(nodes) != 1:
                 return None  # a multi-step route with free text is re-planned, not replayed
+            else:
+                nodes = None  # type: ignore[assignment]
+        if nodes is None:
+            nodes = d.route_nodes or []
             fresh = await self._single_skill_plan(request, nodes[0]["skill"], [])
             if fresh is None:
                 return None
@@ -215,6 +239,14 @@ class Agent:
             ans = await self.answerer.recent_from(srcs)
             dec = RouteDecision(tier="L1", intent_family="recall", skills=[], plan_needed=False, risk_floor=0, memory_types=["episodic"], confidence=1.0, latency_ms=0.0, backend="rule")
             return TurnResult("L1", dec, None, None, (time.perf_counter() - t0) * 1000, answer=ans)
+        if self.answerer is not None and CAPABILITY_ASK.search(request) and not self._is_action_request(request.replace("can you", "")):
+            dec = RouteDecision(tier="L1", intent_family="capabilities", skills=[], plan_needed=False, risk_floor=0, memory_types=[], confidence=1.0, latency_ms=0.0, backend="rule")
+            return TurnResult("L1", dec, None, None, (time.perf_counter() - t0) * 1000, answer=Answered(CAPABILITIES))
+        if self.answerer is not None and COMPLAINT.search(request) and history:
+            dec = RouteDecision(tier="L1", intent_family="complaint", skills=[], plan_needed=False, risk_floor=0, memory_types=[], confidence=1.0, latency_ms=0.0, backend="rule")
+            msg = ("Sorry about that. Tell me again as a clear command and I will do it; anything that changes something outside this computer waits for your click in the Approvals tab, "
+                   "so if no card appears there, I did not understand it as an action.")
+            return TurnResult("L1", dec, None, None, (time.perf_counter() - t0) * 1000, answer=Answered(msg))
         if self.answerer is not None and (is_smalltalk(request) or is_agenda(request)):  # conversation and agendas need no routing and no tool
             ans = await (self.answerer._general(request, history) if is_smalltalk(request) else self.answerer.agenda(request))
             dec = RouteDecision(tier="L1", intent_family="general" if is_smalltalk(request) else "agenda", skills=[], plan_needed=False, risk_floor=0, memory_types=[], confidence=1.0, latency_ms=0.0, backend="rule")

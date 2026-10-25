@@ -37,7 +37,7 @@ def summarize(turn: TurnResult) -> dict[str, Any]:
         res = o.results.get(nid) or {}
         if st == "succeeded":
             if "reminder_id" in res:
-                lines.append(f"Reminder set: {res['text']} ({res['when']}).")
+                lines.append(f"Reminder set: {res['text']} ({res['when']})." + (" That time has already passed, so it will fire right away." if res.get("past") else ""))
             elif "draft" in res:
                 where = "in your Gmail drafts" if res.get("in_gmail") else "locally (connect Google write access to put it in Gmail)"
                 lines.append(f"Draft to {res['draft']['to']} saved {where}: {res['draft']['body'][:200]}")

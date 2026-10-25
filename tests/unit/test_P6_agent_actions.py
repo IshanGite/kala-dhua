@@ -141,3 +141,23 @@ async def test_a_mail_draft_goes_to_gmail_drafts_not_a_send(world):
     await start(world)
     out = summarize(await world.agent.handle("draft an email to priya@acme.com about the invoice"))
     assert SENT[-1] == ("gmail_draft", "priya@acme.com") and "Gmail drafts" in out["text"]
+
+
+async def test_a_reminder_also_asks_to_go_on_the_calendar_when_google_write_is_connected(tmp_path, monkeypatch):
+    from ragnarok.platform.secrets import MemoryStore, token_name
+
+    set_clock(RealClock())
+    monkeypatch.setenv("RAGNAROK_HOME", str(tmp_path / "home2"))
+    vault = MemoryStore()
+    vault.set(token_name("google", "write"), json.dumps({"client_id": "a", "client_secret": "b", "refresh_token": "c"}))
+    SENT.clear()
+    w = build_world(vault=vault, gateway=FakeGateway(responder), sandbox=False, use_laya=False, embed_rungs=True, senders={"calendar": fake_cal}, max_cpu=101)
+    try:
+        await start(w)
+        task = asyncio.create_task(w.agent.handle("set a reminder on 25 oct 7 pm for gym"))
+        cards = await asyncio.wait_for(approve_all(w, True), 8)
+        out = summarize(await asyncio.wait_for(task, 8))
+        assert [c["skill"] for c in cards] == ["calendar.add"] and "Reminder set: gym" in out["text"] and "Added to Google Calendar" in out["text"]
+        assert SENT[-1][0] == "calendar" and SENT[-1][1] == "gym"
+    finally:
+        w.mem.close()

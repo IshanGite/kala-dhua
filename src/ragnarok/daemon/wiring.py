@@ -35,7 +35,7 @@ from ragnarok.memory.reader import MemoryReader
 from ragnarok.memory.routes_store import RoutesStore
 from ragnarok.memory.runtime_state import RuntimeState
 from ragnarok.memory.service import MemoryService
-from ragnarok.platform.secrets import SecretStore, default_store
+from ragnarok.platform.secrets import SecretStore, default_store, token_name
 from ragnarok.policy.engine import load_rules
 from ragnarok.router.backends.laya import LayaBackend
 from ragnarok.router.backends.ollama_small import OllamaSmallBackend
@@ -130,7 +130,7 @@ def build_world(*, use_laya: bool = True, sandbox: bool = True, embed_rungs: boo
     answerer = Answerer(reader, index, gw, COMPARTMENT)
     planner = Planner(gw, lambda n: _manifest(registry, n), Agent._now_text)
     agent = Agent(mem=mem, ledger=ledger, reader=reader, index=index, gateway=gw, cascade=cascade, planner=planner, executor=executor, registry=registry, library=library,
-                  routes=routes, ctx=ExecContext(compartment=COMPARTMENT, workspace=ws, data_dir=root, today=date.today().isoformat()), answerer=answerer, fast_refuse=True)
+                  routes=routes, ctx=ExecContext(compartment=COMPARTMENT, workspace=ws, data_dir=root, today=date.today().isoformat()), answerer=answerer, fast_refuse=True, calendar_mirror=lambda: vault.get(token_name("google", "write")) is not None)
     state = RuntimeState(mem)
     notif = Notifications(default_source(), lambda: json.loads(state.get("notif_apps", "[]")))
     runners["notifications"] = ConnectorRunner(mem, queue, notif, COMPARTMENT, gateway=gw, index=index)

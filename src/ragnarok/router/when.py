@@ -7,6 +7,11 @@ from datetime import datetime, timedelta
 
 _TIME = re.compile(r"\b(\d{1,2})(?::([0-5]\d))?\s*(am|pm)\b|\b([01]?\d|2[0-3]):([0-5]\d)\b", re.I)
 _IN = re.compile(r"\bin\s+(\d{1,3})\s*(minute|min|hour|hr|day|week)s?\b", re.I)
+_MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"]
+_MON = r"(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)"
+_DMY = re.compile(rf"\b(\d{{1,2}})(?:st|nd|rd|th)?\s+(?:of\s+)?({_MON})\b(?:\s+(\d{{4}}))?", re.I)
+_MDY = re.compile(rf"\b({_MON})\s+(\d{{1,2}})(?:st|nd|rd|th)?\b(?:,?\s+(\d{{4}}))?", re.I)
+_NUM = re.compile(r"\b(\d{1,2})/(\d{1,2})(?:/(\d{2,4}))?\b")
 _DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
 _PART = {"morning": 9, "noon": 12, "afternoon": 15, "evening": 18, "tonight": 20, "night": 20}
 
@@ -19,6 +24,14 @@ def _clock(text: str) -> tuple[int, int] | None:
         h = int(m.group(1)) % 12 + (12 if m.group(3).lower() == "pm" else 0)
         return h, int(m.group(2) or 0)
     return int(m.group(4)), int(m.group(5))
+
+
+def _safe_date(now: datetime, d: int, mo: int, yr: str | None):  # noqa: ANN202
+    try:
+        year = int(yr) + (2000 if yr and len(yr) == 2 else 0) if yr else now.year
+        return datetime(year, mo, d).date()
+    except ValueError:
+        return None
 
 
 def parse_when(text: str, now: datetime) -> datetime | None:
@@ -36,7 +49,19 @@ def parse_when(text: str, now: datetime) -> datetime | None:
         delta = {"minute": timedelta(minutes=n), "min": timedelta(minutes=n), "hour": timedelta(hours=n), "hr": timedelta(hours=n), "day": timedelta(days=n), "week": timedelta(weeks=n)}[unit]
         return (now + delta).replace(second=0, microsecond=0)
     day = None
-    if "tomorrow" in low:
+    ex = _DMY.search(low)
+    if ex:
+        d, mo, yr = int(ex.group(1)), _MONTHS.index(ex.group(2)[:3].lower()) + 1, ex.group(3)
+        day = _safe_date(now, d, mo, yr)
+    if day is None and (ex := _MDY.search(low)):
+        mo, d, yr = _MONTHS.index(ex.group(1)[:3].lower()) + 1, int(ex.group(2)), ex.group(3)
+        day = _safe_date(now, d, mo, yr)
+    if day is None and (ex := _NUM.search(low)):
+        d, mo, yr = int(ex.group(1)), int(ex.group(2)), ex.group(3)  # day/month, the common order in India
+        day = _safe_date(now, d, mo, yr)
+    if day is not None:
+        pass
+    elif "tomorrow" in low:
         day = (now + timedelta(days=1)).date()
     elif "today" in low or "tonight" in low:
         day = now.date()
@@ -63,7 +88,7 @@ def parse_when(text: str, now: datetime) -> datetime | None:
 
 _LEAD = re.compile(r"^\s*(?:please\s+)?(?:can you\s+)?(?:remind me|set (?:a )?reminder|add (?:a )?(?:to-?do|reminder)|note)\s*(?:(?:to|about|that|for)\b)?\s*", re.I)
 _TIMEWORDS = re.compile(
-    r"\b(?:tomorrow(?:\s+(?:morning|afternoon|evening|night))?|today|tonight|this\s+(?:morning|afternoon|evening)|in\s+\d{1,3}\s*(?:minutes?|mins?|hours?|hrs?|days?|weeks?)|"
+    r"\b(?:(?:on\s+)?\d{1,2}(?:st|nd|rd|th)?\s+(?:of\s+)?" + _MON + r"(?:\s+\d{4})?|(?:on\s+)?" + _MON + r"\s+\d{1,2}(?:st|nd|rd|th)?(?:,?\s+\d{4})?|(?:on\s+)?\d{1,2}/\d{1,2}(?:/\d{2,4})?|tomorrow(?:\s+(?:morning|afternoon|evening|night))?|today|tonight|this\s+(?:morning|afternoon|evening)|in\s+\d{1,3}\s*(?:minutes?|mins?|hours?|hrs?|days?|weeks?)|"
     r"(?:on\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)(?:\s+(?:morning|afternoon|evening|night))?|(?:at\s+)?\d{1,2}(?::[0-5]\d)?\s*(?:am|pm)|at\s+(?:[01]?\d|2[0-3]):[0-5]\d)\b", re.I)
 
 
@@ -73,7 +98,7 @@ def split_reminder(request: str) -> tuple[str, str]:
     when = " ".join(m.group(0) for m in _TIMEWORDS.finditer(body))
     text = re.sub(r"\s{2,}", " ", _TIMEWORDS.sub("", body)).strip(" ,.;:-")
     text = re.sub(r"\b(?:at|on|by|for)\s*$", "", text, flags=re.I).strip(" ,.;:-")
-    text = re.sub(r"^(?:to|about|that)\b\s*", "", text, flags=re.I).strip(" ,.;:-")
+    text = re.sub(r"^(?:to|about|that|for)\b\s*", "", text, flags=re.I).strip(" ,.;:-")
     return (text or body.strip()), when
 
 
@@ -135,6 +160,15 @@ def agenda_range(text: str, now: datetime) -> tuple[datetime, datetime]:
     low = text.lower()
     start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     one = timedelta(days=1)
+    for rx, order in ((_DMY, "dmy"), (_MDY, "mdy"), (_NUM, "num")):  # an explicit date wins: 'on 27 oct', 'oct 27', '27/10'
+        m = rx.search(low)
+        if m:
+            g = m.groups()
+            d, mo, yr = (int(g[0]), _MONTHS.index(g[1][:3].lower()) + 1, g[2]) if order == "dmy" else (int(g[1]), _MONTHS.index(g[0][:3].lower()) + 1, g[2]) if order == "mdy" else (int(g[0]), int(g[1]), g[2])
+            day = _safe_date(now, d, mo, yr)
+            if day is not None:
+                d0 = datetime(day.year, day.month, day.day)
+                return d0, d0 + one
     if "day after tomorrow" in low:
         return start + 2 * one, start + 3 * one
     if "tomorrow" in low:
