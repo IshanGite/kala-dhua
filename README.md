@@ -104,6 +104,24 @@ flowchart LR
   UI[Local UI / CLI] <--> BRK
 ```
 
+### The eleven memory types
+
+All eleven live in a single encrypted SQLCipher file. The table says how each one is realised today — including the parts that are only partial:
+
+| # | Type | How it works in practice | State |
+|---|---|---|---|
+| 1 | Working | Running tasks and their steps are saved to disk in `tasks` and `task_nodes`, so a crash resumes them (measured restore: 3.3 s). | Working |
+| 2 | Sensory buffer | New messages enter an ingest queue, then get chunked and embedded. | Queue works; the planned 7-day purge of processed raw items is not implemented yet |
+| 3 | Episodic | `events` is an append-only, hash-chained log of every message, reply and task result. | Working; never half-life pruned, because the log is meant to be tamper-evident |
+| 4 | Semantic | `facts`, `chunks` and `embeddings` with provenance; retrieval is keyword plus vector plus recency. | Working and measured (23/24 correct) |
+| 5 | Preference/profile | `facts` rows of kind preference ("remember that I prefer…"); editing a fact pins it. | Working |
+| 6 | Relational (people) | "What did Ravi say" works by looking up the message author. | Partial: the `people`, `identities` and `merge_log` tables exist but nothing writes to them yet, so there is no identity merging across apps |
+| 7 | Prospective | `commitments` and reminders: due dates, firing on time, snooze. | Working |
+| 8 | Procedural | The route library holds learned routes and their stats. | Working |
+| 9 | Meta-memory | Router calibration and route stats. | Partial: the `router_stats` and `skill_stats` tables are never written |
+| 10 | Project/context | Compartments partition every row (the app uses `work`). | Partial: there is no `projects` table or project-close archiving yet |
+| 11 | Autobiographical timeline | `consolidate()` turns events older than 14 days into saga summaries. | Working; the default is extractive, not model-written |
+
 ---
 
 ## Quickstart
@@ -253,31 +271,39 @@ A Norse-themed desktop window (Odin's gold, Thor's lightning blue, a glass orb t
 
 ## Evaluation & evidence
 
-Every claim is measured on this project's own harness and recorded in [`docs/evidence/`](docs/evidence/) and [`docs/EVALS.md`](docs/EVALS.md). The `evals/` harness (`ragnarok evals`) runs ten suites — exact answers, intent, actions, end-to-end tasks, grounded memory, digest, forgetting, security, multimodal and reliability — against the real local models.
+Every claim is measured on this project's own harness and recorded in [`docs/evidence/`](docs/evidence/) and [`docs/EVALS.md`](docs/EVALS.md). No vendor benchmark is ever quoted as a fact.
 
-**Latest measured run (all models local):**
+### The harness
 
-| Suite | Result |
-|---|---|
-| Exact answers (time, dates, units) | 93/93 |
-| Understanding intent | 145/156 correct; 0/122 non-actions treated as actions; 3/34 actions missed |
-| Reading action requests | 37/37 right skill; 36/37 fully right (the one miss read "in an hour" as 30 minutes) |
-| Doing tasks end to end | 37/37 succeeded; 0 wrong or extra side effects; 0/16 denied-but-executed |
-| Grounded memory answers | 23/24 correct; 0/10 invented answers |
-| Digest | 0/90 wrong merges; only 5/15 same-topic pairs grouped (deliberately conservative) |
-| Forgetting (180 simulated days) | 180/180 frequently used facts kept; 5/5 pinned kept; unused facts pruned (127/720 still active) |
-| Security | 0 of 74 attacks succeeded (95% CI up to 4.9%); held-out injections: scanner alone 2/12, with the small-model second opinion 12/12, 0/30 false alarms |
-| Multimodal | OCR 47/47 words; vision engines 8/8 each; speech language ID 3/4 |
-| Reliability | 300/300 hostile or random inputs handled, 0 unapproved sends, slowest 8.0 s; 30/30 concurrent requests answered; 7/7 graceful replies with the model server down (p95 16 ms) |
+`ragnarok evals` (or `python -m evals.run`) runs ten suites from `evals/` against the **real local models** — the model layer is never mocked, and no cloud service is touched at any point:
 
-**Other measurements (separate benchmark scripts):**
+1. **Seed a throwaway world.** Each suite builds synthetic messages, fake senders and, for the task and security suites, simulated clicks, denials and typed approvals. Nothing real is sent or read.
+2. **Run the real pipeline.** Ingestion, router, planner, executor, broker and memory run exactly as they do in production — the suites exercise the app, not a copy of it.
+3. **Score against ground truth.** Every judgement is compared with author-written expected answers (exact-answer ground truth comes from Python's own `zoneinfo`/`datetime`) and written to `docs/evidence/evals/*.json`; `docs/EVALS.md` is regenerated from those files.
+4. **Stay honest about the data.** Datasets are written by the author of the system. Where a suite was tuned on its own data it says so and reports a held-out set separately (intent: 99 tuning messages, 57 written afterwards). Confidence intervals are Wilson 95%; with small samples the interval, not the point value, is the claim.
+5. **Publish the misses.** Every single miss is listed in `docs/EVALS.md` so any number can be re-checked, and several suites exist precisely because an earlier run caught a real bug (a past date for "days until 1 January", invented answers to unanswerable questions, a 30–60 s hang on junk input).
+
+### How each suite tests, and what it found
+
+| Suite | What was actually done | Result | What it means |
+|---|---|---|---|
+| Exact answers | 93 questions: 20 cities in two phrasings, 25 random date offsets, days-until, unit conversions. Ground truth from Python's `zoneinfo` and `datetime`. | 93/93 | Simple facts are never left to a model. One real bug found: "days until 1 January" returned a past date. |
+| Intent | 156 labelled messages over 7 classes; 99 used to tune the prompts, 57 written afterwards. | 145/156 (93%); 0/122 non-actions treated as actions; 3/34 real actions missed | The safe error dominates: it would rather miss an action and ask again than do something you didn't ask for. |
+| Action reading | 37 requests with expected skill and slots; times checked against the system clock at run time; 30 negatives tested the parser alone. | 37/37 right skill; 36/37 fully right slots; 0/30 false actions | The one miss was "in an hour" read as 30 minutes; a code-side time override is now in place. |
+| Tasks end to end | 37 real tasks (mail, Telegram, Slack, Discord, calendar, Drive, multi-step) with a simulated click; 16 denials; 30 non-actions and questions; 5 typed "yes"/"do it"; 4 dictated messages compared word for word. | 37/37 done; 0 wrong or extra side effects; 0/16 denied tasks executed; 0/30 non-actions sent anything; typed "yes" approved 0/5 | Typed text can't approve anything; a denied card does nothing and the agent never claims otherwise. Cost: ~3.6 model calls and 1,740 tokens per task, p50 1.3 s. |
+| Grounded memory | 12 messages, 24 questions with known answers, 10 unanswerable. | 23/24 correct and cited to the right source; 0/10 invented | The first run invented 9 of 10 unanswerable answers (a made-up date, a made-up "$50,000"); a subject check and a number check fixed it. |
+| Digest | 15 messages across 5 topics and 3 apps, plus 3 noise items; pairwise grouping scored against author labels. | 0/90 wrong merges; 5/15 same-topic pairs grouped | Deliberately cautious: it never mixes topics, but it under-groups. This is a known weak spot. |
+| Forgetting | 180 simulated days, 10 new facts a day, a clock that only moves when told. | 180/180 frequently used old facts kept; 5/5 pinned kept; unused facts pruned; growth falls from 10 to ~3.6 a day | Memory stays bounded without losing what you actually use; this closed an old gap in the requirements trace. |
+| Security | 74 attacks through mail, chat, memory, a skill scroll and a screen picture, plus compound read-then-write cases, a canary secret, typed approvals and card integrity. | 0/74 successful (95% CI up to 4.9%); held-out injections: scanner alone 2/12, with the small-model second opinion 12/12, 0/30 false alarms; typed approvals that acted 0/10 | Nothing got through; with 74 trials the honest upper bound at 95% confidence is 4.9%. |
+| Reliability | 300 inputs (hostile and random), 30 simultaneous requests, and the model server replaced by a dead port. | 300/300 handled; 0 unapproved sends; slowest 8.0 s (p95 2.3 s); 30/30 concurrent requests answered; 7/7 graceful replies with the model server down (p95 16 ms) | Time, dates, reminders and mail still work with no model at all. The first run found a 30–60 s hang on junk input, now fixed. |
+| Pictures and speech | OCR on four rendered pages; 8 questions on synthetic invoices through each of the two vision engines; synthetic speech in 4 languages. | OCR 47/47 words; 8/8 for each engine; language ID 3/4 | The speech test is synthetic and the base model's accuracy on it is limited (~64% word overlap) — said plainly. |
+
+### Other measurements (separate benchmark scripts)
 
 - **Retrieval** over 2,000 messages: p50 45 ms, p95 94 ms, recall@5 1.0.
 - **Crash recovery**: state restored in ~3.3 s after `kill -9` (gate 5 s).
 - **Resource use** under load: 4.9% mean / 12.2% peak of the machine (gate 30%).
 - **Skill-scroll routing**: 29/29 on the tuning set, 11/14 held-out.
-
-Confidence intervals are Wilson 95%; small samples are reported as such, and every miss is listed in `docs/EVALS.md` so the numbers can be checked.
 
 ---
 
