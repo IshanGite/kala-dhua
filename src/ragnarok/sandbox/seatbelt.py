@@ -9,8 +9,10 @@ granted. `sandbox-exec` is deprecated by Apple but works; if the profile cannot 
 from __future__ import annotations
 
 import os
+import shutil
 import sys
 import tempfile
+import threading
 from pathlib import Path
 
 from ragnarok.core.errors import SandboxUnavailable
@@ -34,6 +36,10 @@ def skill_interpreter() -> Path:
 
 class SeatbeltBackend:
     name = "seatbelt"
+
+    def __init__(self) -> None:
+        self._dirs: list[Path] = []
+        self._lock = threading.Lock()
 
     def probe(self) -> ProbeResult:
         if sys.platform != "darwin":
@@ -76,6 +82,15 @@ class SeatbeltBackend:
         if not probe.available:
             raise SandboxUnavailable(probe.detail)
         text, phash = self.profile(argv, granted, limits)
-        profile_path = Path(tempfile.mkdtemp(prefix="rag-sb-", dir=str(granted.run_dir.parent))) / "profile.sb"
+        profile_dir = Path(tempfile.mkdtemp(prefix="rag-sb-"))
+        profile_path = profile_dir / "profile.sb"
         profile_path.write_text(text, encoding="utf-8", newline="\n")
+        with self._lock:
+            self._dirs.append(profile_dir)
         return [SANDBOX_EXEC, "-f", str(profile_path), *argv], phash
+
+    def cleanup(self) -> None:
+        with self._lock:
+            dirs, self._dirs = self._dirs, []
+        for d in dirs:
+            shutil.rmtree(d, ignore_errors=True)

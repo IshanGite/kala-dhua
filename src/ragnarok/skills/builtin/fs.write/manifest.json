@@ -1,0 +1,55 @@
+{
+  "name": "fs.write",
+  "version": "0.1.0",
+  "entrypoint": {
+    "type": "python",
+    "file": "main.py"
+  },
+  "description": "Use when you need to create or overwrite a text file inside the approved workspace.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "path": {
+        "type": "string",
+        "minLength": 1
+      },
+      "content": {
+        "type": "string",
+        "maxLength": 500000
+      },
+      "overwrite": {
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "path",
+      "content"
+    ],
+    "additionalProperties": false
+  },
+  "returns": {
+    "type": "object"
+  },
+  "permissions": [
+    {
+      "permission": "fs.write",
+      "scope": "workspace"
+    }
+  ],
+  "side_effects": "reversible",
+  "dry_run": true,
+  "idempotent": true,
+  "examples": [
+    {
+      "params": {
+        "path": "out/summary.md",
+        "content": "hello"
+      }
+    }
+  ],
+  "param_roles": {
+    "paths": [
+      "path"
+    ]
+  }
+}

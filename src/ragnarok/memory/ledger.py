@@ -193,3 +193,58 @@ class Ledger:
             return int(r[0]) if r else 0
 
         return self._m.with_tx(op)
+
+    # ------------------------------------------------------------------ skill registry (D-29: hash-verified skills)
+    def register_skill(self, skill_id: str, version: str, tree_hash: str, scan_report: dict) -> None:
+        def op(c):
+            c.execute(
+                "INSERT INTO skill_registry(skill_id,version,tree_hash,enabled,scan_report,registered_at) VALUES (?,?,?,0,?,?)"
+                " ON CONFLICT(skill_id) DO UPDATE SET version=excluded.version, tree_hash=excluded.tree_hash, enabled=0,"
+                " scan_report=excluded.scan_report, registered_at=excluded.registered_at",
+                (skill_id, version, tree_hash, _dumps(scan_report), self._now()),
+            )
+
+        self._m.with_tx(op)
+
+    def set_skill_enabled(self, skill_id: str, enabled: bool) -> None:
+        self._m.with_tx(lambda c: c.execute("UPDATE skill_registry SET enabled=? WHERE skill_id=?", (1 if enabled else 0, skill_id)))
+
+    def get_skill(self, skill_id: str) -> dict[str, Any] | None:
+        def op(c):
+            r = c.execute("SELECT * FROM skill_registry WHERE skill_id=?", (skill_id,)).fetchone()
+            return dict(r) if r else None
+
+        return self._m.with_tx(op)
+
+    def list_skills(self) -> list[dict[str, Any]]:
+        return self._m.with_tx(lambda c: [dict(r) for r in c.execute("SELECT * FROM skill_registry ORDER BY skill_id")])
+
+    def remove_skill(self, skill_id: str) -> None:
+        self._m.with_tx(lambda c: c.execute("DELETE FROM skill_registry WHERE skill_id=?", (skill_id,)))
+
+    # ------------------------------------------------------------------ security records (codes only, never content)
+    def record_incident(self, kind: str, detail_codes: list[str], task_id: str | None = None) -> str:
+        iid = new_id()
+        self._m.with_tx(lambda c: c.execute("INSERT INTO security_incidents(id,ts,kind,detail_codes,task_id) VALUES (?,?,?,?,?)",
+                                            (iid, self._now(), kind, _dumps(detail_codes), task_id)))
+        return iid
+
+    def incidents(self) -> list[dict[str, Any]]:
+        return self._m.with_tx(lambda c: [dict(r) for r in c.execute("SELECT * FROM security_incidents ORDER BY ts")])
+
+    def add_snapshot(self, scope: str, path: str, node_id: str | None = None) -> str:
+        sid = new_id()
+        self._m.with_tx(lambda c: c.execute("INSERT INTO snapshots(id,created_at,scope,path,task_node_id) VALUES (?,?,?,?,?)",
+                                            (sid, self._now(), scope, path, node_id)))
+        return sid
+
+    def add_canary(self, kind: str, path_or_token_hash: str) -> str:
+        cid = new_id()
+        self._m.with_tx(lambda c: c.execute("INSERT INTO canaries(id,kind,path_or_token_hash) VALUES (?,?,?)", (cid, kind, path_or_token_hash)))
+        return cid
+
+    def trip_canary(self, canary_id: str) -> None:
+        self._m.with_tx(lambda c: c.execute("UPDATE canaries SET tripped_at=? WHERE id=?", (self._now(), canary_id)))
+
+    def canaries(self) -> list[dict[str, Any]]:
+        return self._m.with_tx(lambda c: [dict(r) for r in c.execute("SELECT * FROM canaries")])

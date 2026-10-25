@@ -145,4 +145,9 @@ def supervise(cmd: list[str], *, cwd: Path, env: dict[str, str], stdin: bytes | 
 def run(backend: SandboxBackend, argv: list[str], granted: Granted, limits: Limits, *, stdin: bytes | None = None) -> RunResult:
     granted.run_dir.mkdir(parents=True, exist_ok=True)
     cmd, policy_hash = backend.wrap(argv, granted, limits)
-    return supervise(cmd, cwd=granted.run_dir, env=clean_env(granted), stdin=stdin, limits=limits, backend=backend.name, policy_hash=policy_hash)
+    try:
+        return supervise(cmd, cwd=granted.run_dir, env=clean_env(granted), stdin=stdin, limits=limits, backend=backend.name, policy_hash=policy_hash)
+    finally:
+        cleanup = getattr(backend, "cleanup", None)
+        if cleanup:
+            cleanup()

@@ -1,0 +1,43 @@
+{
+  "name": "fs.search",
+  "version": "0.1.0",
+  "entrypoint": {
+    "type": "python",
+    "file": "main.py"
+  },
+  "description": "Use when you need to find which files in the workspace mention a word or phrase.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "minLength": 1
+      },
+      "max_results": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 200
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "returns": {
+    "type": "object"
+  },
+  "permissions": [
+    {
+      "permission": "fs.read",
+      "scope": "workspace"
+    }
+  ],
+  "examples": [
+    {
+      "params": {
+        "query": "renewal"
+      }
+    }
+  ]
+}

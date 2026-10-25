@@ -1,0 +1,51 @@
+{
+  "name": "fs.read",
+  "version": "0.1.0",
+  "entrypoint": {
+    "type": "python",
+    "file": "main.py"
+  },
+  "description": "Use when you need to read a text file inside the approved workspace.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "path": {
+        "type": "string"
+      },
+      "max_chars": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 200000
+      }
+    },
+    "required": [
+      "path"
+    ],
+    "additionalProperties": false
+  },
+  "returns": {
+    "type": "object"
+  },
+  "permissions": [
+    {
+      "permission": "fs.read",
+      "scope": "workspace"
+    }
+  ],
+  "memory_scope": {
+    "read": [],
+    "write": "none"
+  },
+  "examples": [
+    {
+      "params": {
+        "path": "notes/todo.md"
+      }
+    }
+  ],
+  "param_roles": {
+    "paths": [
+      "path"
+    ]
+  }
+}

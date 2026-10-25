@@ -1,0 +1,42 @@
+{
+  "name": "python.run",
+  "version": "0.1.0",
+  "entrypoint": {
+    "type": "python",
+    "file": "main.py"
+  },
+  "description": "Use when a small calculation or data transformation needs Python code to be run. Runs in a sandbox with no network.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "code": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 20000
+      }
+    },
+    "required": [
+      "code"
+    ],
+    "additionalProperties": false
+  },
+  "returns": {
+    "type": "object"
+  },
+  "permissions": [
+    {
+      "permission": "exec",
+      "scope": "sandbox"
+    }
+  ],
+  "side_effects": "reversible",
+  "dry_run": true,
+  "timeout_s": 20,
+  "examples": [
+    {
+      "params": {
+        "code": "print(2+2)"
+      }
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+# Budgets and throttles (ARCHITECTURE 5.2 item 7). Exceeding one ends the task as partial, with a reason.
+task:
+  max_node_attempts: 40
+  max_replans: 2
+  max_model_calls: 60
+  max_minutes: 15
+hourly:
+  mail_send: 10
+  fs_mutations: 50
+  calendar_writes: 20
+  chat_posts: 10
+daily:
+  skill_installs: 3
+mail:
+  max_recipients: 5
+governor:
+  admit_below_pct: 25
+  cap_pct: 30
+  window_s: 60
+  quiet_hours: "22:00-08:00"
+router:
+  tau_route: 0.86
+  route_margin: 0.04
+  route_min_success: 0.8
+  interactive_timeout_ms: 700
+  laya_backend: laya

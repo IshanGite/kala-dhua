@@ -19,3 +19,8 @@ def mode_allows(mode: str, tier: int, *, preparing: bool = False) -> bool:
 
 def commit_requires_click(tier: int) -> bool:
     return tier >= 2
+
+
+def blocked_by_mode(mode: str, tier: int) -> bool:
+    """Observe mode never acts. In draft and act_limited a tier-2 call is not blocked here: it reaches the approval card."""
+    return mode == "observe" and tier >= 1

@@ -1,0 +1,41 @@
+{
+  "name": "note.add",
+  "version": "0.1.0",
+  "entrypoint": {
+    "type": "python",
+    "file": "main.py"
+  },
+  "description": "Use when the user asks to jot down or remember a short note for today.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "text": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 5000
+      }
+    },
+    "required": [
+      "text"
+    ],
+    "additionalProperties": false
+  },
+  "returns": {
+    "type": "object"
+  },
+  "permissions": [
+    {
+      "permission": "note.write",
+      "scope": "workspace"
+    }
+  ],
+  "side_effects": "reversible",
+  "dry_run": true,
+  "examples": [
+    {
+      "params": {
+        "text": "Call the vendor on Friday"
+      }
+    }
+  ]
+}

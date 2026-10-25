@@ -63,6 +63,7 @@ markers = [
 [tool.ruff]
 line-length = 110
 target-version = "py312"
+extend-exclude = ["src/ragnarok/skills/builtin"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]
