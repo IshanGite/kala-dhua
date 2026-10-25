@@ -27,7 +27,7 @@ def parse_when(text: str, now: datetime) -> datetime | None:
         return None
     try:  # an ISO date-time the planner already produced
         iso = datetime.fromisoformat(text.strip())
-        return iso if iso.tzinfo is None else iso.astimezone().replace(tzinfo=None)
+        return iso.replace(tzinfo=None)  # the wall-clock time as written: a small model cannot know the user's zone, so any offset it invents is ignored
     except ValueError:
         pass
     m = _IN.search(low)
@@ -74,3 +74,16 @@ def split_reminder(request: str) -> tuple[str, str]:
     text = re.sub(r"\s{2,}", " ", _TIMEWORDS.sub("", body)).strip(" ,.;:-")
     text = re.sub(r"\b(?:at|on|by|for)\s*$", "", text, flags=re.I).strip(" ,.;:-")
     return (text or body.strip()), when
+
+
+_EVENT_LEAD = re.compile(r"^\s*(?:please\s+)?(?:can you\s+)?(?:put|add|schedule|book|block(?: out)?|create|set up|plan)\s+(?:in\s+)?(?:an?\s+|the\s+|my\s+)?(?:meeting\s+)?", re.I)
+_CAL = re.compile(r"\b(?:on|to|in|into|onto)\s+(?:my\s+|the\s+)?(?:google\s+)?calendar\b", re.I)
+
+
+def split_event(request: str) -> tuple[str, str]:
+    """('hiring plan sync', 'tomorrow at 11am') from 'put the hiring plan sync on my calendar tomorrow at 11am'."""
+    body = _CAL.sub("", _EVENT_LEAD.sub("", request.strip(), count=1))
+    when = " ".join(m.group(0) for m in _TIMEWORDS.finditer(body))
+    title = re.sub(r"\s{2,}", " ", _TIMEWORDS.sub("", body)).strip(" ,.;:-")
+    title = re.sub(r"\b(?:at|on|by|for|to)\s*$", "", title, flags=re.I).strip(" ,.;:-")
+    return (title or body.strip()), when

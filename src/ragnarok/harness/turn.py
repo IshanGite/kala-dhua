@@ -6,6 +6,7 @@ shadow routes are compared against the plan the big path just produced; active r
 
 from __future__ import annotations
 
+import re
 import time
 from dataclasses import dataclass, field
 
@@ -13,7 +14,7 @@ import jsonschema
 import numpy as np
 
 from ragnarok.core.clock import get_clock
-from ragnarok.harness.answer import Answered, Answerer
+from ragnarok.harness.answer import Answered, Answerer, is_catchup
 from ragnarok.harness.executor import ExecContext, Executor, TaskOutcome
 from ragnarok.harness.plan import Plan, PlanNode, validate_plan
 from ragnarok.harness.planner import Planner
@@ -78,6 +79,25 @@ class Agent:
             return []
         return [f"[{h.kind} trust={h.trust}] {h.text[:300]}" for h in r.hits]
 
+    ACTION_WORDS = {
+        "chat.reply": r"\b(tell|message|text|reply|respond|ping|post|dm|send)\b", "mail.send": r"\b(send|email|mail|reply|forward|write back)\b",
+        "mail.draft": r"\b(draft|write|compose|prepare|reply|email)\b", "calendar.add": r"\b(calendar|schedule|book|block|meeting|appointment|put|add)\b",
+        "reminder.add": r"\b(remind|reminder|to-?do|note|remember)\b",
+    }
+    QUESTIONLIKE = re.compile(r"^\s*(what|when|where|who|whom|whose|which|why|how|is|are|was|were|do|does|did|can|could|will|would|should|any|has|have)\b|\?\s*$", re.I)
+    HISTORYLIKE = re.compile(r"\b(i just (asked|said|told)|you (just )?(said|told|answered)|earlier (we|you|i)|previous (question|message|answer)|what did i (just )?ask)\b", re.I)
+
+    def _wants_any_write(self, request: str) -> bool:
+        return any(re.search(p, request, re.I) for sk, p in self.ACTION_WORDS.items() if sk != "reminder.add") and not self.QUESTIONLIKE.search(request)
+
+    def _wants_action(self, skill: str, request: str) -> bool:
+        """A write-capable skill runs only if the words of the request actually ask for it: small talk and questions never trigger one."""
+        m = self._manifest(skill)
+        if m is None or (m.tier < 1 and not m.external_write):
+            return True
+        pat = self.ACTION_WORDS.get(skill)
+        return bool(pat and re.search(pat, request, re.I)) and not (self.QUESTIONLIKE.search(request) and skill in ("chat.reply", "mail.send", "calendar.add"))
+
     @staticmethod
     def _now_text() -> str:
         from datetime import datetime
@@ -93,7 +113,15 @@ class Agent:
 
             what, when = split_reminder(text)
             return Plan(nodes=[PlanNode(id="n1", goal=text[:200], skill=skill, params={"text": what, "when": when}, criteria=CRITERIA[skill])])
-        if m.external_write:
+        if skill == "calendar.add":
+            from ragnarok.router.when import parse_when, split_event
+
+            title, when = split_event(text)
+            from datetime import datetime as _dt
+
+            if when and parse_when(when, _dt.fromtimestamp(get_clock().now_ms() / 1000)) is not None:
+                return Plan(nodes=[PlanNode(id="n1", goal=text[:200], skill=skill, params={"title": title, "when": when}, criteria=CRITERIA[skill])])
+        if m.tier >= 1 or m.external_write:
             snippets = []  # what leaves the machine is built from the user's own words only, never from memory or received text
         deadline = get_clock().monotonic() + 8
         for _ in range(2):
@@ -123,14 +151,32 @@ class Agent:
             return None
         return plan if validate_plan(plan, self._manifest).ok else None
 
-    async def handle(self, request: str, *, trust: str = "user_direct") -> TurnResult:
+    async def handle(self, request: str, *, trust: str = "user_direct", history: list[tuple[str, str]] | None = None) -> TurnResult:
         t0 = time.perf_counter()
         now = get_clock().now_ms()
         self.mem.write_event(EventIn(compartment=self.ctx.compartment, kind="user_message", actor="user", content=request, trust=trust))  # type: ignore[arg-type]
+        if self.answerer is not None and is_catchup(request):  # a briefing is read-only and needs no routing
+            ans = await self.answerer.catch_up(request)
+            dec = RouteDecision(tier="L1", intent_family="catchup", skills=[], plan_needed=False, risk_floor=0, memory_types=[], confidence=1.0, latency_ms=0.0, backend="catchup")
+            return TurnResult("L1", dec, None, None, (time.perf_counter() - t0) * 1000, answer=ans)
         decision = await self.cascade.route(request, compartment=self.ctx.compartment, caller_trust=trust, now_ms=now)
         decision.memory_types = memory_types_hint(request)
         if decision.intent_family in ("memory", "general") and self.answerer is not None and decision.tier != "L0":
-            ans = await self.answerer.answer(request, general=decision.intent_family == "general")
+            ans = await self.answerer.answer(request, general=decision.intent_family == "general", history=history)
+            return TurnResult(decision.tier, decision, None, None, (time.perf_counter() - t0) * 1000, answer=ans)
+        if self.answerer is not None and history is not None and self.HISTORYLIKE.search(request):
+            ans = await self.answerer._general(request, history)
+            return TurnResult(decision.tier, decision, None, None, (time.perf_counter() - t0) * 1000, answer=ans)
+        if self.answerer is not None and decision.tier != "L0" and decision.skills and not all(self._wants_action(sk, request) for sk in decision.skills[:1]):
+            decision.notes.append("no_action_asked_so_no_tool")
+            ans = await self.answerer.answer(request, general=False, history=history)
+            if not ans.grounded:
+                ans = await self.answerer.answer(request, general=True, history=history)
+            return TurnResult(decision.tier, decision, None, None, (time.perf_counter() - t0) * 1000, answer=ans)
+        if self.answerer is not None and decision.tier == "L3" and self.QUESTIONLIKE.search(request):  # a question is answered from memory, not handed to the slow planner
+            ans = await self.answerer.answer(request, general=False, history=history)
+            if not ans.grounded:
+                ans = await self.answerer.answer(request, general=True, history=history)
             return TurnResult(decision.tier, decision, None, None, (time.perf_counter() - t0) * 1000, answer=ans)
         snippets = await self._snippets(request)
         plan: Plan | None = None
@@ -149,6 +195,10 @@ class Agent:
             manifests = [m for n in decision.shortlist if (m := self._manifest(n)) is not None] or self._all_manifests()[:5]
             pr = await self.planner.plan(request, manifests, snippets=snippets, deadline=get_clock().monotonic() + 30)
             plan, clarification = pr.plan, pr.clarification
+        if plan is None and self.answerer is not None and not self._wants_any_write(request):
+            ans = await self.answerer.answer(request, general=False, history=history)  # nothing safe to do: try to just answer from memory
+            if ans.grounded:
+                return TurnResult(decision.tier, decision, None, None, (time.perf_counter() - t0) * 1000, answer=ans)
         if plan is None:
             self.mem.write_event(EventIn(compartment=self.ctx.compartment, kind="clarification", actor="agent", content=clarification or "no plan", trust="agent"))
             return TurnResult(decision.tier, decision, None, clarification, (time.perf_counter() - t0) * 1000)

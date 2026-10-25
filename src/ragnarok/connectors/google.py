@@ -123,14 +123,15 @@ def valid_address(addr: str) -> bool:
     return bool(_ADDR.match(addr or "")) and not any(c in addr for c in "\r\n")
 
 
-def build_raw(to: str, subject: str, body: str) -> str:
+def build_raw(to: str, subject: str, body: str, *, auto: bool = True) -> str:
     """A plain-text email as the base64url string Gmail wants. Header values lose line breaks, so a subject can never inject a header."""
     if not valid_address(to):
         raise ValueError("not a valid recipient address")
     m = EmailMessage()
     m["To"] = to
     m["Subject"] = " ".join(subject.split())[:200] or "(no subject)"
-    m["Auto-Submitted"] = "auto-generated"
+    if auto:  # our own mail says so, so other robots (and our own reader) will not answer it
+        m["Auto-Submitted"] = "auto-generated"
     m.set_content(body)
     return base64.urlsafe_b64encode(m.as_bytes()).decode()
 

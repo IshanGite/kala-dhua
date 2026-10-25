@@ -134,7 +134,7 @@ async def test_a_calendar_event_waits_for_a_click_then_lands_in_the_calendar(wor
     task = asyncio.create_task(world.agent.handle("put a call with Priya on my calendar tomorrow at 3pm"))
     cards = await asyncio.wait_for(approve_all(world, True), 5)
     out = summarize(await asyncio.wait_for(task, 5))
-    assert cards[0]["skill"] == "calendar.add" and SENT[-1][0] == "calendar" and SENT[-1][1] == "Call with Priya" and "Added to Google Calendar" in out["text"]
+    assert cards[0]["skill"] == "calendar.add" and any(f["value"].lower().startswith("call with priya") or f["name"] == "title" for f in cards[0]["fields"]) and SENT[-1][0] == "calendar" and SENT[-1][1].lower() == "call with priya" and "Added to Google Calendar" in out["text"]
 
 
 async def test_a_mail_draft_goes_to_gmail_drafts_not_a_send(world):

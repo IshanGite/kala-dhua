@@ -62,11 +62,14 @@ class ChatService:
     def __init__(self, agent: Agent) -> None:
         self._agent = agent
         self.jobs: dict[str, Job] = {}
+        self.history: list[tuple[str, str]] = []  # the running conversation, in memory only
         self._tasks: set[asyncio.Task[None]] = set()
 
     async def _run(self, job: Job) -> None:
         try:
-            job.reply = summarize(await self._agent.handle(job.text))
+            job.reply = summarize(await self._agent.handle(job.text, history=list(self.history)))
+            self.history += [("user", job.text), ("assistant", job.reply.get("text", "")[:600])]
+            self.history = self.history[-12:]
             job.state = "done"
         except Exception as exc:  # noqa: BLE001 - a failed turn becomes a message, never a crash
             log("chat_turn_failed", err=type(exc).__name__)
