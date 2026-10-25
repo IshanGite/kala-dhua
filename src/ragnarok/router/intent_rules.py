@@ -14,6 +14,7 @@ RULES: list[tuple[str, re.Pattern[str]]] = [(s, re.compile(p, re.I)) for s, p in
     ("mail.reply", r"^\s*(?:please\s+)?(?:can you\s+)?(?:reply|respond|answer|write back)\s+to\b"),
     ("mail.send", r"^\s*(?:please\s+)?(?:can you\s+)?(?:send|email|mail)\b.*\b[\w.+-]+@[\w-]+\.[\w.-]+\b"),
     ("mail.draft", r"^\s*(?:please\s+)?(?:can you\s+)?(?:draft|write|compose|prepare)\s+(?:an?\s+|the\s+)?(?:email|mail|message)\b.*\b[\w.+-]+@[\w-]+\.[\w.-]+\b"),
+    ("python.run", r"^\s*(?:please\s+)?(?:can you\s+)?(?:run|execute|write and run)\s+(?:a\s+|some\s+|the\s+)?(?:small\s+)?(?:python|code|script|program)\b"),
     ("calendar.add", r"\b(?:put|add|schedule|book|block|create)\b.*\b(?:on|to|in|into)\s+(?:my\s+|the\s+)?(?:google\s+)?calendar\b"),
     ("drive.create", r"\b(?:create|write|save|make)\b.*\b(?:docs?|documents?|notes?|files?)\b.*\b(?:in|on|to)\s+(?:my\s+)?(?:google\s+)?drive\b|\bin (?:my\s+)?(?:google\s+)?drive\b.*\b(?:create|write|save)\b"),
 ]]

@@ -28,6 +28,7 @@ from ragnarok.harness.answer import (
     is_smalltalk,
     source_recall,
 )
+from ragnarok.harness.calc import try_calc
 from ragnarok.harness.executor import ExecContext, Executor, TaskOutcome
 from ragnarok.harness.plan import Plan, PlanNode, validate_plan
 from ragnarok.harness.planner import Planner
@@ -99,7 +100,7 @@ class Agent:
 
     ACTION_WORDS = {
         "chat.reply": r"\b(tell|message|text|reply|respond|ping|post|dm|send)\b", "mail.send": r"\b(send|email|mail|reply|forward|write back)\b",
-        "mail.draft": r"\b(draft|write|compose|prepare|reply|email)\b", "calendar.add": r"\b(calendar|schedule|book|block|meeting|appointment|put|add)\b", "mail.reply": r"\b(reply|respond|answer|write back)\b", "drive.create": r"\b(create|write|save|make|draft)\b.*\b(doc|document|drive|note|notes|file)\b",
+        "mail.draft": r"\b(draft|write|compose|prepare|reply|email)\b", "calendar.add": r"\b(calendar|schedule|book|block|meeting|appointment|put|add)\b", "mail.reply": r"\b(reply|respond|answer|write back)\b", "python.run": r"\b(run|execute|python|script|code|program)\b", "drive.create": r"\b(create|write|save|make|draft)\b.*\b(doc|document|drive|note|notes|file)\b",
         "reminder.add": r"\b(remind|reminder|to-?do|note|remember)\b",
     }
     QUESTIONLIKE = re.compile(r"^\s*(what|when|where|who|whom|whose|which|why|how|is|are|was|were|do|does|did|can|could|will|would|should|any|has|have)\b|\?\s*$", re.I)
@@ -326,6 +327,9 @@ class Agent:
             ans = await self.answerer.recent_from(srcs)
             dec = RouteDecision(tier="L1", intent_family="recall", skills=[], plan_needed=False, risk_floor=0, memory_types=["episodic"], confidence=1.0, latency_ms=0.0, backend="rule")
             return TurnResult("L1", dec, None, None, (time.perf_counter() - t0) * 1000, answer=ans)
+        if (calc := try_calc(request)) is not None:  # arithmetic is done by code, never by the model
+            dec = RouteDecision(tier="L1", intent_family="calc", skills=[], plan_needed=False, risk_floor=0, memory_types=[], confidence=1.0, latency_ms=0.0, backend="rule", trace=["Arithmetic evaluated by code (a model is not trusted with sums)"])
+            return TurnResult("L1", dec, None, None, (time.perf_counter() - t0) * 1000, answer=Answered(calc if " " in calc else f"= {calc}", grounded=True), timings=tm)
         if self.answerer is not None and TIME_ASK.search(request) and not self._is_action_request(request):
             from datetime import datetime as _dt
 

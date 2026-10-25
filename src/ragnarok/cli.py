@@ -26,6 +26,83 @@ def doctor(
     raise typer.Exit(run_doctor(benchmark=benchmark, restore_test=restore_test))
 
 
+skill_app = typer.Typer(help="Define and manage your own skills (a skill is a small program the agent may call, run in a sandbox).", no_args_is_help=True)
+app.add_typer(skill_app, name="skill")
+
+_MAIN = '''import json
+import sys
+
+req = json.load(sys.stdin)  # {"params": {...}, "ctx": {"workspace": ..., "dry_run": bool}}
+params, ctx = req["params"], req["ctx"]
+if ctx.get("dry_run"):
+    print(json.dumps({"ok": True, "result": {"would_do": params}}))
+    sys.exit(0)
+# --- your code: it runs in a sandbox (no network, only the workspace folder) ---
+result = {"echo": params}
+print(json.dumps({"ok": True, "result": result}))
+'''
+
+
+@skill_app.command("new")
+def skill_new(name: str = typer.Argument(..., help="lowercase name, for example text.count"), folder: str = typer.Option(".", help="where to create the skill folder"),
+              permission: list[str] = typer.Option([], "--permission", help="what it needs: fs.read, fs.write, note.write, ... (default none)")) -> None:  # noqa: B008
+    """Create a skill template you can edit, then register with `ragnarok skill add`."""
+    import json
+    from pathlib import Path
+
+    d = Path(folder).expanduser() / name
+    if d.exists():
+        typer.echo(f"{d} already exists", err=True)
+        raise typer.Exit(1)
+    d.mkdir(parents=True)
+    manifest = {"name": name, "version": "0.1.0", "description": f"Use when the user asks to {name.replace('.', ' ')}. (Describe, in one sentence, when to use this skill.)",
+                "entrypoint": {"type": "python", "file": "main.py"}, "parameters": {"type": "object", "properties": {"text": {"type": "string", "maxLength": 5000}}, "required": ["text"], "additionalProperties": False},
+                "permissions": [{"permission": p} for p in permission], "side_effects": "none", "dry_run": True, "examples": [{"params": {"text": "example"}, "note": "an example request in plain words"}]}
+    (d / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    (d / "main.py").write_text(_MAIN, encoding="utf-8")
+    typer.echo(f"Created {d}. Edit main.py and manifest.json, then: ragnarok skill add {d}")
+
+
+def _admin():  # noqa: ANN202
+    from ragnarok.broker.approvals import Broker
+    from ragnarok.config.paths import data_dir, db_path, ensure_dirs
+    from ragnarok.memory.ledger import Ledger
+    from ragnarok.memory.service import MemoryService
+    from ragnarok.platform.secrets import default_store
+    from ragnarok.skills.registry import SkillRegistry
+    from ragnarok.store.crypto import KeyHierarchy
+
+    root = ensure_dirs()
+    keys = KeyHierarchy.load_or_create(default_store())
+    mem = MemoryService(db_path(root), keys)
+    ledger = Ledger(mem)
+    return mem, ledger, SkillRegistry(ledger, Broker(ledger, keys), data_dir() / "skills")
+
+
+@skill_app.command("add")
+def skill_add(folder: str = typer.Argument(..., help="a folder with manifest.json and the skill's files")) -> None:
+    """Register a skill: it is copied, scanned and hashed. It stays OFF until you approve it in the window (Sources > Skills)."""
+    from pathlib import Path
+
+    mem, _ledger, reg = _admin()
+    try:
+        r = reg.register(Path(folder).expanduser())
+        typer.echo(f"registered {r.skill_id} (risk tier {int(r.manifest.tier)}); install scan: {'BLOCKED' if r.report.blocked else 'clean'}. Enable it in the window; it needs your step-up approval.")
+    finally:
+        mem.close()
+
+
+@skill_app.command("list")
+def skill_list() -> None:
+    """List registered skills and whether they are on."""
+    mem, ledger, _reg = _admin()
+    try:
+        for row in ledger.list_skills():
+            typer.echo(f"{'on ' if row['enabled'] else 'off'}  {row['skill_id']}  v{row['version']}")
+    finally:
+        mem.close()
+
+
 connect_app = typer.Typer(help="Connect a source. Tokens go to the OS keychain, never to a file.", no_args_is_help=True)
 app.add_typer(connect_app, name="connect")
 

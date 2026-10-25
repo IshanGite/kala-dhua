@@ -28,7 +28,7 @@ FRIENDLY = {
     "E_BAD_RECIPIENT": "That is not a valid email address.", "E_NO_TIME": "I could not tell what time that is. Say it like 'tomorrow at 3pm'.",
     "E_AUTH": "The app refused the request (permission or expired sign-in).", "E_SLACK": "Slack refused the message. It needs the chat:write permission and the bot invited to the channel.",
     "E_DISCORD": "Discord refused the message. The bot needs permission to send messages in that channel.", "E_TELEGRAM": "Telegram refused the message.",
-    "E_APPROVAL_DENIED": "You denied it, so nothing was done.", "E_GOOGLE": "Google refused the request.", "E_NET": "No network connection to that app.",
+    "E_APPROVAL_DENIED": "You denied it, so nothing was done.", "E_CODE_NAMEERROR": "The code had an error (a name was not defined).", "E_CODE_SYNTAXERROR": "The code had a syntax error.", "E_SANDBOX_UNAVAILABLE": "No sandbox is available on this machine, so I will not run code.", "E_GOOGLE": "Google refused the request.", "E_NET": "No network connection to that app.",
 }
 
 
@@ -59,6 +59,11 @@ def summarize(turn: TurnResult) -> dict[str, Any]:
                 lines.append("Email sent" + (f" to {res['to']}." if res.get("to") else "."))
             elif res.get("posted"):
                 lines.append(f"Message posted to {res.get('to', 'the chat')}.")
+            elif "stdout" in res:
+                out = str(res["stdout"]).strip()
+                lines.append(("Ran in the sandbox. Output:\n" + out[:1500]) if out else "Ran in the sandbox. It printed nothing.")
+            elif "hits" in res:
+                lines.append(f"Found {len(res['hits'])} match(es) in memory.")
             elif "reminders" in res:
                 rs = res["reminders"]
                 lines.append("Open reminders: " + ("; ".join(r["text"] for r in rs) if rs else "none."))

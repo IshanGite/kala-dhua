@@ -34,6 +34,7 @@ class Services:
     proactive: Any = None
     mem: Any = None  # MemoryService, for delete
     reindex: Any = None  # callable: rebuild the in-memory vector index after a delete
+    skills: Any = None  # SkillsAdmin
 
 
 class ChatIn(BaseModel):
@@ -64,6 +65,10 @@ class DeleteIn(BaseModel):
 
 class FactEditIn(BaseModel):
     value: str = Field(min_length=1, max_length=2000)
+
+
+class SkillPathIn(BaseModel):
+    path: str = Field(min_length=1, max_length=500)
 
 
 class DecideIn(BaseModel):
@@ -236,6 +241,48 @@ def create_app(guard: TokenGuard | None = None, port: int = DEFAULT_PORT, servic
     @app.get("/trace")
     async def trace(limit: int = 20) -> dict[str, Any]:
         return {"items": svc.chat.recent_trace(limit) if svc.chat else []}
+
+    @app.get("/skills")
+    async def skills_list() -> dict[str, Any]:
+        if svc.skills is None:
+            return {"items": []}
+        await svc.skills.reindex()
+        return {"items": svc.skills.list()}
+
+    @app.post("/skills/register")
+    async def skills_register(body: SkillPathIn) -> dict[str, Any]:
+        if svc.skills is None:
+            return {"ok": False, "error": "E_NO_AGENT"}
+        try:
+            return {"ok": True, **svc.skills.register(body.path)}
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "error": getattr(exc, "code", "E_SKILL"), "detail": str(exc)[:200]}
+
+    @app.post("/skills/{name}/enable")
+    async def skills_enable(name: str) -> dict[str, Any]:
+        if svc.skills is None:
+            return {"ok": False, "error": "E_NO_AGENT"}
+        try:
+            return await svc.skills.enable(name)
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "error": getattr(exc, "code", "E_SKILL"), "detail": str(exc)[:200]}
+
+    @app.post("/skills/{name}/disable")
+    async def skills_disable(name: str) -> dict[str, Any]:
+        if svc.skills is None:
+            return {"ok": False, "error": "E_NO_AGENT"}
+        await svc.skills.disable(name)
+        return {"ok": True}
+
+    @app.delete("/skills/{name}")
+    async def skills_remove(name: str) -> dict[str, Any]:
+        if svc.skills is None:
+            return {"ok": False, "error": "E_NO_AGENT"}
+        try:
+            await svc.skills.remove(name)
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "error": getattr(exc, "code", "E_SKILL")}
+        return {"ok": True}
 
     @app.get("/approvals")
     async def approvals() -> dict[str, Any]:

@@ -25,6 +25,7 @@ from ragnarok.daemon.chat import ChatService, summarize
 from ragnarok.daemon.maintenance import Maintenance
 from ragnarok.daemon.proactive import Proactive
 from ragnarok.daemon.runtime import PAIRED, Governor, Runtime
+from ragnarok.daemon.skills_admin import SkillsAdmin
 from ragnarok.harness.answer import Answerer
 from ragnarok.harness.executor import ExecContext, Executor
 from ragnarok.harness.memorycmd import MemoryCommands
@@ -113,7 +114,7 @@ def build_world(*, use_laya: bool = True, sandbox: bool = True, embed_rungs: boo
     ws = root / "workspace"
     ws.mkdir(exist_ok=True)
     registry = SkillRegistry(ledger, broker, root / "skills")
-    register_builtins(registry)
+    builtin_names = {r.skill_id for r in register_builtins(registry)}
     budgets = yaml.safe_load((REPO / "src" / "ragnarok" / "policy" / "budgets.yaml").read_text(encoding="utf-8"))
     guard_ = Guard(registry, ledger, load_rules(), workspace_roots=[ws], run_dir=root / "run", budgets=budgets)
     actions = Actions(mem, reader, index, gw, vault, COMPARTMENT, senders=senders)
@@ -162,7 +163,8 @@ def build_world(*, use_laya: bool = True, sandbox: bool = True, embed_rungs: boo
     def reindex() -> None:
         _load_index(mem, reader, index)
 
-    services = Services(runtime, answerer, notif, chat, reader, hub, proactive, mem, reindex)
+    skills_admin = SkillsAdmin(registry, ledger, broker, hub, selector, gw, builtin_names)
+    services = Services(runtime, answerer, notif, chat, reader, hub, proactive, mem, reindex, skills_admin)
     w = World(mem, reader, index, gw, runtime, services, guard, token_file, agent, ledger, broker, None, selector, l1)
     w.registry = registry  # type: ignore[attr-defined]
     return w
