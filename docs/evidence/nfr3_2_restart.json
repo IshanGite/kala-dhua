@@ -1,0 +1,17 @@
+{
+ "process_start_to_state_restored_s": 3.29,
+ "interrupted_task_resumed_and_asking_again": true,
+ "recovered_activity": [
+  {
+   "ts": 1792934755593,
+   "kind": "recovered",
+   "source": "tasks",
+   "code": "ok",
+   "resumed": 1,
+   "requeued": 1,
+   "ms": 0
+  }
+ ],
+ "gate_s": 5,
+ "passes": true
+}
