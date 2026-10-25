@@ -19,7 +19,7 @@ from urllib.parse import parse_qs, urlencode, urlparse
 
 import httpx
 
-from ragnarok.connectors.google import READ_SCOPES, TOKEN_URL
+from ragnarok.connectors.google import READ_SCOPES, TOKEN_URL, WRITE_SCOPES
 from ragnarok.platform.secrets import SecretStore, token_name
 
 AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
@@ -74,9 +74,9 @@ def _wait_for_code(server: HTTPServer, state: str, timeout: float) -> str:
     return str(box["code"])
 
 
-def sign_in(client_id: str, client_secret: str, vault: SecretStore, *, services: list[str] | None = None, timeout: float = 300, open_browser: bool = True) -> None:
+def sign_in(client_id: str, client_secret: str, vault: SecretStore, *, services: list[str] | None = None, timeout: float = 300, open_browser: bool = True, write: bool = False) -> None:
     services = services or list(READ_SCOPES)
-    scopes = [READ_SCOPES[s] for s in services]
+    scopes = [x for s in services for x in WRITE_SCOPES[s]] if write else [READ_SCOPES[s] for s in services]
     server = HTTPServer(("127.0.0.1", 0), BaseHTTPRequestHandler)
     redirect = f"http://127.0.0.1:{server.server_port}"
     verifier, challenge = pkce()
@@ -91,4 +91,4 @@ def sign_in(client_id: str, client_secret: str, vault: SecretStore, *, services:
     d = r.json()
     if "refresh_token" not in d:
         raise RuntimeError(f"google did not return a refresh token: {d.get('error', r.status_code)}")
-    vault.set(token_name("google", "read"), json.dumps({"client_id": client_id, "client_secret": client_secret, "refresh_token": d["refresh_token"], "services": services}))
+    vault.set(token_name("google", "write" if write else "read"), json.dumps({"client_id": client_id, "client_secret": client_secret, "refresh_token": d["refresh_token"], "services": services}))

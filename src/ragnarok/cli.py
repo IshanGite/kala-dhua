@@ -69,7 +69,10 @@ def _store_and_check(name: str, token: str) -> None:
 
 
 @connect_app.command("google")
-def connect_google(client_file: str = typer.Option(..., "--client-file", help="The Desktop-app OAuth client JSON from Google Cloud Console")) -> None:
+def connect_google(
+    client_file: str = typer.Option(..., "--client-file", help="The Desktop-app OAuth client JSON from Google Cloud Console"),
+    write: bool = typer.Option(False, "--write", help="Second sign-in for sending mail, writing events and files (separate token)"),
+) -> None:
     """Sign in to Google once (Gmail, Calendar, Drive, Meet; read-only)."""
     from pathlib import Path
 
@@ -77,8 +80,8 @@ def connect_google(client_file: str = typer.Option(..., "--client-file", help="T
     from ragnarok.platform.secrets import default_store
 
     cid, secret = load_client_file(Path(client_file).expanduser())
-    sign_in(cid, secret, default_store())
-    typer.echo("google: connected (refresh token is in the keychain; the JSON file can be deleted)")
+    sign_in(cid, secret, default_store(), write=write)
+    typer.echo(f"google: {'write access' if write else 'read access'} connected (token is in the keychain; the JSON file can be deleted)")
 
 
 @app.command()

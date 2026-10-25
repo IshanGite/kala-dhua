@@ -47,3 +47,21 @@ def test_registry_builds_from_vault_and_refuses_when_missing():
 def test_connect_command_is_listed():
     out = CliRunner().invoke(app, ["connect", "--help"]).output
     assert all(n in out for n in ("slack", "telegram", "discord", "google"))
+
+
+def test_write_sign_in_asks_only_for_write_scopes_and_uses_a_separate_vault_name(monkeypatch):
+    from ragnarok.connectors import oauth_google as og
+
+    seen = {}
+    monkeypatch.setattr(og, "_wait_for_code", lambda server, state, timeout: "code")
+    monkeypatch.setattr(og.webbrowser, "open_new_tab", lambda url: seen.setdefault("url", url))
+
+    class R:
+        def json(self):
+            return {"refresh_token": "rt"}
+
+    monkeypatch.setattr(og.httpx, "post", lambda *a, **k: R())
+    v = MemoryStore()
+    og.sign_in("cid", "sec", v, services=["gmail", "calendar"], write=True)
+    assert "gmail.send" in seen["url"] and "calendar.events" in seen["url"] and "readonly" not in seen["url"]
+    assert v.get(token_name("google", "write")) and v.get(token_name("google", "read")) is None

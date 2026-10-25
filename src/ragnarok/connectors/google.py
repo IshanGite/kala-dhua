@@ -34,6 +34,14 @@ READ_SCOPES = {
 }
 
 
+WRITE_SCOPES = {
+    "gmail": ("https://www.googleapis.com/auth/gmail.send", "https://www.googleapis.com/auth/gmail.compose"),
+    "calendar": ("https://www.googleapis.com/auth/calendar.events",),
+    "drive": ("https://www.googleapis.com/auth/drive.file",),
+    "meet": ("https://www.googleapis.com/auth/meetings.space.created",),
+}
+
+
 class GoogleAuth:
     """Turns a refresh token into short-lived access tokens, kept in memory only."""
 
