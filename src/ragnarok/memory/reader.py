@@ -1,0 +1,139 @@
+"""Read-only access to memory (PRAGMA query_only). Retrieval and everything that is not the Memory Service uses this."""
+
+from __future__ import annotations
+
+import re
+from pathlib import Path
+from typing import Any
+
+import numpy as np
+
+from ragnarok.memory.service import GENESIS, blob_to_vec, event_hash
+from ragnarok.store.crypto import KeyHierarchy
+from ragnarok.store.db import open_reader
+
+_TOKEN = re.compile(r"[A-Za-z0-9_]{2,}")
+_STOP = {"the", "and", "for", "what", "when", "did", "does", "with", "that", "this", "from", "have", "about", "was", "were", "are", "you", "your", "can", "how", "who", "which"}
+
+
+def fts_query(text: str, limit: int = 12) -> str | None:
+    """Make free text safe for FTS5: quoted tokens joined with OR. Returns None if nothing searchable remains."""
+    toks = [t for t in _TOKEN.findall(text.lower()) if t not in _STOP][:limit]
+    return " OR ".join(f'"{t}"' for t in toks) if toks else None
+
+
+class MemoryReader:
+    def __init__(self, db_path: Path, keys: KeyHierarchy) -> None:
+        self._r = open_reader(db_path, keys)
+
+    def close(self) -> None:
+        self._r.close()
+
+    def compartment_id(self, name: str) -> str | None:
+        r = self._r.execute("SELECT id FROM compartments WHERE name=?", (name,)).fetchone()
+        return r[0] if r else None
+
+    # ---------------------------------------------------------------- keyword search (BM25)
+    def fts_chunks(self, query: str, comp_id: str, k: int = 20) -> list[dict[str, Any]]:
+        q = fts_query(query)
+        if not q:
+            return []
+        rows = self._r.execute(
+            "SELECT c.id AS id, c.text AS text, c.item_id AS item_id, c.page AS page, i.trust AS trust, i.title AS title,"
+            " i.source AS source, i.deep_link AS deep_link, i.occurred_at AS ts, bm25(chunks_fts) AS s"
+            " FROM chunks_fts JOIN chunks c ON c.rowid = chunks_fts.rowid JOIN items i ON i.id = c.item_id"
+            " WHERE chunks_fts MATCH ? AND i.compartment_id=? AND i.status<>'archived' ORDER BY s LIMIT ?",
+            (q, comp_id, k),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def fts_events(self, query: str, comp_id: str, k: int = 20) -> list[dict[str, Any]]:
+        q = fts_query(query)
+        if not q:
+            return []
+        rows = self._r.execute(
+            "SELECT e.id AS id, e.content AS text, e.ts AS ts, e.trust AS trust, e.kind AS kind, bm25(events_fts) AS s"
+            " FROM events_fts JOIN events e ON e.rowid = events_fts.rowid"
+            " WHERE events_fts MATCH ? AND e.compartment_id=? ORDER BY s LIMIT ?",
+            (q, comp_id, k),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def fts_facts(self, query: str, comp_id: str, k: int = 20) -> list[dict[str, Any]]:
+        q = fts_query(query)
+        if not q:
+            return []
+        rows = self._r.execute(
+            "SELECT f.id AS id, f.subject AS subject, f.predicate AS predicate, f.value AS value, f.confidence AS confidence,"
+            " f.importance AS importance, f.trust AS trust, f.learned_at AS ts, f.pinned AS pinned, bm25(facts_fts) AS s"
+            " FROM facts_fts JOIN facts f ON f.rowid = facts_fts.rowid"
+            " WHERE facts_fts MATCH ? AND f.compartment_id=? AND f.state='active' AND f.valid_to IS NULL ORDER BY s LIMIT ?",
+            (q, comp_id, k),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    # ---------------------------------------------------------------- episodic
+    def events_in_range(self, comp_id: str, start_ms: int, end_ms: int, limit: int = 50) -> list[dict[str, Any]]:
+        rows = self._r.execute(
+            "SELECT id, ts, kind, actor, content AS text, trust FROM events WHERE compartment_id=? AND ts>=? AND ts<? ORDER BY ts DESC LIMIT ?",
+            (comp_id, start_ms, end_ms, limit),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def recent_events(self, comp_id: str, limit: int = 10) -> list[dict[str, Any]]:
+        rows = self._r.execute(
+            "SELECT id, ts, kind, actor, content AS text, trust FROM events WHERE compartment_id=? ORDER BY ts DESC LIMIT ?", (comp_id, limit)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    # ---------------------------------------------------------------- semantic
+    def facts(self, comp_id: str, *, subject: str | None = None, predicate: str | None = None, as_of: int | None = None, include_closed: bool = False) -> list[dict[str, Any]]:
+        sql = "SELECT * FROM facts WHERE compartment_id=?"
+        args: list[Any] = [comp_id]
+        if subject:
+            sql += " AND lower(subject)=lower(?)"
+            args.append(subject)
+        if predicate:
+            sql += " AND lower(predicate)=lower(?)"
+            args.append(predicate)
+        if as_of is not None:  # time travel: what did we believe was true at that moment, using only what we had learned by then
+            sql += " AND learned_at<=? AND (valid_from IS NULL OR valid_from<=?) AND (valid_to IS NULL OR valid_to>?)"
+            args += [as_of, as_of, as_of]
+        elif not include_closed:
+            sql += " AND valid_to IS NULL AND state='active'"
+        return [dict(r) for r in self._r.execute(sql + " ORDER BY learned_at DESC", args)]
+
+    def facts_by_state(self, comp_id: str, state: str) -> list[dict[str, Any]]:
+        return [dict(r) for r in self._r.execute("SELECT * FROM facts WHERE compartment_id=? AND state=?", (comp_id, state))]
+
+    def chunk_text(self, chunk_id: str) -> str | None:
+        r = self._r.execute("SELECT text FROM chunks WHERE id=?", (chunk_id,)).fetchone()
+        return r[0] if r else None
+
+    def provenance_of(self, child_type: str, child_id: str) -> list[dict[str, Any]]:
+        return [dict(r) for r in self._r.execute("SELECT * FROM provenance WHERE child_type=? AND child_id=?", (child_type, child_id))]
+
+    # ---------------------------------------------------------------- vectors
+    def load_embeddings(self, comp_id: str, owner_types: tuple[str, ...] = ("chunk", "event", "fact")) -> tuple[list[tuple[str, str]], np.ndarray]:
+        q = ",".join("?" * len(owner_types))
+        rows = self._r.execute(f"SELECT owner_type, owner_id, vec FROM embeddings WHERE compartment_id=? AND owner_type IN ({q})", (comp_id, *owner_types)).fetchall()
+        if not rows:
+            return [], np.zeros((0, 0), dtype=np.float32)
+        ids = [(r[0], r[1]) for r in rows]
+        return ids, np.stack([blob_to_vec(r[2]) for r in rows])
+
+    # ---------------------------------------------------------------- integrity
+    def verify_chain(self) -> tuple[bool, int | None]:
+        """Recompute the event hash chain. Returns (ok, first_bad_seq)."""
+        prev = GENESIS
+        for r in self._r.execute("SELECT seq, ts, compartment_id, kind, actor, content, trust, prev_hash, hash FROM events ORDER BY seq"):
+            if r["prev_hash"] != prev or event_hash(prev, r["seq"], r["ts"], r["compartment_id"], r["kind"], r["actor"], r["content"], r["trust"]) != r["hash"]:
+                return False, int(r["seq"])
+            prev = r["hash"]
+        return True, None
+
+    def count(self, table: str) -> int:
+        allowed = {"items", "chunks", "events", "facts", "embeddings", "provenance", "people", "saga", "commitments"}
+        if table not in allowed:
+            raise ValueError("unknown table")
+        return int(self._r.execute(f"SELECT count(*) FROM {table}").fetchone()[0])
