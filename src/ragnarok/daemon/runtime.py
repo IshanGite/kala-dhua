@@ -17,7 +17,7 @@ from ragnarok.memory.runtime_state import RuntimeState
 
 PAIRED = {"telegram"}  # sources where an unknown sender is held until the user approves
 # Seconds between polls per source. Telegram long-polls (the call itself waits for a message), so it is effectively instant; the rest are cheap list calls.
-DEFAULT_INTERVALS = {"telegram": 0.2, "slack": 5.0, "discord": 5.0, "gmail": 8.0, "outlook": 15.0, "gcal": 30.0, "outlook_cal": 60.0, "gdrive": 60.0, "gmeet": 180.0, "notifications": 3.0, "files": 5.0}
+DEFAULT_INTERVALS = {"telegram": 0.2, "slack": 4.0, "discord": 4.0, "gmail": 4.0, "outlook": 8.0, "gcal": 30.0, "outlook_cal": 60.0, "gdrive": 60.0, "gmeet": 180.0, "notifications": 3.0, "files": 5.0}
 BURST_S = 1.0  # right after something arrived, look again quickly: messages come in bursts
 
 
@@ -39,6 +39,8 @@ class Runtime:
         self._tasks: list[asyncio.Task[None]] = []
         self.commitments = commitments
         self.maintenance: Any = None  # FR1.3: consolidation and forgetting, once a day
+        self.digest: Any = None  # the digest engine: its model rewrites are refreshed in the background
+        self._digest_seen = ""
         self.proactive: Any = None  # set by the wiring: the FR4 engine (triggers, heads-ups, briefing)
         self.reminders: deque[dict[str, Any]] = deque(maxlen=50)
         self.governor = governor or Governor()
@@ -148,9 +150,26 @@ class Runtime:
                 backoff = 0.0
                 await self._sleep(min(BURST_S, self._interval(name)) if (rep.ingested or rep.held) else self._interval(name))
 
+    async def _refine_digest(self) -> None:
+        """Low priority and only when the content changed: the most important sections get a validated model rewrite; the deterministic digest is always there meanwhile."""
+        if self.digest is None or not self.enabled:
+            return
+        d = self.digest.build(24)
+        if d["fingerprint"] == self._digest_seen or not d["sections"]:
+            return
+        try:
+            await self.digest.refine(d, max_sections=3)
+            self._digest_seen = d["fingerprint"]
+        except Exception as exc:  # noqa: BLE001 - a summary improvement must never disturb ingestion
+            log("digest_refine_failed", err=type(exc).__name__)
+
     async def _aux(self) -> None:
+        n = 0
         while not self._stop.is_set():
             await self.housekeeping()
+            n += 1
+            if n % 6 == 0:  # about every 30 s
+                await self._refine_digest()
             await self._sleep(5.0)
 
     def start(self) -> None:

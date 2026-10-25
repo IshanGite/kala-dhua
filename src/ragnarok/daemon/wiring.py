@@ -27,6 +27,7 @@ from ragnarok.daemon.proactive import Proactive
 from ragnarok.daemon.runtime import PAIRED, Governor, Runtime
 from ragnarok.daemon.skills_admin import SkillsAdmin
 from ragnarok.harness.answer import Answerer
+from ragnarok.harness.digest import Digest
 from ragnarok.harness.executor import ExecContext, Executor
 from ragnarok.harness.memorycmd import MemoryCommands
 from ragnarok.harness.planner import Planner
@@ -134,7 +135,8 @@ def build_world(*, use_laya: bool = True, sandbox: bool = True, embed_rungs: boo
 
     library = RouteLibrary(routes, skill_hashes=hashes)
     cascade = Cascade(gateway=gw, selector=selector, l1=l1, l2=small, calibrator=calibrator, library=library, family_skills=FAMILY_SKILLS, l2_timeout_ms=2500, read_only_skills={"memory.search", "reminder.list"}, embed_accept=0.70 if embed_rungs else None, general_below=0.50 if embed_rungs else None, intent_rules=match_intent if rules else None, l2_skill_only=True)
-    answerer = Answerer(reader, index, gw, COMPARTMENT)
+    digest = Digest(reader, gw, COMPARTMENT)
+    answerer = Answerer(reader, index, gw, COMPARTMENT, digest=digest)
     planner = Planner(gw, lambda n: _manifest(registry, n), Agent._now_text)
     agent = Agent(mem=mem, ledger=ledger, reader=reader, index=index, gateway=gw, cascade=cascade, planner=planner, executor=executor, registry=registry, library=library,
                   routes=routes, ctx=ExecContext(compartment=COMPARTMENT, workspace=ws, data_dir=root, today=date.today().isoformat()), answerer=answerer, fast_refuse=True, memcmd=MemoryCommands(mem, reader, COMPARTMENT), calendar_mirror=lambda: vault.get(token_name("google", "write")) is not None)
@@ -150,6 +152,7 @@ def build_world(*, use_laya: bool = True, sandbox: bool = True, embed_rungs: boo
 
     proactive = Proactive(state, reader, run_command=run_command, agenda=agenda_today)
     runtime.proactive = proactive
+    runtime.digest = digest
     runtime.maintenance = Maintenance(mem, state, proactive.inbox)
     guard = TokenGuard(secrets.token_urlsafe(32))
     token_file = root / "run" / "session.token"
@@ -164,7 +167,7 @@ def build_world(*, use_laya: bool = True, sandbox: bool = True, embed_rungs: boo
         _load_index(mem, reader, index)
 
     skills_admin = SkillsAdmin(registry, ledger, broker, hub, selector, gw, builtin_names)
-    services = Services(runtime, answerer, notif, chat, reader, hub, proactive, mem, reindex, skills_admin)
+    services = Services(runtime, answerer, notif, chat, reader, hub, proactive, mem, reindex, skills_admin, digest)
     w = World(mem, reader, index, gw, runtime, services, guard, token_file, agent, ledger, broker, None, selector, l1)
     w.registry = registry  # type: ignore[attr-defined]
     return w

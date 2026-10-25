@@ -35,6 +35,7 @@ class Services:
     mem: Any = None  # MemoryService, for delete
     reindex: Any = None  # callable: rebuild the in-memory vector index after a delete
     skills: Any = None  # SkillsAdmin
+    digest: Any = None  # the digest engine
 
 
 class ChatIn(BaseModel):
@@ -283,6 +284,12 @@ def create_app(guard: TokenGuard | None = None, port: int = DEFAULT_PORT, servic
         except Exception as exc:  # noqa: BLE001
             return {"ok": False, "error": getattr(exc, "code", "E_SKILL")}
         return {"ok": True}
+
+    @app.get("/digest")
+    async def digest(hours: float = 24, sources: str | None = None, topic: str | None = None) -> dict[str, Any]:
+        if svc.digest is None:
+            return {"sections": [], "timeline": [], "overview": "The digest is not available.", "items": 0}
+        return svc.digest.build(max(0.25, min(hours, 24 * 30)), sources={s for s in sources.split(",") if s} if sources else None, topic=topic[:80] if topic else None)
 
     @app.get("/approvals")
     async def approvals() -> dict[str, Any]:

@@ -122,6 +122,35 @@ class MemoryReader:
         sql += " ORDER BY ts DESC LIMIT ?"
         return [dict(x) for x in self._r.execute(sql, [*args, max(1, min(limit, 200))])]
 
+    def items_window(self, comp_id: str, since_ms: int, *, until_ms: int | None = None, limit: int = 500) -> list[dict[str, Any]]:
+        """Everything that happened in a window, with its text and (if embedded) one vector per item: the raw material for the digest. Newest first."""
+        import json as _json
+
+        sql = ("SELECT i.id, i.source, i.title, i.kind, i.trust, i.thread_id, i.deep_link, coalesce(i.occurred_at, i.ingested_at) AS ts, i.ingested_at, i.flags_json FROM items i "
+               "WHERE i.compartment_id=? AND coalesce(i.occurred_at, i.ingested_at) >= ?" + (" AND coalesce(i.occurred_at, i.ingested_at) < ?" if until_ms else "") + " ORDER BY ts DESC LIMIT ?")
+        args: list[Any] = [comp_id, since_ms] + ([until_ms] if until_ms else []) + [limit]
+        rows = [dict(x) for x in self._r.execute(sql, args)]
+        if not rows:
+            return []
+        ids = [r["id"] for r in rows]
+        texts: dict[str, list[str]] = {i: [] for i in ids}
+        vecs: dict[str, list[Any]] = {i: [] for i in ids}
+        for k in range(0, len(ids), 200):
+            part = ids[k:k + 200]
+            q = ",".join("?" * len(part))
+            for iid, text in self._r.execute(f"SELECT item_id, text FROM chunks WHERE item_id IN ({q}) ORDER BY item_id, ordinal", part):
+                if len(texts[iid]) < 4:
+                    texts[iid].append(text)
+            for iid, blob in self._r.execute(f"SELECT c.item_id, e.vec FROM chunks c JOIN embeddings e ON e.owner_type='chunk' AND e.owner_id=c.id WHERE c.item_id IN ({q})", part):
+                vecs[iid].append(blob_to_vec(blob))
+        for r_ in rows:
+            fl = _json.loads(r_.pop("flags_json") or "{}")
+            r_["author"] = fl.get("author") or fl.get("from") or ""
+            r_["text"] = "\n".join(texts[r_["id"]])[:1800]
+            v = vecs[r_["id"]]
+            r_["vec"] = (np.mean(np.stack(v), axis=0) if v else None)
+        return rows
+
     def items_since(self, ingested_after_ms: int, limit: int = 100) -> list[dict[str, Any]]:
         """Items that arrived after a point in time, oldest first: what the proactive engine looks at."""
         import json as _json
