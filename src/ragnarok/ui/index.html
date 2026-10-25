@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; img-src data:">
+<title>Ragnarok</title>
+<style>
+:root{--bg:#f6f5f2;--panel:#fff;--ink:#1c1b19;--mute:#6e6b64;--line:#e4e1d9;--accent:#1f5f4a;--accent-ink:#fff;--warn:#a65b00;--bad:#a42d2d;--chip:#edeae1}
+@media (prefers-color-scheme:dark){:root{--bg:#17181a;--panel:#1f2124;--ink:#ecebe7;--mute:#9a978f;--line:#2e3034;--accent:#5fbf9d;--accent-ink:#0c1a14;--warn:#e0a24a;--bad:#e27a7a;--chip:#2a2d30}}
+*{box-sizing:border-box}html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;display:flex;flex-direction:column}
+header{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--panel);border-bottom:1px solid var(--line)}
+h1{font-size:15px;margin:0;font-weight:650;letter-spacing:.2px;flex:1}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--mute)}.dot.on{background:var(--accent)}.dot.off{background:var(--warn)}
+.sw{position:relative;width:42px;height:24px;border-radius:12px;background:var(--line);border:0;cursor:pointer;padding:0}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:var(--panel);transition:left .15s;box-shadow:0 1px 2px #0004}
+.sw[aria-checked=true]{background:var(--accent)}.sw[aria-checked=true]::after{left:21px}
+nav{display:flex;background:var(--panel);border-bottom:1px solid var(--line)}
+nav button{flex:1;padding:9px 0;border:0;background:none;color:var(--mute);font:inherit;cursor:pointer;border-bottom:2px solid transparent}
+nav button[aria-selected=true]{color:var(--ink);border-bottom-color:var(--accent);font-weight:600}
+main{flex:1;overflow:hidden;display:flex;flex-direction:column;min-height:0}
+section{display:none;flex:1;min-height:0;flex-direction:column}section.show{display:flex}
+#log,#feed,#src{flex:1;overflow:auto;padding:12px 14px}
+.msg{max-width:92%;padding:8px 11px;border-radius:12px;margin:0 0 9px;white-space:pre-wrap;word-wrap:break-word}
+.me{background:var(--accent);color:var(--accent-ink);margin-left:auto;border-bottom-right-radius:3px}
+.bot{background:var(--panel);border:1px solid var(--line);border-bottom-left-radius:3px}
+.cites{margin-top:6px;display:flex;flex-wrap:wrap;gap:4px}.chip{background:var(--chip);color:var(--mute);border-radius:9px;padding:1px 8px;font-size:11.5px}
+.sys{color:var(--mute);font-size:12.5px;text-align:center;margin:4px 0 10px}
+form{display:flex;gap:8px;padding:10px 12px;background:var(--panel);border-top:1px solid var(--line)}
+input[type=text]{flex:1;padding:9px 11px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:inherit}
+input:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.btn{padding:8px 13px;border-radius:9px;border:1px solid var(--line);background:var(--panel);color:var(--ink);font:inherit;cursor:pointer}
+.btn.pri{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line)}.row .grow{flex:1;min-width:0}
+.small{font-size:12px;color:var(--mute)}.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:10px}
+h2{font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:var(--mute);margin:14px 0 6px;font-weight:600}
+.ok{color:var(--accent)}.err{color:var(--bad)}
+</style>
+</head>
+<body>
+<header>
+  <span id="dot" class="dot" title="status"></span>
+  <h1>Ragnarok</h1>
+  <span class="small" id="state">connecting</span>
+  <button id="sw" class="sw" role="switch" aria-checked="true" aria-label="Always-on ingestion"></button>
+</header>
+<nav role="tablist">
+  <button role="tab" aria-selected="true" data-t="chat">Chat</button>
+  <button role="tab" aria-selected="false" data-t="act">Activity</button>
+  <button role="tab" aria-selected="false" data-t="src">Sources</button>
+</nav>
+<main>
+  <section id="chat" class="show">
+    <div id="log" aria-live="polite"><p class="sys">Ask about anything it has read. It answers only from your memory and cites where.</p></div>
+    <form id="f"><input id="q" type="text" autocomplete="off" placeholder="Ask your memory" aria-label="Message" maxlength="4000"><button class="btn pri" type="submit">Send</button></form>
+  </section>
+  <section id="act"><div id="feed"></div></section>
+  <section id="src"><div id="srcbox"></div></section>
+</main>
+<script>
+(function(){
+  var tok=(location.hash.match(/token=([\w-]+)/)||[])[1]||"";
+  try{history.replaceState(null,"",location.pathname)}catch(e){}
+  var H={"x-ragnarok-token":tok,"content-type":"application/json"};
+  function api(p,body){return fetch(p,body===undefined?{headers:H}:{method:"POST",headers:H,body:JSON.stringify(body)}).then(function(r){return r.json()})}
+  function el(t,c,x){var e=document.createElement(t);if(c)e.className=c;if(x!==undefined)e.textContent=x;return e}
+  var tabs=document.querySelectorAll("nav button");
+  tabs.forEach(function(b){b.onclick=function(){tabs.forEach(function(o){o.setAttribute("aria-selected",o===b)});document.querySelectorAll("section").forEach(function(s){s.classList.toggle("show",s.id===b.dataset.t)})}});
+  var log=document.getElementById("log"),q=document.getElementById("q");
+  function add(cls,text,cites){var m=el("div","msg "+cls,text);if(cites&&cites.length){var c=el("div","cites");cites.forEach(function(x){c.appendChild(el("span","chip","["+x.n+"] "+(x.citation||x.kind||"memory")))});m.appendChild(c)}log.appendChild(m);log.scrollTop=log.scrollHeight;return m}
+  document.getElementById("f").onsubmit=function(e){e.preventDefault();var t=q.value.trim();if(!t)return;q.value="";add("me",t);var w=add("bot","Looking through memory...");
+    api("/chat",{text:t}).then(function(d){w.remove();add("bot",d.ok?d.answer:"The agent is not ready ("+(d.error||"error")+").",d.citations)}).catch(function(){w.remove();add("bot","Could not reach the agent.")})};
+  var sw=document.getElementById("sw");
+  sw.onclick=function(){var on=sw.getAttribute("aria-checked")!=="true";api("/toggle",{enabled:on}).then(refresh)};
+  function ago(ts){var s=Math.max(0,(Date.now()-ts)/1000|0);return s<60?s+"s ago":s<3600?(s/60|0)+"m ago":(s/3600|0)+"h ago"}
+  function refresh(){
+    api("/status").then(function(d){
+      var rt=d.runtime||{},on=!!rt.enabled;sw.setAttribute("aria-checked",on);
+      document.getElementById("dot").className="dot "+(on?"on":"off");document.getElementById("state").textContent=on?"reading continuously":"paused";
+      var box=document.getElementById("srcbox");box.textContent="";
+      var names=Object.keys(rt.sources||{});
+      if(!names.length)box.appendChild(el("p","small","No sources connected yet. Run: ragnarok connect <name>"));
+      names.forEach(function(n){var s=rt.sources[n],r=el("div","row"),g=el("div","grow");g.appendChild(el("div","",n));
+        g.appendChild(el("div","small "+(s.ok===false?"err":""),s.ok===null?"waiting for first sync":s.ok?("last sync "+ago(s.at)+" - "+(s.ingested||0)+" new"):("problem: "+s.code)));
+        r.appendChild(g);r.appendChild(el("span",s.ok?"ok":s.ok===false?"err":"small",s.ok?"OK":s.ok===false?"!":"..."));box.appendChild(r)});
+      var b=document.createElement("div");var sync=el("button","btn","Sync now");sync.onclick=function(){sync.disabled=true;sync.textContent="Syncing...";api("/tick",{}).then(function(){sync.disabled=false;sync.textContent="Sync now";refresh()})};b.style.marginTop="12px";b.appendChild(sync);box.appendChild(b);
+      renderFeed(rt.held||[]);
+    }).catch(function(){document.getElementById("state").textContent="offline"});
+    api("/activity").then(function(d){window.__items=d.items||[];renderFeed(window.__held||[])}).catch(function(){});
+  }
+  function renderFeed(held){window.__held=held;var f=document.getElementById("feed");f.textContent="";
+    if(held.length){f.appendChild(el("h2","","Waiting for you"));held.forEach(function(h){var c=el("div","card");c.appendChild(el("div","",h.platform+": new sender "+h.handle));c.appendChild(el("div","small","Unknown senders are held until you approve them."));
+      var row=el("div","row");var a=el("button","btn pri","Approve"),bl=el("button","btn","Block");
+      a.onclick=function(){api("/pairing",{platform:h.platform,handle:h.handle,action:"approve"}).then(refresh)};bl.onclick=function(){api("/pairing",{platform:h.platform,handle:h.handle,action:"block"}).then(refresh)};
+      row.appendChild(a);row.appendChild(bl);c.appendChild(row);f.appendChild(c)})}
+    f.appendChild(el("h2","","Recent activity"));var items=window.__items||[];if(!items.length)f.appendChild(el("p","small","Nothing yet."));
+    items.forEach(function(i){var r=el("div","row"),g=el("div","grow");var line=i.kind==="ingested"?("Read "+i.ingested+" new from "+i.source+(i.held?(", "+i.held+" held"):"")):i.kind==="error"?(i.source+": "+i.code):i.kind==="toggle"?("Switched "+i.code):i.kind==="paired"?(i.source+" sender "+i.code):(i.source+" "+i.code);
+      g.appendChild(el("div",i.kind==="error"?"err":"",line));g.appendChild(el("div","small",ago(i.ts)));r.appendChild(g);f.appendChild(r)})}
+  refresh();setInterval(refresh,4000);
+})();
+</script>
+</body>
+</html>

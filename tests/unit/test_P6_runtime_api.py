@@ -140,3 +140,12 @@ def test_build_world_wires_connected_sources_and_writes_a_private_token_file(tmp
         assert json.dumps(w.runtime.status())  # serialisable for the window
     finally:
         w.mem.close()
+
+
+def test_the_window_page_is_served_without_a_token_but_holds_no_secret_and_loads_nothing_external(world):
+    mem, keys, rt, reader, gw, idx = world
+    c = TestClient(create_app(TokenGuard("S3CRET-guard-value"), 8765, Services(rt, Answerer(reader, idx, gw))), base_url="http://127.0.0.1:8765")
+    r = c.get("/")
+    assert r.status_code == 200 and "Ragnarok" in r.text and "S3CRET-guard-value" not in r.text
+    assert "default-src 'none'" in r.text and "http://" not in r.text.split("<script>")[1] and "https://" not in r.text
+    assert r.headers["x-frame-options"] == "DENY"

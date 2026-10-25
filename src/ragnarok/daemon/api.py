@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
 from ragnarok import __version__
@@ -41,8 +43,14 @@ def create_app(guard: TokenGuard | None = None, port: int = DEFAULT_PORT, servic
     guard = guard or TokenGuard()
     svc = services or Services()
     app = FastAPI(title="Ragnarok", docs_url=None, redoc_url=None, openapi_url=None)
-    app.add_middleware(LocalOnlyMiddleware, port=port, guard=guard)
+    app.add_middleware(LocalOnlyMiddleware, port=port, guard=guard, public_paths=frozenset({"/healthz", "/"}))
     app.state.guard, app.state.services = guard, svc
+
+    ui_file = Path(__file__).resolve().parents[1] / "ui" / "index.html"
+
+    @app.get("/", response_class=HTMLResponse)
+    async def ui() -> str:
+        return ui_file.read_text(encoding="utf-8")  # no secrets in the page; the session token arrives in the URL fragment from the launcher
 
     @app.get("/healthz")
     async def healthz() -> dict[str, Any]:

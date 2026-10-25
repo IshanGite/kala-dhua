@@ -32,6 +32,7 @@ connectors = [
   "discord.py>=2.4",
 ]
 parsing = ["pypdf>=4.2", "python-docx>=1.1", "icalendar>=5.0"]
+window = ["pywebview>=5.3"]
 
 [project.scripts]
 ragnarok = "ragnarok.cli:main"
