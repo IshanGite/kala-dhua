@@ -1,6 +1,11 @@
 {
  "n": 99,
  "correct": 94,
+ "latency_ms": {
+  "p50": 399,
+  "p95": 583,
+  "max": 1967
+ },
  "note": "author-written labelled messages, one labeller; a regression guard, not a benchmark",
  "misses": [
   {

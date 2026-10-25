@@ -2,16 +2,9 @@
  "n_scrolls": 8,
  "routing": {
   "n": 29,
-  "correct": 28,
+  "correct": 29,
   "ms_each_after_cache": 42,
-  "misses": [
-   {
-    "message": "help me decide between a lodge and a city loft",
-    "expected": "decision-helper",
-    "got": null,
-    "score": null
-   }
-  ],
+  "misses": [],
   "tuned_on_this_set": true
  },
  "routing_holdout": {
@@ -72,10 +65,10 @@
   }
  },
  "progressive_loading": {
-  "all_in_one_prompt_tokens": 2332,
-  "headers_only_tokens": 603,
-  "headers_plus_one_scroll_tokens": 972,
-  "saving_percent": 58.3
+  "all_in_one_prompt_tokens": 2358,
+  "headers_only_tokens": 626,
+  "headers_plus_one_scroll_tokens": 995,
+  "saving_percent": 57.8
  },
  "note": "token counts are a cheap estimate (characters / 3); routing set is author-written"
 }

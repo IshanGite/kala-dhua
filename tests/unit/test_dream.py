@@ -270,3 +270,25 @@ async def test_a_better_revision_is_proposed_as_a_diff_and_only_applied_on_appro
     assert draft and "wrong-word" in draft["diff"] and "2 of 2" not in draft["reason"] and "passes 1 of 1" in draft["reason"]
     assert lib.peek("budget-checker").sha == old_sha, "the scroll in use is untouched until a human approves the draft"
     assert lib.approve_draft(draft["id"]) == "budget-checker" and lib.peek("budget-checker").sha != old_sha
+
+
+async def test_the_housekeeping_tick_does_not_block_while_a_dream_runs(world):
+    import asyncio
+
+    w, d = world
+    await warm_up(w)
+    gate = asyncio.Event()
+
+    async def slow(text):
+        await gate.wait()
+        return True, "ok"
+
+    say(w, "ping Priya about lunch", "I did not do anything.")
+    d._rehearse = slow
+    await asyncio.wait_for(d.tick(), 2)  # returns at once even though the dream will wait on `gate`
+    await asyncio.sleep(0.3)
+    assert d.running and d.tick.__name__ == "tick"
+    await asyncio.wait_for(d.tick(), 2)  # a second tick while dreaming does nothing
+    gate.set()
+    await asyncio.wait_for(d._task, 30)
+    assert not d.running

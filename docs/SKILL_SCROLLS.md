@@ -36,7 +36,7 @@ examples:                           # self-tests
 Instructions in plain words (at most 6,000 characters: small models follow long instructions poorly).
 ```
 
-Seven scrolls ship with the app (`src/ragnarok/scrolls/builtin/`): meeting-notes, email-triage, reply-drafter, triage-and-reply (a chain), explain-simply, action-items, decision-helper, standup-writer. Yours live in the app's data folder under `scrolls/`.
+Eight scrolls ship with the app (`src/ragnarok/scrolls/builtin/`): meeting-notes, email-triage, reply-drafter, triage-and-reply (a chain), explain-simply, action-items, decision-helper, standup-writer. Yours live in the app's data folder under `scrolls/`.
 
 ## How a message becomes a specialist
 

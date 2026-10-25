@@ -45,18 +45,22 @@ SET = [
 
 async def main():
     gw = OllamaGateway(ModelLock.load(Path("models.lock")))
-    ok, rows, t0 = 0, [], time.time()
+    ok, rows, t0, lat = 0, [], time.time(), []
     for text, exp in SET:
+        t1 = time.perf_counter()
         u = await understand(gw, text, None)
+        lat.append((time.perf_counter() - t1) * 1000)
         got = u.intent if u else None
         rows.append((text, exp, got))
         ok += got == exp
-    print(f"{ok}/{len(SET)} correct; {(time.time() - t0) / len(SET):.2f} s each")
+    lat.sort()
+    p50, p95 = lat[len(lat) // 2], lat[int(len(lat) * 0.95)]
+    print(f"{ok}/{len(SET)} correct; latency p50 {p50:.0f} ms, p95 {p95:.0f} ms, max {lat[-1]:.0f} ms")
     for t, e, g in rows:
         if e != g:
             print(f"MISS {t!r}: expected {e}, got {g}")
     Path("docs/evidence").mkdir(exist_ok=True)
-    Path("docs/evidence/understand_eval.json").write_text(json.dumps({"n": len(SET), "correct": ok, "note": "author-written labelled messages, one labeller; a regression guard, not a benchmark", "misses": [{"text": t, "expected": e, "got": g} for t, e, g in rows if e != g]}, indent=1), encoding="utf-8")
+    Path("docs/evidence/understand_eval.json").write_text(json.dumps({"n": len(SET), "correct": ok, "latency_ms": {"p50": round(p50), "p95": round(p95), "max": round(lat[-1])}, "note": "author-written labelled messages, one labeller; a regression guard, not a benchmark", "misses": [{"text": t, "expected": e, "got": g} for t, e, g in rows if e != g]}, indent=1), encoding="utf-8")
 
 
 asyncio.run(main())

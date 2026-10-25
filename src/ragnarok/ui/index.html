@@ -259,7 +259,7 @@ section.show{animation:secIn .32s var(--ease) both}
 <div class="toasts" id="toasts"></div>
 <script>
 (function(){
-  var tok=(location.hash.match(/token=([\w-]+)/)||[])[1]||"";
+  var tok=(location.hash.match(/token=([\w-]+)/)||[])[1]||"",tabq=(location.hash.match(/tab=(\w+)/)||[])[1]||"";
   try{history.replaceState(null,"",location.pathname)}catch(e){}
   var H={"x-ragnarok-token":tok,"content-type":"application/json"};
   var dead=false;
@@ -604,7 +604,7 @@ section.show{animation:secIn .32s var(--ease) both}
   $("idis").onclick=function(){api("/inbox/dismiss",{}).then(loadInbox)};
 
   /* ---------------- live refresh ---------------- */
-  refresh();pullCards();loadInbox();
+  refresh();pullCards();loadInbox();if(tabq&&document.querySelector('nav button[data-t="'+tabq+'"]'))goto(tabq);
   setInterval(refresh,3000);setInterval(pullCards,1000);setInterval(loadInbox,4000);
   setInterval(function(){if(cur==="dig")loadDigest()},4000);
   setInterval(function(){if(cur==="msg"&&!$("mq").value)loadMsgs()},5000);

@@ -25,6 +25,7 @@ from ragnarok.scrolls.format import Scroll, ScrollError, parse
 
 ROUTE_MIN = 0.62  # cosine similarity to the closest trigger sentence needed before a scroll takes a message
 ROUTE_MARGIN = 0.04
+ROUTE_CLEAR = (0.56, 0.10)  # or a lower similarity that still leads the runner-up by a wide gap: one scroll is plainly the nearest
 ROUTE_STRONG = 0.75  # a message this close to a scroll's own example takes it even when it also looks like a summary or a lookup  # and how far ahead of the runner-up it must be
 EXPLICIT = re.compile(r"\b(?:use|run|apply|with)\s+(?:the\s+)?([a-z][a-z0-9-]{2,40})\s+(?:scroll|skill)\b|\bscroll\s+([a-z][a-z0-9-]{2,40})\b", re.I)
 
@@ -247,9 +248,13 @@ class ScrollLibrary:
             log("scroll_route_failed", err=type(exc).__name__)
             return None
         scores.sort(reverse=True)
-        if not scores or scores[0][0] < ROUTE_MIN:
+        if not scores:
             return None
         second = scores[1][0] if len(scores) > 1 else 0.0
-        if scores[0][0] - second < ROUTE_MARGIN and second >= ROUTE_MIN:
+        top = scores[0][0]
+        clear = top >= ROUTE_CLEAR[0] and top - second >= ROUTE_CLEAR[1]
+        if top < ROUTE_MIN and not clear:
+            return None
+        if top - second < ROUTE_MARGIN and second >= ROUTE_MIN:
             return None  # two scrolls fit equally well: better to answer normally than to pick one at random
         return Route(scores[0][1], scores[0][0], second, strong=scores[0][0] >= ROUTE_STRONG)

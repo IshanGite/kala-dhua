@@ -7,6 +7,8 @@ triggers:
   - help me decide between
   - help me decide
   - help me choose between two options
+  - help me decide between two things
+  - I need to choose between two options
   - which option is better
   - weigh up these two choices
   - should I pick this or that

@@ -106,9 +106,14 @@ class Dreamer:
 
     # ------------------------------------------------------------------ the loop
     async def tick(self) -> None:
+        """Called every few seconds by the housekeeping loop. A dream can take minutes, so it runs as its own task: reminders and proactive alerts keep firing while it works."""
+        import asyncio
+
+        if getattr(self, "_task", None) is not None and not self._task.done():
+            return
         ok, _ = self.eligibility()
         if ok:
-            await self.run()
+            self._task = asyncio.get_running_loop().create_task(self.run())
 
     def _stop(self) -> bool:
         if self._abort:
