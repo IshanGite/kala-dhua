@@ -44,7 +44,7 @@ class CassetteGateway:
 
     async def chat(
         self, *, role: str, messages: list[dict[str, str]], schema: dict | None, max_tokens: int,
-        deadline: float, priority: Priority, seed: int | None = 0, temperature: float = 0.0,
+        deadline: float, priority: Priority, seed: int | None = 0, temperature: float = 0.0, images: list[str] | None = None,
     ) -> ChatResult:
         key = chat_key(role, messages, schema, seed, max_tokens, temperature)
         if key in self._store:
@@ -53,7 +53,7 @@ class CassetteGateway:
         if self._inner is None:
             raise ModelError("cassette miss", code="E_CASSETTE_MISS")
         res = await self._inner.chat(role=role, messages=messages, schema=schema, max_tokens=max_tokens,
-                                     deadline=deadline, priority=priority, seed=seed, temperature=temperature)
+                                     deadline=deadline, priority=priority, seed=seed, temperature=temperature, images=images)
         self._append(key, {"text": res.text, "parsed": res.parsed, "model": res.model})
         return res
 

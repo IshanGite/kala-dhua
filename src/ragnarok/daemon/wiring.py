@@ -32,6 +32,7 @@ from ragnarok.harness.executor import ExecContext, Executor
 from ragnarok.harness.memorycmd import MemoryCommands
 from ragnarok.harness.planner import Planner
 from ragnarok.harness.turn import Agent
+from ragnarok.harness.vision import Vision
 from ragnarok.llm_gateway.client import Gateway, OllamaGateway
 from ragnarok.llm_gateway.models import ModelLock
 from ragnarok.memory.commitments import Commitments
@@ -106,6 +107,7 @@ def build_world(*, use_laya: bool = True, sandbox: bool = True, embed_rungs: boo
         runners[name] = ConnectorRunner(mem, queue, build(name, vault, long_poll_s=live_telegram_s), COMPARTMENT, gateway=gw, index=index, require_pairing=name in PAIRED)
     if files:
         runners["files"] = ConnectorRunner(mem, queue, build("files", vault, folders=files), COMPARTMENT, gateway=gw, index=index)
+    vision = Vision(gw)
     state = RuntimeState(mem)
     notif = Notifications(default_source(), lambda: json.loads(state.get("notif_apps", "[]")))
     runners["notifications"] = ConnectorRunner(mem, queue, notif, COMPARTMENT, gateway=gw, index=index)
@@ -139,7 +141,7 @@ def build_world(*, use_laya: bool = True, sandbox: bool = True, embed_rungs: boo
     answerer = Answerer(reader, index, gw, COMPARTMENT, digest=digest)
     planner = Planner(gw, lambda n: _manifest(registry, n), Agent._now_text)
     agent = Agent(mem=mem, ledger=ledger, reader=reader, index=index, gateway=gw, cascade=cascade, planner=planner, executor=executor, registry=registry, library=library,
-                  routes=routes, ctx=ExecContext(compartment=COMPARTMENT, workspace=ws, data_dir=root, today=date.today().isoformat()), answerer=answerer, fast_refuse=True, memcmd=MemoryCommands(mem, reader, COMPARTMENT), calendar_mirror=lambda: vault.get(token_name("google", "write")) is not None)
+                  routes=routes, ctx=ExecContext(compartment=COMPARTMENT, workspace=ws, data_dir=root, today=date.today().isoformat()), answerer=answerer, fast_refuse=True, memcmd=MemoryCommands(mem, reader, COMPARTMENT), vision=vision, calendar_mirror=lambda: vault.get(token_name("google", "write")) is not None)
     state = RuntimeState(mem)
     notif = Notifications(default_source(), lambda: json.loads(state.get("notif_apps", "[]")))
     runners["notifications"] = ConnectorRunner(mem, queue, notif, COMPARTMENT, gateway=gw, index=index)
@@ -167,7 +169,7 @@ def build_world(*, use_laya: bool = True, sandbox: bool = True, embed_rungs: boo
         _load_index(mem, reader, index)
 
     skills_admin = SkillsAdmin(registry, ledger, broker, hub, selector, gw, builtin_names)
-    services = Services(runtime, answerer, notif, chat, reader, hub, proactive, mem, reindex, skills_admin, digest)
+    services = Services(runtime, answerer, notif, chat, reader, hub, proactive, mem, reindex, skills_admin, digest, vision)
     w = World(mem, reader, index, gw, runtime, services, guard, token_file, agent, ledger, broker, None, selector, l1)
     w.registry = registry  # type: ignore[attr-defined]
     return w

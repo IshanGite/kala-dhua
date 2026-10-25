@@ -14,5 +14,9 @@
   "writer": {
     "name": "qwen3:0.6b",
     "digest": "7df6b6e09427a769808717c0a93cadc4ae99ed4eb8bf5ca557c90846becea435"
+  },
+  "vision": {
+    "name": "qwen3-vl:2b",
+    "digest": "0635d9d857d497aeadba3d7d27485746c50554446f9f6ec01ef39788221adbe8"
   }
 }

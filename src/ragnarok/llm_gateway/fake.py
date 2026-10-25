@@ -33,9 +33,9 @@ class FakeGateway:
 
     async def chat(
         self, *, role: str, messages: list[dict[str, str]], schema: dict | None, max_tokens: int,
-        deadline: float, priority: Priority, seed: int | None = 0, temperature: float = 0.0,
+        deadline: float, priority: Priority, seed: int | None = 0, temperature: float = 0.0, images: list[str] | None = None,
     ) -> ChatResult:
-        self.calls.append({"role": role, "messages": messages, "schema": schema})
+        self.calls.append({"role": role, "messages": messages, "schema": schema, "images": len(images or [])})
         out = self.responder(messages, schema)
         if schema is not None:
             import json

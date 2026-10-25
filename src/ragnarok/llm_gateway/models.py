@@ -12,7 +12,7 @@ from pathlib import Path
 
 from ragnarok.core.errors import ConfigError, ModelNotAllowed
 
-ROLES = ("embedder", "arbiter", "planner", "writer")
+ROLES = ("embedder", "arbiter", "planner", "writer", "vision")
 
 
 @dataclass(frozen=True)

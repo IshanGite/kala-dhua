@@ -36,6 +36,7 @@ class Services:
     reindex: Any = None  # callable: rebuild the in-memory vector index after a delete
     skills: Any = None  # SkillsAdmin
     digest: Any = None  # the digest engine
+    vision: Any = None  # explain the screen / ask about an image
 
 
 class ChatIn(BaseModel):
@@ -70,6 +71,12 @@ class FactEditIn(BaseModel):
 
 class SkillPathIn(BaseModel):
     path: str = Field(min_length=1, max_length=500)
+
+
+class VisionIn(BaseModel):
+    question: str | None = Field(default=None, max_length=500)
+    image_b64: str | None = Field(default=None, max_length=17_000_000)  # a picture the user attached; empty means: look at the screen
+    delay_s: float = Field(default=0.0, ge=0, le=10)
 
 
 class DecideIn(BaseModel):
@@ -290,6 +297,25 @@ def create_app(guard: TokenGuard | None = None, port: int = DEFAULT_PORT, servic
         if svc.digest is None:
             return {"sections": [], "timeline": [], "overview": "The digest is not available.", "items": 0}
         return svc.digest.build(max(0.25, min(hours, 24 * 30)), sources={s for s in sources.split(",") if s} if sources else None, topic=topic[:80] if topic else None)
+
+    @app.post("/vision")
+    async def vision(body: VisionIn) -> dict[str, Any]:
+        """Typed or clicked by the user only. The picture is used once and never stored; the answer is words, and nothing is executed from it."""
+        if svc.vision is None:
+            return {"ok": False, "error": "E_NO_AGENT"}
+        import asyncio as _a
+        import base64 as _b
+
+        try:
+            if body.image_b64:
+                text = await svc.vision.ask(_b.b64decode(body.image_b64.split(",")[-1], validate=False), body.question)
+            else:
+                if body.delay_s:
+                    await _a.sleep(body.delay_s)  # time to switch to the window that should be explained
+                text = await svc.vision.explain_screen(body.question)
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "error": getattr(exc, "code", "E_VISION"), "detail": str(exc)[:300]}
+        return {"ok": True, "answer": text}
 
     @app.get("/approvals")
     async def approvals() -> dict[str, Any]:

@@ -36,6 +36,7 @@ from ragnarok.harness.executor import ExecContext, Executor, TaskOutcome
 from ragnarok.harness.plan import Plan, PlanNode, validate_plan
 from ragnarok.harness.planner import Planner
 from ragnarok.harness.verify import evaluate
+from ragnarok.harness.vision import SCREEN_ASK
 from ragnarok.llm_gateway.client import Gateway, Priority
 from ragnarok.memory.ledger import Ledger
 from ragnarok.memory.models import EventIn
@@ -77,8 +78,9 @@ class TurnResult:
 
 class Agent:
     def __init__(self, *, mem: MemoryService, ledger: Ledger, reader: MemoryReader, index: VectorIndex, gateway: Gateway, cascade: Cascade, planner: Planner,
-                 executor: Executor, registry: SkillRegistry, library: RouteLibrary | None, routes: RoutesStore | None, ctx: ExecContext, answerer: Answerer | None = None, fast_refuse: bool = False, calendar_mirror: Any = None, memcmd: Any = None) -> None:
+                 executor: Executor, registry: SkillRegistry, library: RouteLibrary | None, routes: RoutesStore | None, ctx: ExecContext, answerer: Answerer | None = None, fast_refuse: bool = False, calendar_mirror: Any = None, memcmd: Any = None, vision: Any = None) -> None:
         self.memcmd = memcmd
+        self.vision = vision
         self._mirror = calendar_mirror  # callable -> bool: is Google write access connected, so reminders also go on the calendar
         self.answerer = answerer
         self.fast_refuse = fast_refuse  # the daemon sets it: one unresolved action is refused at once instead of spending the slow planner on it
@@ -332,6 +334,16 @@ class Agent:
                                     trace=[f"Split into {len(d.clauses)} steps by code: " + " then ".join(f"{n.skill}" for n in d.plan.nodes) + "; later steps use earlier results, so anything derived from outside content asks for your click"])
                 return await self._run_plan(request, dec, d.plan, "C", [], t0, tm)
             decomposer_note = f"The step splitter could not handle it ({d.reason}), so the planner model tries"  # falls through to the cascade and the LLM planner
+        if self.vision is not None and SCREEN_ASK.search(request) and not self._is_action_request(re.sub(r"\b(?:read|check)\b", "", request, flags=re.I)):
+            dec = RouteDecision(tier="L1", intent_family="vision", skills=[], plan_needed=False, risk_floor=0, memory_types=[], confidence=1.0, latency_ms=0.0, backend="vision",
+                                trace=["You asked about your screen: one capture, sent only to the local vision model, never stored"])
+            if trust != "user_direct":  # a schedule or another autonomous run may never look at the screen
+                return TurnResult("L1", dec, None, None, 0.0, answer=Answered("I only look at your screen when you ask me to in the chat."), timings=tm)
+            try:
+                text = await self.vision.explain_screen(request)
+            except Exception as exc:  # noqa: BLE001
+                text = str(exc) if getattr(exc, "code", "").startswith("E_") else "I could not look at the screen."
+            return TurnResult("L1", dec, None, None, (time.perf_counter() - t0) * 1000, answer=Answered(text, grounded=False, notes=["vision"]), timings=tm)
         if self.answerer is not None and is_catchup(request):  # a briefing is read-only and needs no routing
             ans = await self.answerer.catch_up(request)
             dec = RouteDecision(tier="L1", intent_family="catchup", skills=[], plan_needed=False, risk_floor=0, memory_types=[], confidence=1.0, latency_ms=0.0, backend="catchup")

@@ -30,7 +30,7 @@ from ragnarok.llm_gateway.models import ModelLock
 LOOPBACK_NAMES = {"localhost"}
 DEFAULT_URL = "http://127.0.0.1:11434"
 # Starting context sizes per role, tuned by measured memory use (ARCHITECTURE 6.3).
-NUM_CTX = {"planner": 8192, "arbiter": 2048, "extractor": 2048, "writer": 2048, "judge": 2048, "embedder": 2048}  # small contexts: prefill time is part of the latency budget
+NUM_CTX = {"planner": 8192, "arbiter": 2048, "extractor": 2048, "writer": 2048, "judge": 2048, "embedder": 2048, "vision": 4096}  # small contexts: prefill time is part of the latency budget
 
 
 class Priority(enum.IntEnum):
@@ -53,7 +53,7 @@ class ChatResult:
 class Gateway(Protocol):
     async def chat(
         self, *, role: str, messages: list[dict[str, str]], schema: dict | None, max_tokens: int,
-        deadline: float, priority: Priority, seed: int | None = 0, temperature: float = 0.0,
+        deadline: float, priority: Priority, seed: int | None = 0, temperature: float = 0.0, images: list[str] | None = None,
     ) -> ChatResult: ...
 
     async def embed(self, texts: list[str], *, deadline: float, priority: Priority) -> np.ndarray: ...
@@ -164,7 +164,7 @@ class OllamaGateway:
 
     async def chat(
         self, *, role: str, messages: list[dict[str, str]], schema: dict | None, max_tokens: int,
-        deadline: float, priority: Priority, seed: int | None = 0, temperature: float = 0.0,
+        deadline: float, priority: Priority, seed: int | None = 0, temperature: float = 0.0, images: list[str] | None = None,
     ) -> ChatResult:
         entry = self.lock.for_role(role)
         self.lock.check_name(entry.name)
@@ -172,14 +172,21 @@ class OllamaGateway:
         prompt_tokens_est = sum(approx_tokens(m["content"]) for m in messages)
         if prompt_tokens_est + max_tokens > ctx:
             raise ModelError("prompt does not fit the context window", code="E_CTX_OVERFLOW")
+        if images:  # base64 images ride on the last user message; only the locked vision model is ever asked
+            messages = [dict(m) for m in messages]  # type: ignore[assignment]
+            for m in reversed(messages):
+                if m["role"] == "user":
+                    m["images"] = images  # type: ignore[assignment]
+                    break
         body: dict[str, Any] = {
             "model": entry.name,
             "messages": messages,
             "stream": False,
-            "think": False,  # qwen3-class models reason silently by default and spend the whole token cap before answering (spike 2)
             "keep_alive": self.keep_alive,
             "options": {"num_ctx": ctx, "num_predict": max_tokens, "temperature": temperature, "seed": seed or 0},
         }
+        if role != "vision":  # qwen3-class text models reason silently by default and spend the whole token cap before answering (spike 2); qwen3-vl returns nothing at all with think off, so it is asked to skip reasoning in words instead
+            body["think"] = False
         if schema is not None:
             body["format"] = schema
         started = get_clock().monotonic()
