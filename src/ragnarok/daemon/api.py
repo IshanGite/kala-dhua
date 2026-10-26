@@ -463,6 +463,13 @@ def create_app(guard: TokenGuard | None = None, port: int = DEFAULT_PORT, servic
     async def scroll_draft_reject(draft_id: str) -> dict[str, Any]:
         return {"ok": bool(svc.scrolls and svc.scrolls.lib.reject_draft(draft_id))}
 
+    @app.get("/graph")
+    async def graph(demo: bool = False, hours: float = 24 * 30) -> dict[str, Any]:
+        """The knowledge graph of what Ragnarok holds (labels only). demo=true adds clearly marked made-up nodes for a bigger picture."""
+        from ragnarok.daemon.graph import build_graph
+
+        return build_graph(svc, demo=demo, hours=max(1.0, min(hours, 24 * 120)))
+
     @app.get("/showcase")
     async def showcase_list() -> dict[str, Any]:
         return {"items": svc.showcase.items() if svc.showcase else [], "apps": svc.showcase.apps() if svc.showcase else [], "default_to": __import__("ragnarok.harness.showcase", fromlist=["DEFAULT_TO"]).DEFAULT_TO}

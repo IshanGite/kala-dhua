@@ -154,3 +154,15 @@ async def test_composer_posts_to_a_chat_and_apps_say_what_is_ready(world):
     await asyncio.wait_for(clicks(world), 5)
     await asyncio.wait_for(task, 5)
     assert SENT[0] == ("post", "55", "Demo is at nine")
+
+
+async def test_graph_has_the_realms_models_and_real_people_and_demo_is_separate(world):
+    from ragnarok.daemon.graph import build_graph
+
+    await start(world)
+    g = build_graph(world.services)
+    ids = {n["id"] for n in g["nodes"]}
+    assert "root" in ids and sum(1 for i in ids if i.startswith("realm:")) == 11 and "person:ravi" in ids and "src:telegram" in ids
+    assert not any(n.get("demo") for n in g["nodes"]) and all(e["s"] in ids and e["t"] in ids for e in g["edges"])
+    d = build_graph(world.services, demo=True)
+    assert len(d["nodes"]) > len(g["nodes"]) + 50 and all(n.get("demo") for n in d["nodes"] if n["id"] not in ids)

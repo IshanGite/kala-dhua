@@ -1,6 +1,9 @@
 // Browser-level smoke test of the window page: real DOM (jsdom), real API (a seeded throwaway app), real clicks. Run: node tests/ui/smoke.mjs  (needs: npm i jsdom in tests/ui)
 import { spawn } from "node:child_process";
-import { JSDOM } from "jsdom";
+import { JSDOM, VirtualConsole } from "jsdom";
+const vc = new VirtualConsole();
+const pageErrors = [];
+vc.on("jsdomError", (e) => pageErrors.push(String(e.message || e).slice(0, 200)));
 
 const server = spawn(".venv/bin/python", ["tests/ui/smoke_server.py", "8794"], { env: { ...process.env, PYTHONPATH: "src" }, stdio: ["pipe", "pipe", "inherit"] });
 const info = await new Promise((res) => { let buf = ""; server.stdout.on("data", (d) => { buf += d; const l = buf.split("\n").find((x) => x.startsWith("{")); if (l) res(JSON.parse(l)); }); });
@@ -9,7 +12,7 @@ const results = [];
 const check = (name, ok, detail = "") => { results.push([name, !!ok]); console.log(`${ok ? "PASS" : "FAIL"}  ${name} ${ok ? "" : detail}`); };
 
 const url = `http://127.0.0.1:${info.port}/`;
-const dom = await JSDOM.fromURL(url + `#token=${info.token}`, { runScripts: "dangerously", resources: "usable", pretendToBeVisual: true,
+const dom = await JSDOM.fromURL(url + `#token=${info.token}`, { runScripts: "dangerously", resources: "usable", pretendToBeVisual: true, virtualConsole: vc,
   beforeParse(w) { w.fetch = (u, o) => fetch(new URL(u, url), o); w.history.replaceState = () => {}; } });
 const { window } = dom, doc = window.document;
 const waitFor = async (fn, ms = 8000) => { const t = Date.now(); while (Date.now() - t < ms) { try { const v = fn(); if (v) return v; } catch {} await sleep(100); } return null; };
@@ -107,9 +110,20 @@ const mailAp = await waitFor(() => [...doc.querySelectorAll("#log .ap")].find((b
 check("the approval card names the recipient and the exact text", mailAp);
 if (mailAp) click(mailAp);
 check("after the click the mail is reported as sent", await waitFor(() => /sent|Sent|Email/.test(doc.getElementById("log").textContent.split("The demo moved to five").slice(-1)[0]), 12000));
+click(doc.getElementById("graphb"));
+const nodesIn = () => Number((doc.getElementById("gstat").textContent.match(/(\d+) nodes/) || [])[1] || 0);
+check("the header button opens the knowledge graph tab", await waitFor(() => doc.getElementById("gra").classList.contains("show") && nodesIn() >= 25));
+check("the graph legend lists the kinds of nodes", doc.querySelectorAll("#gleg button").length >= 5);
+const before = nodesIn();
+click(doc.getElementById("gdemo"));
+check("the demo constellation adds clearly marked extra nodes", await waitFor(() => nodesIn() > before + 40 && /demo constellation on/.test(doc.getElementById("gstat").textContent)));
+click(doc.getElementById("gdemo"));
+check("and switching it off returns to the real graph", await waitFor(() => nodesIn() === before));
+tab("chat");
 const sw = doc.getElementById("sw"); click(sw);
 check("the on/off switch pauses reading", await waitFor(() => /paused/.test(doc.getElementById("state").textContent)));
 
+check("the page raised no script errors", pageErrors.length === 0, pageErrors.join(" | "));
 const failed = results.filter((r) => !r[1]);
 console.log(`\n${results.length - failed.length}/${results.length} UI checks passed`);
 server.stdin.end();

@@ -25,11 +25,11 @@ svg{width:100%;height:100%;overflow:visible;display:block;shape-rendering:geomet
 #lat1{transform-origin:36px 40px;animation:spin 29s linear infinite}#lat2{transform-origin:36px 40px;animation:spin 41s linear infinite reverse}
 #core{transform-origin:36px 40px;animation:core 2.8s ease-in-out infinite}
 @keyframes core{0%,100%{opacity:.7;transform:scale(.85)}50%{opacity:1;transform:scale(1.15)}}
-.tw{fill:#e8fffb;opacity:0;animation:tw 3.4s ease-in-out infinite}
+.tw{fill:#fff3d1;opacity:0;animation:tw 3.4s ease-in-out infinite}
 .tw:nth-of-type(2){animation-delay:.9s}.tw:nth-of-type(3){animation-delay:1.8s}.tw:nth-of-type(4){animation-delay:2.4s}
 @keyframes tw{0%,100%{opacity:0;transform:scale(.3)}50%{opacity:.95;transform:scale(1)}}
 .tw{transform-box:fill-box;transform-origin:center}
-#ring{fill:none;stroke:#7ff5df;stroke-width:1.4;opacity:0;transform-box:fill-box;transform-origin:center}
+#ring{fill:none;stroke:#ffd877;stroke-width:1.4;opacity:0;transform-box:fill-box;transform-origin:center}
 @keyframes ring{0%{opacity:.9;transform:scale(.7)}100%{opacity:0;transform:scale(2)}}
 .zap #flash{animation:flash .6s ease-out 1}
 #flash{opacity:0}
@@ -41,7 +41,7 @@ svg{width:100%;height:100%;overflow:visible;display:block;shape-rendering:geomet
 .alert #halo{animation:halo .5s ease-in-out infinite}
 .alert #ring{animation:ring .9s ease-out 3}
 @keyframes flare{0%{transform:scale(1)}25%{transform:scale(1.25)}50%{transform:scale(.96)}75%{transform:scale(1.12)}100%{transform:scale(1)}}
-#bubble{max-width:188px;background:linear-gradient(180deg,#f3fffc,#e3f8f2);color:#10231f;font:600 12.5px/1.3 system-ui,sans-serif;border-radius:13px;padding:8px 11px;box-shadow:0 3px 14px #0008;opacity:0;transform:translateX(var(--bx,8px)) scale(.92);transform-origin:center;transition:opacity .22s,transform .25s cubic-bezier(.3,1.5,.5,1);display:none;word-break:break-word;border:1px solid #38d6b0}
+#bubble{max-width:188px;background:linear-gradient(180deg,#fff8e6,#f3e6c4);color:#2a1d08;font:600 12.5px/1.3 system-ui,sans-serif;border-radius:13px;padding:8px 11px;box-shadow:0 3px 14px #0008;opacity:0;transform:translateX(var(--bx,8px)) scale(.92);transform-origin:center;transition:opacity .22s,transform .25s cubic-bezier(.3,1.5,.5,1);display:none;word-break:break-word;border:1px solid #d8a93a}
 #row.right #bubble{--bx:10px}#row.left #bubble{--bx:-10px}
 #bubble.on{opacity:1;transform:translateX(0) scale(1)}
 #dot{position:absolute;right:6px;top:2px;min-width:17px;height:17px;border-radius:9px;background:#ff6b5e;color:#fff;font:700 10.5px/17px system-ui;text-align:center;display:none;padding:0 4px;box-shadow:0 1px 4px #0007;animation:pop .3s cubic-bezier(.3,1.8,.5,1);z-index:2}
@@ -55,15 +55,15 @@ svg{width:100%;height:100%;overflow:visible;display:block;shape-rendering:geomet
     <div id="dot"></div>
     <svg viewBox="0 0 72 92" aria-label="A glowing orb">
       <defs>
-        <radialGradient id="halog" cx="50%" cy="50%" r="50%"><stop offset=".45" stop-color="#34e0c0" stop-opacity=".5"/><stop offset=".75" stop-color="#1fb89f" stop-opacity=".14"/><stop offset="1" stop-color="#1fb89f" stop-opacity="0"/></radialGradient>
-        <radialGradient id="base" cx="34%" cy="28%" r="82%"><stop offset="0" stop-color="#d9fff7"/><stop offset=".22" stop-color="#6ff0d6"/><stop offset=".55" stop-color="#19b3a0"/><stop offset=".82" stop-color="#0a5f6c"/><stop offset="1" stop-color="#062a3b"/></radialGradient>
-        <radialGradient id="bl1" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#e6fffb" stop-opacity=".85"/><stop offset="1" stop-color="#7ff5df" stop-opacity="0"/></radialGradient>
+        <radialGradient id="halog" cx="50%" cy="50%" r="50%"><stop offset=".45" stop-color="#5cc8ff" stop-opacity=".5"/><stop offset=".75" stop-color="#3a7bff" stop-opacity=".14"/><stop offset="1" stop-color="#3a7bff" stop-opacity="0"/></radialGradient>
+        <radialGradient id="base" cx="34%" cy="28%" r="82%"><stop offset="0" stop-color="#e6f6ff"/><stop offset=".22" stop-color="#7fd4ff"/><stop offset=".55" stop-color="#2f6fe0"/><stop offset=".82" stop-color="#14338f"/><stop offset="1" stop-color="#070f33"/></radialGradient>
+        <radialGradient id="bl1" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#fff3d1" stop-opacity=".85"/><stop offset="1" stop-color="#ffd877" stop-opacity="0"/></radialGradient>
         <radialGradient id="bl2" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#9a8bff" stop-opacity=".75"/><stop offset="1" stop-color="#6a5cff" stop-opacity="0"/></radialGradient>
-        <radialGradient id="bl3" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#3dffd6" stop-opacity=".7"/><stop offset="1" stop-color="#17c7b0" stop-opacity="0"/></radialGradient>
-        <radialGradient id="corg" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#ffffff"/><stop offset=".4" stop-color="#b8fff0" stop-opacity=".85"/><stop offset="1" stop-color="#58f0d2" stop-opacity="0"/></radialGradient>
-        <radialGradient id="fres" cx="50%" cy="50%" r="50%"><stop offset=".62" stop-color="#9ffbe9" stop-opacity="0"/><stop offset=".9" stop-color="#9ffbe9" stop-opacity=".38"/><stop offset="1" stop-color="#e9fffb" stop-opacity=".85"/></radialGradient>
+        <radialGradient id="bl3" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#5cf0ff" stop-opacity=".7"/><stop offset="1" stop-color="#2aa8ff" stop-opacity="0"/></radialGradient>
+        <radialGradient id="corg" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#ffffff"/><stop offset=".4" stop-color="#ffe9a8" stop-opacity=".85"/><stop offset="1" stop-color="#ffc94d" stop-opacity="0"/></radialGradient>
+        <radialGradient id="fres" cx="50%" cy="50%" r="50%"><stop offset=".62" stop-color="#9fd8ff" stop-opacity="0"/><stop offset=".9" stop-color="#9fd8ff" stop-opacity=".38"/><stop offset="1" stop-color="#eaf6ff" stop-opacity=".85"/></radialGradient>
         <linearGradient id="spec" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".95"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
-        <radialGradient id="bounce" cx="50%" cy="100%" r="70%"><stop offset="0" stop-color="#8dffe9" stop-opacity=".6"/><stop offset="1" stop-color="#8dffe9" stop-opacity="0"/></radialGradient>
+        <radialGradient id="bounce" cx="50%" cy="100%" r="70%"><stop offset="0" stop-color="#ffd877" stop-opacity=".6"/><stop offset="1" stop-color="#ffd877" stop-opacity="0"/></radialGradient>
         <radialGradient id="shg" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#001a1c" stop-opacity=".55"/><stop offset="1" stop-color="#001a1c" stop-opacity="0"/></radialGradient>
         <clipPath id="orb"><circle cx="36" cy="40" r="27"/></clipPath>
       </defs>
@@ -76,8 +76,8 @@ svg{width:100%;height:100%;overflow:visible;display:block;shape-rendering:geomet
           <g id="sw1" class="sw"><ellipse cx="22" cy="34" rx="19" ry="12" fill="url(#bl1)"/></g>
           <g id="sw2" class="sw"><ellipse cx="50" cy="46" rx="18" ry="13" fill="url(#bl2)"/></g>
           <g id="sw3" class="sw"><ellipse cx="36" cy="58" rx="20" ry="10" fill="url(#bl3)"/></g>
-          <g id="lat1"><ellipse cx="36" cy="40" rx="27" ry="9" fill="none" stroke="#e9fffb" stroke-opacity=".16" stroke-width=".6"/></g>
-          <g id="lat2"><ellipse cx="36" cy="40" rx="10" ry="27" fill="none" stroke="#e9fffb" stroke-opacity=".14" stroke-width=".6"/></g>
+          <g id="lat1"><ellipse cx="36" cy="40" rx="27" ry="9" fill="none" stroke="#eaf6ff" stroke-opacity=".16" stroke-width=".6"/></g>
+          <g id="lat2"><ellipse cx="36" cy="40" rx="10" ry="27" fill="none" stroke="#eaf6ff" stroke-opacity=".14" stroke-width=".6"/></g>
           <circle id="core" cx="36" cy="40" r="11" fill="url(#corg)"/>
           <ellipse cx="36" cy="66" rx="20" ry="9" fill="url(#bounce)"/>
         </g>
@@ -87,7 +87,7 @@ svg{width:100%;height:100%;overflow:visible;display:block;shape-rendering:geomet
         <circle cx="21" cy="33" r="1.5" fill="#fff" opacity=".75"/>
         <circle id="flash" cx="36" cy="40" r="27" fill="#fff"/>
         <circle class="tw" cx="9" cy="22" r="1.2"/><circle class="tw" cx="63" cy="30" r="1.4"/><circle class="tw" cx="60" cy="64" r="1.1"/><circle class="tw" cx="12" cy="62" r="1.3"/>
-        <g transform="rotate(-18 36 40)"><circle r="1.7" fill="#eafffb"><animateMotion dur="5.5s" repeatCount="indefinite" path="M72,40 A36,9 0 1 1 0,40 A36,9 0 1 1 72,40 Z"/></circle><circle r="1.1" fill="#9ff8e6"><animateMotion dur="5.5s" begin="-2.7s" repeatCount="indefinite" path="M72,40 A36,9 0 1 1 0,40 A36,9 0 1 1 72,40 Z"/></circle></g>
+        <g transform="rotate(-18 36 40)"><circle r="1.7" fill="#fff3d1"><animateMotion dur="5.5s" repeatCount="indefinite" path="M72,40 A36,9 0 1 1 0,40 A36,9 0 1 1 72,40 Z"/></circle><circle r="1.1" fill="#ffd877"><animateMotion dur="5.5s" begin="-2.7s" repeatCount="indefinite" path="M72,40 A36,9 0 1 1 0,40 A36,9 0 1 1 72,40 Z"/></circle></g>
       </g>
     </svg>
   </div>

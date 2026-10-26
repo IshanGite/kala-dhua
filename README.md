@@ -247,6 +247,10 @@ See **[`docs/SKILL_SCROLLS.md`](docs/SKILL_SCROLLS.md)**.
 
 ---
 
+## The window
+
+A Norse-themed desktop window (Odin's gold, Thor's lightning blue, a glass orb that hovers when pinned). Tabs: Chat (with section bubbles for one-click tasks and a composer that sends to any connected app), Digest, Inbox, Approvals, Memory, Activity, **Graph** (a 3D knowledge graph of memory realms, apps, people, topics, facts, skills, scrolls and models; an optional, clearly marked demo constellation adds extra nodes), Scrolls and Sources.
+
 ## Evaluation & evidence
 
 Every claim is measured on this project's own harness and recorded in [`docs/evidence/`](docs/evidence/) and [`docs/EVALS.md`](docs/EVALS.md). The `evals/` harness (`ragnarok evals`) runs ten suites — exact answers, intent, actions, end-to-end tasks, grounded memory, digest, forgetting, security, multimodal and reliability — against the real local models.
