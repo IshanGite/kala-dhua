@@ -117,6 +117,8 @@ check("the graph legend lists the kinds of nodes", doc.querySelectorAll("#gleg b
 const before = nodesIn();
 click(doc.getElementById("gdemo"));
 check("the demo constellation adds clearly marked extra nodes", await waitFor(() => nodesIn() > before + 40 && /demo constellation on/.test(doc.getElementById("gstat").textContent)));
+click([...doc.querySelectorAll("#gview button")].find((b) => b.dataset.v === "flow"));
+check("the Flow view shows the agents and the hand-offs between them", await waitFor(() => /\d+ agents · \d+ hand-offs/.test(doc.getElementById("gstat").textContent)));
 click([...doc.querySelectorAll("#gview button")].find((b) => b.dataset.v === "runs"));
 check("the Runs view lists what the agent really did, with route tier and timings", await waitFor(() => doc.querySelectorAll("#gruns .gr").length >= 1 && /L\d|rule|\bms\b/.test(doc.getElementById("gruns").textContent)));
 click([...doc.querySelectorAll("#gview button")].find((b) => b.dataset.v === "bench"));
