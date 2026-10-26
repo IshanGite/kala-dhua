@@ -117,6 +117,11 @@ check("the graph legend lists the kinds of nodes", doc.querySelectorAll("#gleg b
 const before = nodesIn();
 click(doc.getElementById("gdemo"));
 check("the demo constellation adds clearly marked extra nodes", await waitFor(() => nodesIn() > before + 40 && /demo constellation on/.test(doc.getElementById("gstat").textContent)));
+click([...doc.querySelectorAll("#gview button")].find((b) => b.dataset.v === "runs"));
+check("the Runs view lists what the agent really did, with route tier and timings", await waitFor(() => doc.querySelectorAll("#gruns .gr").length >= 1 && /L\d|rule|\bms\b/.test(doc.getElementById("gruns").textContent)));
+click([...doc.querySelectorAll("#gview button")].find((b) => b.dataset.v === "bench"));
+check("the Benchmarks view shows the saved eval results as bars", await waitFor(() => doc.querySelectorAll("#gbench .bc").length >= 8 && doc.querySelectorAll("#gbench .bt").length >= 10));
+click([...doc.querySelectorAll("#gview button")].find((b) => b.dataset.v === "map"));
 click(doc.getElementById("gdemo"));
 check("and switching it off returns to the real graph", await waitFor(() => nodesIn() === before));
 tab("chat");

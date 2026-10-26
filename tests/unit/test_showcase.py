@@ -166,3 +166,19 @@ async def test_graph_has_the_realms_models_and_real_people_and_demo_is_separate(
     assert not any(n.get("demo") for n in g["nodes"]) and all(e["s"] in ids and e["t"] in ids for e in g["edges"])
     d = build_graph(world.services, demo=True)
     assert len(d["nodes"]) > len(g["nodes"]) + 50 and all(n.get("demo") for n in d["nodes"] if n["id"] not in ids)
+
+
+async def test_graph_has_a_pipeline_ring_and_runs_and_evals_are_served(world):
+    from ragnarok.daemon.graph import build_graph, eval_summary
+
+    await start(world)
+    g = build_graph(world.services)
+    stages = [n["id"] for n in g["nodes"] if n["type"] == "stage"]
+    assert stages[0] == "stage:intake" and stages[-1] == "stage:reply" and len(stages) == 10
+    assert any(e["s"] == "stage:route" and e["t"] == "model:laya" for e in g["edges"])
+    world.services.chat = world.services.chat or None
+    r = await world.services.showcase.run("catchup")
+    out = summarize(r)
+    assert out["family"] == "catchup" and "tier" in out
+    ev = eval_summary()
+    assert isinstance(ev["suites"], list) and all({"suite", "title", "rows"} <= s.keys() for s in ev["suites"])

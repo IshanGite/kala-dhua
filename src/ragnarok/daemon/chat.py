@@ -7,6 +7,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
+from ragnarok.core.clock import get_clock
 from ragnarok.core.ids import new_id
 from ragnarok.core.logging import log
 from ragnarok.harness.turn import PROGRESS, Agent, TurnResult
@@ -22,6 +23,7 @@ class Job:
     reply: dict[str, Any] = field(default_factory=dict)
     task_id: str | None = None
     task: Any = None  # the asyncio task, so the user can stop it
+    ts: int = field(default_factory=lambda: get_clock().now_ms())
 
 
 FRIENDLY = {
@@ -90,7 +92,7 @@ def follow_ups(family: str, text: str) -> list[str]:
 
 def summarize(turn: TurnResult) -> dict[str, Any]:
     """A plain-words reply from what the turn did. Never includes more than the user's own request and the action results."""
-    meta = {"why": turn.decision.trace + [f"Time: {turn.latency_ms:.0f} ms" + (f" ({', '.join(f'{k} {v}' for k, v in turn.timings.items())})" if turn.timings else "")], "timings": turn.timings, "tier": turn.tier, "backend": turn.decision.backend, "ms": round(turn.latency_ms), "learned": turn.learned, "route_id": turn.decision.route_id}
+    meta = {"why": turn.decision.trace + [f"Time: {turn.latency_ms:.0f} ms" + (f" ({', '.join(f'{k} {v}' for k, v in turn.timings.items())})" if turn.timings else "")], "timings": turn.timings, "tier": turn.tier, "backend": turn.decision.backend, "ms": round(turn.latency_ms), "learned": turn.learned, "route_id": turn.decision.route_id, "family": turn.decision.intent_family, "skills": list(turn.decision.skills), "mem": list(turn.decision.memory_types), "task_state": turn.outcome.state if turn.outcome else None}
     fam = turn.decision.intent_family
     if turn.answer is not None:
         return {"text": turn.answer.text, "citations": turn.answer.citations, "grounded": turn.answer.grounded, "follow_ups": follow_ups(fam, turn.answer.text), **meta}
@@ -134,6 +136,16 @@ class ChatService:
     def recent_trace(self, limit: int = 20) -> list[dict[str, Any]]:
         """The last decisions with the reasons the agent gave itself, newest first (NFR4.1)."""
         return [{"job": j.id, "text": j.text[:120], "state": j.state, "why": j.reply.get("why", []), "tier": j.reply.get("tier"), "backend": j.reply.get("backend")} for j in list(self.jobs.values())[-max(1, min(limit, 100)):][::-1]]
+
+    def recent_runs(self, limit: int = 20) -> list[dict[str, Any]]:
+        """What each recent turn really did, for the Graph tab: the stages it went through, the route tier, skills and memory realms it touched, and where its time went. Newest first."""
+        out = []
+        for j in list(self.jobs.values())[-max(1, min(limit, 60)):][::-1]:
+            r = j.reply or {}
+            out.append({"id": j.id, "ts": j.ts, "text": j.text[:120], "state": j.state, "tier": r.get("tier"), "backend": r.get("backend"), "family": r.get("family"), "skills": r.get("skills") or [],
+                        "mem": r.get("mem") or [], "ms": r.get("ms"), "timings": r.get("timings") or {}, "grounded": r.get("grounded"), "cites": len(r.get("citations") or []), "task_state": r.get("task_state"),
+                        "learned": r.get("learned"), "waiting": bool(self.interim(j).get("pending")) if j.state == "running" and j.task_id else False})
+        return out
 
     def interim(self, job: Job) -> dict[str, Any]:
         """While a task waits for a click, say what is already done and what is waiting: the user should never stare at 'working'."""

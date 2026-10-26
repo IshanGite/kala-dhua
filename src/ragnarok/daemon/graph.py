@@ -17,6 +17,13 @@ from typing import Any
 
 from ragnarok.core.clock import get_clock
 
+STAGES = [  # (id, label, what happens)
+    ("intake", "Intake", "your message arrives; nothing is sent anywhere"), ("scan", "Scan", "received text is checked for instructions aimed at the assistant"),
+    ("understand", "Understand", "what do you want: ask, act, catch up, look at the screen"), ("route", "Route", "learned route, rule, Laya, embedding, arbiter, planner: cheapest first"),
+    ("plan", "Plan", "steps and their order; read steps feed write steps"), ("policy", "Policy", "rules decide the risk tier; models cannot grant permission"),
+    ("approve", "Approve", "a card with the exact content waits for your click"), ("execute", "Execute", "the skill runs in the sandbox"),
+    ("remember", "Remember", "memory is read or written, with a quote as evidence"), ("reply", "Reply", "the answer, with citations and a Why? trace"),
+]
 REALMS = [  # (id, label, norse flavour, table to count)
     ("working", "Working memory", "the task at hand", None), ("sensory", "Sensory buffer", "what just arrived", "items"), ("episodic", "Episodic", "Muninn's saga-log", "events"),
     ("semantic", "Semantic", "Mimir's well", "facts"), ("preference", "Preferences", "what you like", None), ("relational", "Relational", "who is who", "people"),
@@ -60,6 +67,13 @@ def build_graph(svc: Any, *, demo: bool = False, hours: float = 24 * 30) -> dict
         node(f"realm:{rid}", label, "realm", 1.6 + (math.log10(c + 1) * 0.5 if c else 0), f"{flav}" + (f" - {c} stored" if c is not None else ""))
         edge("root", f"realm:{rid}", "realm")
 
+    # the pipeline every request goes through: a ring of stages, so a live run can be shown as a path through it
+    prev = None
+    for sid, label, tip in STAGES:
+        node(f"stage:{sid}", label, "stage", 1.25, tip, fixed=True)
+        edge(prev or "root", f"stage:{sid}", "flow")
+        prev = f"stage:{sid}"
+    edge("stage:reply", "root", "flow")
     # the local models (names only)
     try:
         lock = json.loads((Path(__file__).resolve().parents[3] / "models.lock").read_text(encoding="utf-8"))
@@ -70,6 +84,8 @@ def build_graph(svc: Any, *, demo: bool = False, hours: float = 24 * 30) -> dict
         pass
     node("model:laya", "Laya router", "model", 1.2, "small in-process classifier that picks the fast path")
     edge("root", "model:laya", "runs")
+    for sid, other in (("route", "model:laya"), ("understand", "model:arbiter"), ("plan", "model:planner"), ("execute", "realm:procedural"), ("remember", "realm:semantic"), ("scan", "realm:meta"), ("reply", "model:writer")):
+        edge(f"stage:{sid}", other, "uses")
 
     # apps, people and topics from what was really read
     people: Counter[str] = Counter()
@@ -200,3 +216,32 @@ def _constellation(nodes: dict[str, dict[str, Any]], edges: list[dict[str, str]]
         edges.append({"s": rid, "t": mid, "k": "holds"})
         if rng.random() < .5 and people:
             edges.append({"s": mid, "t": rng.choice(people), "k": "about"})
+
+
+EVAL_TITLES = {"utility": "Exact answers", "intent": "Understanding", "actions": "Reading actions", "tasks": "Tasks end to end", "memory": "Grounded memory", "digest": "Digest", "forgetting": "Forgetting (180 days)",
+               "security": "Red team", "reliability": "Reliability", "multimodal": "Pictures and speech"}
+
+
+def eval_summary() -> dict[str, Any]:
+    """The benchmark results saved by `ragnarok evals`, reshaped for the Benchmarks panel: rates with their intervals, latencies, and plain values."""
+    d = Path(__file__).resolve().parents[3] / "docs" / "evidence" / "evals"
+    out = []
+    for name in EVAL_TITLES:
+        f = d / f"{name}.json"
+        if not f.exists():
+            continue
+        try:
+            r = json.loads(f.read_text(encoding="utf-8"))
+        except Exception:  # noqa: BLE001
+            continue
+        rows = []
+        for k, v in (r.get("metrics") or {}).items():
+            if isinstance(v, dict) and {"k", "n", "ci95"} <= v.keys():
+                rows.append({"name": k.replace("_", " "), "kind": "rate", "k": v["k"], "n": v["n"], "rate": v.get("rate"), "ci": v["ci95"]})
+            elif isinstance(v, dict) and "p50_ms" in v:
+                rows.append({"name": k.replace("_", " "), "kind": "latency", "p50": v["p50_ms"], "p95": v["p95_ms"], "n": v["n"]})
+            elif isinstance(v, (int, float)):
+                rows.append({"name": k.replace("_", " "), "kind": "value", "value": v})
+        out.append({"suite": name, "title": EVAL_TITLES[name], "requirement": r.get("requirement", ""), "n": r.get("n"), "seconds": r.get("seconds"), "rows": rows[:14], "notes": (r.get("notes") or r.get("note") or "")[:260],
+                    "misses": len(r.get("failures") or [])})
+    return {"suites": out}

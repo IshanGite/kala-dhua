@@ -53,7 +53,7 @@ Five principles guide every feature:
 
 ## What it does
 
-- **Ingests** Gmail, Google Calendar, Drive, Meet, Slack, Telegram, Discord, Outlook, local files, and desktop notifications — each source on its own live poller.
+- **Ingests** Gmail, Google Calendar, Drive, Meet, Slack, Telegram, Discord, local files, and desktop notifications — each source on its own live poller.
 - **Remembers** everything in an encrypted SQLCipher store with provenance, bitemporal facts, and hash-chained events.
 - **Routes** every request through a four-tier cascade (learned routes → Laya → small model → big model), so repeat tasks get faster.
 - **Plans and executes** multi-step tasks: *"look up what Dev needs and remind me about it tomorrow"* is split into an execution graph by code in about 0.1 s (the LLM planner is only the fallback), with crash recovery, retries and one self-correcting re-plan.
@@ -89,7 +89,7 @@ When a task succeeds, the route that worked becomes a **candidate**, is verified
 
 ```mermaid
 flowchart LR
-  SRC[Sources: Gmail · Calendar · Drive · Meet · Slack · Telegram · Discord · Outlook · files] --> CONN[Connectors]
+  SRC[Sources: Gmail · Calendar · Drive · Meet · Slack · Telegram · Discord · files] --> CONN[Connectors]
   CONN --> ING[Ingestion pipeline]
   ING --> MEM[(SQLCipher memory)]
   MEM --> RET[Hybrid retrieval]
@@ -186,7 +186,7 @@ On an empty store the agent answers *"I don't have anything about that in memory
 | `ragnarok evals [--suite …] [--report-only]` | Run the benchmark suites against the real local models and write `docs/EVALS.md`. |
 | `ragnarok connect slack\|telegram\|discord` | Store a bot token in the OS keychain. |
 | `ragnarok connect google --client-file <json> [--write]` | Google OAuth sign-in (Gmail, Calendar, Drive, Meet). |
-| `ragnarok connect outlook --client-id <id>` | Outlook device-code sign-in. |
+| `ragnarok connect outlook --client-id <id>` | Optional, not part of this build's scope (Outlook is not used). |
 | `ragnarok skill new <name>` / `add <folder>` / `list` | Create, register and list your own skills (turn them on in the window). |
 | `ragnarok version` | Print the version. |
 
@@ -205,7 +205,7 @@ Read and write tokens are **separate**; tokens live in the OS keychain, never in
 | Slack | ✅ (polling) | Post in a channel (needs the `chat:write` scope) |
 | Telegram | ✅ (long-poll) | Send message |
 | Discord | ✅ | Post in channel |
-| Outlook | ✅ (coded, not yet live-tested) | Draft & send (designed) |
+| Outlook | out of scope: optional code, not used and not tested | none |
 | Local files | ✅ | — |
 | Desktop notifications | Built, not yet live-tested | — |
 
@@ -267,7 +267,7 @@ See **[`docs/SKILL_SCROLLS.md`](docs/SKILL_SCROLLS.md)**.
 
 ## The window
 
-A Norse-themed desktop window (Odin's gold, Thor's lightning blue, a glass orb that hovers when pinned). Tabs: Chat (with section bubbles for one-click tasks and a composer that sends to any connected app), Digest, Inbox, Approvals, Memory, Activity, **Graph** (a 3D knowledge graph of memory realms, apps, people, topics, facts, skills, scrolls and models; an optional, clearly marked demo constellation adds extra nodes), Scrolls and Sources.
+A Norse-themed desktop window (Odin's gold, Thor's lightning blue, a glass orb that hovers when pinned). Tabs: Chat (with section bubbles for one-click tasks and a composer that sends to any connected app), Digest, Inbox, Approvals, Memory, Activity, **Graph** (a 3D observatory: the knowledge graph of memory realms, apps, people, topics, facts, skills, scrolls and models, a ring of the ten pipeline stages that lights up the path each request really took, a Runs view with stage timings, and a Benchmarks view of the eval results; an optional, clearly marked demo constellation adds extra nodes), Scrolls and Sources.
 
 ## Evaluation & evidence
 
@@ -368,7 +368,7 @@ Under active construction for a hackathon deadline of **09:00 IST, 26 October 20
 
 **Done (verified live on real accounts, with evidence in `docs/evidence/`):** encrypted store and memory (view, edit, export, verified delete), Zero Trust layer, executor with crash recovery (state back in ~3.3 s after `kill -9`), the four-tier router that learns routes, deterministic multi-step decomposition, always-on triggers and proactivity, read connectors (Gmail, Calendar, Drive, Meet, Slack, Telegram, Discord) and click-gated writes (email, reply, draft, calendar, Drive, Telegram, Discord, Slack), live per-app ingestion, a context-grouped Digest with a timeline, explain-my-screen and picture questions with a local vision model, local multilingual voice, skill scrolls and idle-time dreaming, user-defined skills, a sandboxed Python skill, and a benchmark harness with ten eval suites.
 
-**Honest gaps:** Windows sandbox backends and notification reader, Laya fine-tuning (it is calibrated, not fine-tuned), Outlook and notifications on real accounts, the full red-team report, and the 90-simulated-day pruning run. The requirement-by-requirement trace against the original problem statement is in [`docs/REQUIREMENTS_TRACE.md`](docs/REQUIREMENTS_TRACE.md).
+**Honest gaps:** Windows sandbox backends and notification reader, Laya fine-tuning (it is calibrated, not fine-tuned), desktop notifications on real accounts (Outlook is out of scope), the full red-team report, and the 90-simulated-day pruning run. The requirement-by-requirement trace against the original problem statement is in [`docs/REQUIREMENTS_TRACE.md`](docs/REQUIREMENTS_TRACE.md).
 
 See [`docs/HANDOVER_TUSHAR.md`](docs/HANDOVER_TUSHAR.md) for the full list.
 

@@ -470,6 +470,18 @@ def create_app(guard: TokenGuard | None = None, port: int = DEFAULT_PORT, servic
 
         return build_graph(svc, demo=demo, hours=max(1.0, min(hours, 24 * 120)))
 
+    @app.get("/runs")
+    async def runs(limit: int = 20) -> dict[str, Any]:
+        """What the agent really did for each recent request (stages, route, skills, memory realms, timings): the Graph tab replays these."""
+        return {"items": svc.chat.recent_runs(limit) if svc.chat else []}
+
+    @app.get("/evals")
+    async def evals() -> dict[str, Any]:
+        """The saved benchmark results (docs/evidence/evals), for the Benchmarks panel."""
+        from ragnarok.daemon.graph import eval_summary
+
+        return eval_summary()
+
     @app.get("/showcase")
     async def showcase_list() -> dict[str, Any]:
         return {"items": svc.showcase.items() if svc.showcase else [], "apps": svc.showcase.apps() if svc.showcase else [], "default_to": __import__("ragnarok.harness.showcase", fromlist=["DEFAULT_TO"]).DEFAULT_TO}

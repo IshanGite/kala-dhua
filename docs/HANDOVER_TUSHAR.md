@@ -57,7 +57,7 @@ Ragnarok: an always-on personal AI agent that runs entirely on the machine. Loca
 - Run `uv run ragnarok check` before every push. Never leave `main` red. Small commits, conventional prefixes. Pull with `git pull --rebase` (Ishan and you both push to `main`).
 
 ## Known problems / honest gaps
-- Outlook and desktop notifications have not been run on real accounts.
+- Outlook is out of scope (not used). Desktop notifications have not been run on real accounts.
 - Laya is calibrated, not fine-tuned (see `docs/spikes/laya.md`).
 - The LLM planner fallback takes 20 to 30 s and can invent skills; common multi-step shapes use the code decomposer instead.
 - The red-team report (`docs/RED_TEAM.md`) and a one-command acceptance runner are not written; `tests/security/` and the live injection test are the evidence for now.

@@ -113,7 +113,7 @@ What about hallucinations? Answers must cite a snippet or they are discarded; wi
 Can it be tricked by an email? We tested exactly that live; see section 4.
 How is it different from a cloud assistant? Nothing leaves the machine except actions you approve; memory is yours (view, edit, export, provably delete); and it works on its own in the background, not only when asked.
 What about Windows? The core runs on Windows in CI. The Windows sandbox and notification reader are the open items (Tushar is on them).
-What is NOT done? Windows sandbox; Laya full-encoder fine-tuning and re-fitted thresholds; Outlook and desktop notifications on real accounts; a polished red-team report and one-command acceptance runner; the 90-simulated-day pruning run; model-based fact extraction from all ingested text (facts come from commands and rules today); the slow LLM planner fallback is unreliable, which is why common shapes use the code decomposer.
+What is NOT done? Windows sandbox; Laya full-encoder fine-tuning and re-fitted thresholds; desktop notifications on real accounts (Outlook is out of scope); a polished red-team report and one-command acceptance runner; the 90-simulated-day pruning run; model-based fact extraction from all ingested text (facts come from commands and rules today); the slow LLM planner fallback is unreliable, which is why common shapes use the code decomposer.
 Why only qwen3 small models? We measured: the 4B model ignores the no-thinking switch and leaks reasoning into plain text (8 to 13 second replies), so it is used only where output is structured. The 1.7B model answers in 0.2 to 0.7 s; the 0.6B in under 0.1 s for chat and drafting.
 
 ==============================================================
