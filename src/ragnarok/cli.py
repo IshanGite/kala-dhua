@@ -256,6 +256,16 @@ def check() -> None:
     typer.echo("check: ok")
 
 
+@app.command()
+def evals(suite: list[str] = typer.Option(None, help="Run only these suites (default: all)"), report_only: bool = typer.Option(False, help="Only rebuild docs/EVALS.md")) -> None:
+    """Run the benchmark suites against the real local models and write docs/EVALS.md."""
+    import subprocess
+    import sys
+
+    cmd = [sys.executable, "-m", "evals.run"] + (["--suite", *suite] if suite else []) + (["--report-only"] if report_only else [])
+    raise typer.Exit(subprocess.call(cmd))  # noqa: S603
+
+
 def main() -> None:
     app()
 

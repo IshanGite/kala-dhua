@@ -1,0 +1,212 @@
+{
+ "suite": "intent",
+ "requirement": "FR2.2, NFR2.1",
+ "n": 156,
+ "metrics": {
+  "accuracy": {
+   "k": 145,
+   "n": 156,
+   "rate": 0.9295,
+   "ci95": [
+    0.878,
+    0.96
+   ]
+  },
+  "per_class": {
+   "action": {
+    "k": 31,
+    "n": 34,
+    "rate": 0.9118,
+    "ci95": [
+     0.77,
+     0.97
+    ]
+   },
+   "agenda": {
+    "k": 14,
+    "n": 14,
+    "rate": 1.0,
+    "ci95": [
+     0.785,
+     1.0
+    ]
+   },
+   "catchup": {
+    "k": 17,
+    "n": 21,
+    "rate": 0.8095,
+    "ci95": [
+     0.6,
+     0.923
+    ]
+   },
+   "chat": {
+    "k": 41,
+    "n": 43,
+    "rate": 0.9535,
+    "ci95": [
+     0.845,
+     0.987
+    ]
+   },
+   "recall": {
+    "k": 25,
+    "n": 26,
+    "rate": 0.9615,
+    "ci95": [
+     0.811,
+     0.993
+    ]
+   },
+   "screen": {
+    "k": 10,
+    "n": 10,
+    "rate": 1.0,
+    "ci95": [
+     0.722,
+     1.0
+    ]
+   },
+   "unclear": {
+    "k": 7,
+    "n": 8,
+    "rate": 0.875,
+    "ci95": [
+     0.529,
+     0.978
+    ]
+   }
+  },
+  "false_action_rate": {
+   "k": 0,
+   "n": 122,
+   "rate": 0.0,
+   "ci95": [
+    0.0,
+    0.031
+   ]
+  },
+  "missed_action_rate": {
+   "k": 3,
+   "n": 34,
+   "rate": 0.0882,
+   "ci95": [
+    0.03,
+    0.23
+   ]
+  },
+  "latency": {
+   "n": 156,
+   "p50_ms": 392.5,
+   "p95_ms": 550.9,
+   "max_ms": 1938.0
+  }
+ },
+ "confusions": [
+  {
+   "expected": "catchup",
+   "got": "recall",
+   "count": 3
+  },
+  {
+   "expected": "chat",
+   "got": "recall",
+   "count": 1
+  },
+  {
+   "expected": "catchup",
+   "got": "screen",
+   "count": 1
+  },
+  {
+   "expected": "action",
+   "got": null,
+   "count": 1
+  },
+  {
+   "expected": "chat",
+   "got": "unclear",
+   "count": 1
+  },
+  {
+   "expected": "recall",
+   "got": "chat",
+   "count": 1
+  },
+  {
+   "expected": "action",
+   "got": "agenda",
+   "count": 1
+  },
+  {
+   "expected": "action",
+   "got": "chat",
+   "count": 1
+  },
+  {
+   "expected": "unclear",
+   "got": "recall",
+   "count": 1
+  }
+ ],
+ "failures": [
+  {
+   "text": "who won the match yesterday",
+   "expected": "chat",
+   "got": "recall"
+  },
+  {
+   "text": "what happened while I was away",
+   "expected": "catchup",
+   "got": "recall"
+  },
+  {
+   "text": "resume mis correos",
+   "expected": "catchup",
+   "got": "screen"
+  },
+  {
+   "text": "recap discord",
+   "expected": "catchup",
+   "got": "recall"
+  },
+  {
+   "text": "run python to print 1 to 10",
+   "expected": "action",
+   "got": null
+  },
+  {
+   "text": "what's 2 plus 2 lol",
+   "expected": "chat",
+   "got": "unclear"
+  },
+  {
+   "text": "what is the wifi password at the office",
+   "expected": "recall",
+   "got": "chat"
+  },
+  {
+   "text": "what did i miss on discord",
+   "expected": "catchup",
+   "got": "recall"
+  },
+  {
+   "text": "add standup to my calendar tomorrow 10am",
+   "expected": "action",
+   "got": "agenda"
+  },
+  {
+   "text": "reply to mugdha saying 11 works",
+   "expected": "action",
+   "got": "chat"
+  },
+  {
+   "text": "the thing from before",
+   "expected": "unclear",
+   "got": "recall"
+  }
+ ],
+ "note": "author-written labelled messages, one labeller; the class prompts were tuned on the first 99, the rest were written afterwards",
+ "seconds": 64.5,
+ "finished_at": 1792981586109
+}

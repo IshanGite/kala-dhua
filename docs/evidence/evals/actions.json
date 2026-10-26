@@ -1,0 +1,61 @@
+{
+ "suite": "actions",
+ "requirement": "FR2.2, FR3.1",
+ "n": 67,
+ "metrics": {
+  "skills_correct": {
+   "k": 37,
+   "n": 37,
+   "rate": 1.0,
+   "ci95": [
+    0.906,
+    1.0
+   ]
+  },
+  "fields_correct": {
+   "k": 82,
+   "n": 83,
+   "rate": 0.988,
+   "ci95": [
+    0.935,
+    0.998
+   ]
+  },
+  "requests_fully_correct": {
+   "k": 36,
+   "n": 37,
+   "rate": 0.973,
+   "ci95": [
+    0.862,
+    0.995
+   ]
+  },
+  "parser_alone_false_action_rate": {
+   "k": 0,
+   "n": 30,
+   "rate": 0.0,
+   "ci95": [
+    0.0,
+    0.114
+   ]
+  },
+  "latency": {
+   "n": 37,
+   "p50_ms": 738.9,
+   "p95_ms": 3484.2,
+   "max_ms": 3576.6
+  }
+ },
+ "failures": [
+  {
+   "text": "remind me in an hour to stretch",
+   "field": "when",
+   "want": "+1h",
+   "got": "in 30 minutes"
+  }
+ ],
+ "false_actions": [],
+ "note": "times are checked against the system clock at run time; 'parser alone' is the worst case: in the live turn a second reading must also agree it is an action (see the tasks suite)",
+ "seconds": 60.5,
+ "finished_at": 1792981646588
+}

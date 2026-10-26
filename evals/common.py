@@ -64,6 +64,7 @@ def lat(xs: list[float]) -> dict[str, float]:
 
 
 async def make_world(*, mirror: bool = True, laya: bool = True, sandbox: bool = True, gateway: Any = None, seed: Any = None) -> World:
+    os.environ["RAGNAROK_HOME"] = tempfile.mkdtemp(prefix="ragnarok-eval-")  # one data folder per world: its key lives only in this world's vault
     vault = MemoryStore()
     if mirror:
         vault.set(token_name("google", "write"), json.dumps({"client_id": "e", "client_secret": "e", "refresh_token": "e"}))  # only so calendar copies are offered; every send is a recording fake
@@ -95,7 +96,7 @@ class Approver:
                 self.w.services.hub.decide(c["id"], self.approve and not c.get("stepup"))
             await asyncio.sleep(0.02)
 
-    def __enter__(self) -> "Approver":
+    def __enter__(self) -> Approver:
         self._task = asyncio.get_running_loop().create_task(self._loop())
         return self
 

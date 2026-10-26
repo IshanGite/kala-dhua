@@ -562,6 +562,9 @@ class Agent:
             return done("agenda", ans, "read from your calendar")
         if u.intent == "recall":
             return await self._recall(request, u, history, done)
+        if u.intent == "unclear" and self._is_question(request) and len(request.split()) > 2:  # a plain question the reader could not classify may still be about the user's data
+            ans = await self.answerer.answer(request, general=False, history=history, context_hint=self._hint(request, history))
+            return done("question", ans, "answered from your memory with citations" if ans.grounded else "nothing in your memory matched")
         if u.intent == "unclear":
             return done("unclear", Answered("I did not quite get that. You can ask me about your messages, ask for a summary ('catch me up'), or tell me to do something like 'remind me to call the bank at 5pm'."), "too vague to act on")
         if u.intent == "chat":

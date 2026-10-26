@@ -1,0 +1,26 @@
+{
+ "suite": "utility",
+ "requirement": "NFR2.1 (instant answers), correctness",
+ "n": 93,
+ "metrics": {
+  "exact_correct": {
+   "k": 93,
+   "n": 93,
+   "rate": 1.0,
+   "ci95": [
+    0.96,
+    1.0
+   ]
+  },
+  "latency": {
+   "n": 93,
+   "p50_ms": 0.0,
+   "p95_ms": 7.8,
+   "max_ms": 45.1
+  }
+ },
+ "failures": [],
+ "note": "ground truth from zoneinfo, datetime arithmetic and published conversion factors; a model is never involved",
+ "seconds": 0.3,
+ "finished_at": 1792981521619
+}

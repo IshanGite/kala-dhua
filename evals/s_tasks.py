@@ -3,11 +3,9 @@ Requirements: FR2.2, FR3.1, FR3.2, NFR4.3 (nothing without a click), FR3.3. Metr
 from __future__ import annotations
 
 import asyncio
-import time
 
-from evals import common
 from evals.common import SENT, Approver, ask, lat, make_world, pctl, prop
-from evals.s_actions import NEG, POS, at
+from evals.s_actions import NEG, POS
 
 SUITE = "tasks"
 REQ = "FR2.2, FR3.1, FR3.2, FR3.3, NFR4.3"

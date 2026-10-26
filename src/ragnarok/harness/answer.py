@@ -135,6 +135,27 @@ def _echo(answer: str, question: str) -> bool:
     return bool(a) and len(a & q) / len(a) >= 0.8
 
 
+_Q_STOP = set("what when where which who whom whose how why does did was were are the and for with about from that this have has had can could would should will not you your mine our his her their its any all some much many time date day say said tell told give gave get got there then than into out over under after before again still just only also very more most long new big old first last next latest good number name kind".split())
+
+
+_SYN = {w: ("value", "cost", "price", "amount", "rupee", "rs ", "dollar", "$") for w in ("worth", "cost", "price", "value", "amount", "pay", "paid", "spend", "spent")}
+
+
+def _names(question: str) -> set[str]:
+    """Capitalised words after the first are people or places in the question; they identify who, not what."""
+    return {w.lower() for w in re.findall(r"(?<!^)\b[A-Z][a-z]{2,}", question)}
+
+
+def unsupported_terms(question: str, texts: list[str], names: set[str] | None = None) -> bool:
+    """True when the question asks about something none of the retrieved text mentions: the nearest memory is about something else, so answering from it would invent. Terms match by their first five letters (plural, tense); names of people are not counted as the subject."""
+    terms = [w for w in re.findall(r"[a-z0-9]{3,}", re.sub(r"'s\b", "", question.lower())) if w not in _Q_STOP and w not in (names or set())]
+    if not terms:
+        return False
+    hay = " ".join(texts).lower()
+    hits = [w for w in terms if w[:5] in hay or any(x in hay for x in _SYN.get(w, ()))]
+    return not hits or (len(terms) >= 2 and len(hits) < 0.6 * len(terms))
+
+
 class Answerer:
     def __init__(self, reader: MemoryReader, index: VectorIndex, gateway: Gateway, compartment: str = "work", *, answer_role: str = "arbiter", digest: Any = None) -> None:
         self._r, self._i, self._gw, self._comp = reader, index, gateway, compartment
@@ -151,6 +172,8 @@ class Answerer:
             return Answered("I could not search memory just now.", notes=["retrieval_failed"])
         if not res.hits:
             return await self._general(question) if general else Answered(NOTHING)
+        if unsupported_terms(question, [h.text for h in res.hits] + [(c or {}).get("author", "") or "" for c in self._r.chunk_context([h.id for h in res.hits if h.kind == "chunk"]).values()], _names(question)):
+            return Answered(NOTHING, notes=["subject_not_in_memory"])
         lines = []
         held = 0
         ctx = self._r.chunk_context([h.id for h in res.hits if h.kind == "chunk"])
@@ -182,6 +205,11 @@ class Answerer:
         if not cites:
             return Answered(NOTHING, notes=["ungrounded_answer_discarded"])  # an answer with no valid citation is not shown as fact
         text = drop_false_claims(str(data.get("answer", "")).strip())
+        evidence = " ".join(h.text for h in res.hits).replace(",", "")
+        loose = [n for n in re.findall(r"\d[\d.]*\d|\d", text.replace(",", "")) if n not in evidence]
+        said = bool(re.search(r"\b(say|said|says|send|sent|wrote|write|message|mention|mentioned)\b", question, re.I))
+        if loose and not said:  # a number or time that is in none of the cited messages was made up: show the messages themselves
+            text = ""
         if _echo(text, question) or len(text) < 8:  # a small model sometimes just repeats the question: show the evidence itself instead
             def _one(c: int) -> str:
                 h, cc = res.hits[c - 1], ctx.get(res.hits[c - 1].id) or {}

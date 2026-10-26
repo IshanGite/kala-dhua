@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from ragnarok.gateway_scan import deep
 from ragnarok.llm_gateway.fake import FakeGateway
 
