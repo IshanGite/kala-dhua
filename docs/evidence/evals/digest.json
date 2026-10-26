@@ -4,12 +4,12 @@
  "n": 18,
  "metrics": {
   "same_topic_pairs_grouped_together": {
-   "k": 5,
+   "k": 13,
    "n": 15,
-   "rate": 0.3333,
+   "rate": 0.8667,
    "ci95": [
-    0.152,
-    0.583
+    0.621,
+    0.963
    ]
   },
   "different_topic_pairs_wrongly_merged": {
@@ -22,51 +22,45 @@
    ]
   },
   "flagged_sections_correct": {
-   "k": 5,
-   "n": 7,
-   "rate": 0.7143,
+   "k": 3,
+   "n": 5,
+   "rate": 0.6,
    "ci95": [
-    0.359,
-    0.918
+    0.231,
+    0.882
    ]
   },
-  "urgent_sections_missed": 1,
+  "urgent_sections_missed": 0,
   "sections_with_unfaithful_numbers": {
    "k": 0,
-   "n": 13,
+   "n": 9,
    "rate": 0.0,
    "ci95": [
     0.0,
-    0.228
+    0.299
    ]
   },
-  "sections": 13,
+  "sections": 9,
   "timeline_entries": 1
  },
  "failures": [],
  "sections_dump": [
   {
    "t": "Hackathon",
-   "n": 2,
-   "sum": "2 item(s) from Kabir, Nina: “Hackathon demo slides are in the drive, please check the last slide.” (Kabir); “Hackathon logo is final: teal and charcoal.” (Nina)",
-   "na": true
-  },
-  {
-   "t": "Priya (telegram)",
-   "n": 1,
-   "sum": "1 message(s) from Priya: “Did you pay the BrightPrint invoice? Accounts keeps asking.” (Priya)",
+   "n": 3,
+   "sum": "3 item(s) from Kabir, Nina, Tushar: “The hackathon demo is at 9 am, bring the charger and the HDMI cable.” (Tushar); “Hackathon demo slides are in the drive, please check the last slide.” (Kabir); “Ha",
    "na": true
   },
   {
    "t": "Invoice",
-   "n": 2,
-   "sum": "Invoice 7731 for 12,500 rupees from BrightPrint is due on 5 November. Reminder: BrightPrint invoice 7731 is still unpaid.",
+   "n": 3,
+   "sum": "Invoice 7731 for 12,500 rupees from BrightPrint is due on 5 November. Reminder: BrightPrint invoice 7731 is still unpaid. Did you pay the BrightPrint invoice?",
    "na": true
   },
   {
    "t": "#eng (slack)",
-   "n": 2,
-   "sum": "2 message(s) from Asha, Ravi: “Database migration is Sunday 2am, expect ten minutes of downtime.” (Asha); “Migration rollback plan is in the wiki, please review before Sunday.” (Ravi)",
+   "n": 3,
+   "sum": "Database migration is Sunday 2am, expect ten minutes of downtime. Scheduled maintenance: database migration Sunday, services restart briefly. Migration rollback plan is in the wiki, please review befo",
    "na": true
   },
   {
@@ -77,14 +71,8 @@
   },
   {
    "t": "Dev",
-   "n": 2,
-   "sum": "2 item(s) from Dev, Ravi: “Dev is waiting on the signed contract, can someone send it today?” (Ravi); “Did you get my mail about the signed contract?” (Dev)",
-   "na": true
-  },
-  {
-   "t": "Contract",
-   "n": 1,
-   "sum": "Please send me the signed contract by Friday, it is urgent.",
+   "n": 3,
+   "sum": "Please send me the signed contract by Friday, it is urgent. Dev is waiting on the signed contract, can someone send it today? Did you get my mail about the signed contract?",
    "na": true
   },
   {
@@ -106,18 +94,6 @@
    "na": false
   },
   {
-   "t": "Tushar (telegram)",
-   "n": 1,
-   "sum": "1 message(s) from Tushar: “The hackathon demo is at 9 am, bring the charger and the HDMI cable.” (Tushar)",
-   "na": false
-  },
-  {
-   "t": "Maintenance",
-   "n": 1,
-   "sum": "Scheduled maintenance: database migration Sunday, services restart briefly.",
-   "na": false
-  },
-  {
    "t": "Offsite and Lonavala",
    "n": 2,
    "sum": "The team offsite is in Lonavala on 14 November, we leave at 7. Offsite packing list: sunscreen, charger, board games.",
@@ -125,6 +101,6 @@
   }
  ],
  "notes": "15 author-written messages across 5 topics and 3 apps plus 3 noise items; pairwise grouping precision and recall against the author's topic labels; 'urgent' is the author's judgement. Small corpus.",
- "seconds": 6.0,
- "finished_at": 1792981854728
+ "seconds": 5.6,
+ "finished_at": 1792987738367
 }

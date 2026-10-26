@@ -83,7 +83,7 @@ Samples: 83  ·  run time 145.3 s
 ## Grounded answers from memory
 
 Requirement: FR1.2 recall, FR2.3 grounded answers with citations  
-Samples: 34  ·  run time 56.8 s
+Samples: 34  ·  run time 47.1 s
 
 | Metric | Result |
 |---|---|
@@ -92,27 +92,27 @@ Samples: 34  ·  run time 56.8 s
 | citation points to source | 95.8% (23/24), 95% CI 80–99% |
 | unanswerable not invented | 100.0% (10/10), 95% CI 72–100% |
 | hallucination rate | 0.0% (0/10), 95% CI 0–28% |
-| latency | p50 1633 ms, p95 2333 ms (n=34) |
+| latency | p50 1294 ms, p95 1873 ms (n=34) |
 
 Misses (1), shown so the numbers can be checked:
 
-- {"q": "what should I bring to the doctor", "got": "You should bring any relevant medical records, medications, and any notes or questions you have for your doctor. Let me know if you need help preparing a list."}
+- {"q": "what should I bring to the doctor", "got": "You should bring any relevant medical records, medications, and any notes from your last visit. Also, bring any new symptoms or concerns you have."}
 
 _Note: 12 author-written messages, 24 answerable and 10 unanswerable questions; answers matched by regex on key facts; real local models. Small corpus, so this measures grounding and refusal, not scale._
 
 ## Digest grouping and flags
 
 Requirement: FR2.2 context-grouped digest with needs-action flags  
-Samples: 18  ·  run time 6.0 s
+Samples: 18  ·  run time 5.6 s
 
 | Metric | Result |
 |---|---|
-| same topic pairs grouped together | 33.3% (5/15), 95% CI 15–58% |
+| same topic pairs grouped together | 86.7% (13/15), 95% CI 62–96% |
 | different topic pairs wrongly merged | 0.0% (0/90), 95% CI 0–4% |
-| flagged sections correct | 71.4% (5/7), 95% CI 36–92% |
-| urgent sections missed | 1 |
-| sections with unfaithful numbers | 0.0% (0/13), 95% CI 0–23% |
-| sections | 13 |
+| flagged sections correct | 60.0% (3/5), 95% CI 23–88% |
+| urgent sections missed | 0 |
+| sections with unfaithful numbers | 0.0% (0/9), 95% CI 0–30% |
+| sections | 9 |
 | timeline entries | 1 |
 
 _Note: 15 author-written messages across 5 topics and 3 apps plus 3 noise items; pairwise grouping precision and recall against the author's topic labels; 'urgent' is the author's judgement. Small corpus._
@@ -120,7 +120,7 @@ _Note: 15 author-written messages across 5 topics and 3 apps plus 3 noise items;
 ## Forgetting over 180 simulated days
 
 Requirement: FR1.3 forgetting and bounded growth  
-Samples: 1800
+Samples: 1800  ·  run time 0.8 s
 
 | Metric | Result |
 |---|---|

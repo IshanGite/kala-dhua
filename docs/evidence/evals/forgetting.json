@@ -88,5 +88,6 @@
   1193
  ],
  "notes": "Simulated clock, 10 facts per day for 180 days (20% important); each day a random 15% of the 'first two facts of each earlier day' are used again. Retention sweep weekly, 30-day grace before a purge. Measures the policy, not model quality. 'Stored' counts active plus archived; the difference to facts written was purged.",
- "finished_at": 1792983377121
+ "seconds": 0.8,
+ "finished_at": 1792987787610
 }

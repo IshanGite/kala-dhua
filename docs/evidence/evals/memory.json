@@ -50,18 +50,18 @@
   },
   "latency": {
    "n": 34,
-   "p50_ms": 1632.8,
-   "p95_ms": 2333.1,
-   "max_ms": 2499.7
+   "p50_ms": 1294.2,
+   "p95_ms": 1873.0,
+   "max_ms": 2419.1
   }
  },
  "failures": [
   {
    "q": "what should I bring to the doctor",
-   "got": "You should bring any relevant medical records, medications, and any notes or questions you have for your doctor. Let me know if you need help preparing a list."
+   "got": "You should bring any relevant medical records, medications, and any notes from your last visit. Also, bring any new symptoms or concerns you have."
   }
  ],
  "notes": "12 author-written messages, 24 answerable and 10 unanswerable questions; answers matched by regex on key facts; real local models. Small corpus, so this measures grounding and refusal, not scale.",
- "seconds": 56.8,
- "finished_at": 1792981848683
+ "seconds": 47.1,
+ "finished_at": 1792987785987
 }
