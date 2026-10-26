@@ -10,7 +10,6 @@ import platform
 import subprocess
 import sys
 import time
-import traceback
 
 from evals.common import OUT, REPO, models, save
 
@@ -31,22 +30,29 @@ def fmt(v: object) -> str:
     return str(v)
 
 
-def run_suites(names: list[str]) -> None:
+def run_one(name: str) -> None:
+    """Runs inside its own process (a fresh model runtime per suite; the embedding library on the GPU does not tolerate being reused across worlds)."""
     import importlib
+    m = importlib.import_module(f"evals.s_{name}")
+    t = time.time()
+    r = m.run()
+    if inspect.isawaitable(r):
+        r = asyncio.run(r)
+    r["seconds"] = round(time.time() - t, 1)
+    save(r)
+
+
+def run_suites(names: list[str]) -> None:
     for name in names:
         t = time.time()
         print(f"== {name}", flush=True)
-        try:
-            m = importlib.import_module(f"evals.s_{name}")
-            r = m.run()
-            if inspect.isawaitable(r):
-                r = asyncio.run(r)
-            r["seconds"] = round(time.time() - t, 1)
-            save(r)
-            print(f"   done in {r['seconds']}s", flush=True)
-        except Exception:  # noqa: BLE001
-            traceback.print_exc()
-            save({"suite": name, "error": traceback.format_exc()[-800:], "metrics": {}})
+        p = subprocess.run([sys.executable, "-m", "evals.run", "--one", name], cwd=REPO, capture_output=True, text=True)  # noqa: S603
+        if p.returncode != 0:
+            tail = (p.stderr or "")[-600:]
+            save({"suite": name, "error": f"exit {p.returncode}: {tail}", "metrics": {}})
+            print(f"   FAILED exit {p.returncode}", flush=True)
+        else:
+            print(f"   done in {round(time.time() - t, 1)}s", flush=True)
 
 
 def machine() -> str:
@@ -108,7 +114,11 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--suite", nargs="*", default=None)
     ap.add_argument("--report-only", action="store_true")
+    ap.add_argument("--one", default=None)
     a = ap.parse_args()
+    if a.one:
+        run_one(a.one)
+        return
     if not a.report_only:
         run_suites(a.suite or ORDER)
     (REPO / "docs" / "EVALS.md").write_text(report(), encoding="utf-8")

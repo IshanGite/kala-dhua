@@ -14,10 +14,10 @@ REQ = "FR1.3 forgetting and bounded growth"
 
 def run() -> dict:
     from ragnarok.core import clock as ck
-    from ragnarok.store.crypto import KeyHierarchy
     from ragnarok.memory.models import EventIn, FactIn, ProvenanceIn
     from ragnarok.memory.retention import Retention
     from ragnarok.memory.service import MemoryService
+    from ragnarok.store.crypto import KeyHierarchy
 
     sim = ck.SimClock()
     old = ck.get_clock()
@@ -53,7 +53,8 @@ def run() -> dict:
         def state_of(f: str) -> str | None:
             r = mem.with_tx(lambda c: c.execute("SELECT state FROM facts WHERE id=?", (f,)).fetchone())
             return r[0] if r else None
-        alive = lambda ids: sum(1 for f, _ in ids if state_of(f) == "active")
+        def alive(ids):
+            return sum(1 for f, _ in ids if state_of(f) == "active")
         old_used = [x for x in used_ids if x[1] < 90]
         old_unused = [x for x in unused_ids if x[1] < 90]
         pin_alive = sum(1 for f in pinned if state_of(f) == "active")
@@ -68,8 +69,8 @@ def run() -> dict:
                             "growth_per_day_days_150_to_180": round((sizes[-1] - sizes[-31]) / 30, 2), "write_rate_per_day": 10,
                             "frequently_used_facts_older_than_90d_still_active": prop(alive(old_used), len(old_used)),
                             "rarely_used_facts_older_than_90d_still_active": prop(alive(old_unused), len(old_unused)),
-                            "pinned_facts_kept": prop(pin_alive, len(pinned)), "active_query_latency": lat(ts)},
+                            "pinned_facts_kept": prop(pin_alive, len(pinned)), "plain_read_of_50_active_facts_ms": lat(ts)},
                 "series_stored_facts_every_5_days": sizes[::5],
-                "notes": "Simulated clock, 10 facts per day for 90 days (20% important), a random 15% of earlier first-two-of-the-day facts touched daily. Retention sweep weekly. Measures the policy, not model quality."}
+                "notes": "Simulated clock, 10 facts per day for 180 days (20% important); each day a random 15% of the 'first two facts of each earlier day' are used again. Retention sweep weekly, 30-day grace before a purge. Measures the policy, not model quality. 'Stored' counts active plus archived; the difference to facts written was purged."}
     finally:
         ck.set_clock(old)

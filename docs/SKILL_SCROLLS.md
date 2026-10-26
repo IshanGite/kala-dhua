@@ -66,3 +66,8 @@ A dream holds no sender, no executor and no approval power (checked structurally
 ## Measured (scripts/eval_scrolls.py, scripts/qa_scrolls_dream.py; real local models; author-written sets)
 
 See `docs/evidence/scrolls.json`. Routing on the 29 messages the triggers were tuned on, and on 14 held-out messages written afterwards; each builtin scroll's own self-test; the token saving of progressive loading against one prompt containing every scroll. These sets are small and written by one person: a regression guard, not a benchmark.
+
+
+## Where to find them in the window
+
+There is a **Scrolls** tab (between Activity and Sources). It shows one button per approved scroll under "Try a scroll" (one click sends a ready-made request to the right specialist, so wording never has to be right), the full list with Read, Test and Try it, the drafts waiting for review, and the dreaming card. The chat also has a **Scrolls** bubble row above the input.

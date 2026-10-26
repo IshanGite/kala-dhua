@@ -108,3 +108,49 @@ async def test_doc_and_mail_uses_the_documents_real_link(world):
     await asyncio.wait_for(task, 8)
     kinds = [s[0] for s in SENT]
     assert kinds == ["drive", "mail"] and "https://docs.example/d/1" in SENT[1][3] and "privacy" in SENT[1][3]
+
+
+async def test_email_button_goes_to_the_demo_recipient(world):
+    from ragnarok.harness.showcase import DEFAULT_TO
+
+    await start(world)
+    task = asyncio.create_task(world.services.showcase.run("email"))
+    await asyncio.wait_for(clicks(world), 5)
+    await asyncio.wait_for(task, 5)
+    assert SENT[0][0] == "mail" and SENT[0][1] == DEFAULT_TO == "tushar.singh.software@gmail.com"
+
+
+async def test_full_flow_writes_a_doc_mails_the_link_adds_an_event_and_tells_the_chat(world):
+    await start(world)
+    task = asyncio.create_task(world.services.showcase.run("flow"))
+    await asyncio.wait_for(clicks(world, True, 4), 20)
+    await asyncio.wait_for(task, 20)
+    kinds = [s[0] for s in SENT]
+    assert kinds[0] == "drive" and set(kinds) == {"drive", "mail", "calendar", "post"}
+    mail = next(s for s in SENT if s[0] == "mail")
+    post = next(s for s in SENT if s[0] == "post")
+    assert mail[1] == "tushar.singh.software@gmail.com" and "https://docs.example/d/1" in mail[3] and "https://docs.example/d/1" in post[2]
+
+
+async def test_composer_sends_what_was_typed_where_it_was_typed(world):
+    await start(world)
+    task = asyncio.create_task(world.services.showcase.run("send", {"app": "mail", "to": "someone@example.com", "text": "Lunch is at one\nSee you there"}))
+    await asyncio.wait_for(clicks(world), 5)
+    await asyncio.wait_for(task, 5)
+    assert SENT[0][:3] == ("mail", "someone@example.com", "Lunch is at one") and "See you there" in SENT[0][3]
+
+
+async def test_composer_refuses_a_bad_address_and_sends_nothing(world):
+    await start(world)
+    out = summarize(await world.services.showcase.run("send", {"app": "mail", "to": "not an address", "text": "hi"}))
+    assert "not an email address" in out["text"] and SENT == [] and not world.services.hub.pending()
+
+
+async def test_composer_posts_to_a_chat_and_apps_say_what_is_ready(world):
+    await start(world)
+    apps = {a["id"]: a for a in world.services.showcase.apps()}
+    assert apps["telegram"]["ready"] and apps["telegram"]["target"] == "Ravi" and not apps["slack"]["ready"] and apps["mail"]["target"] == "tushar.singh.software@gmail.com"
+    task = asyncio.create_task(world.services.showcase.run("send", {"app": "telegram", "to": "", "text": "Demo is at nine"}))
+    await asyncio.wait_for(clicks(world), 5)
+    await asyncio.wait_for(task, 5)
+    assert SENT[0] == ("post", "55", "Demo is at nine")

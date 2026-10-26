@@ -54,7 +54,7 @@ async def run() -> dict:
     rec_k = rec_n = 0
     t_ocr: list[float] = []
     if ocr.available():
-        for png, page in zip(imgs, PAGES):
+        for png, page in zip(imgs, PAGES, strict=False):
             t = time.perf_counter()
             got = words(ocr.read_text(png))
             t_ocr.append((time.perf_counter() - t) * 1000)

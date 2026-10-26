@@ -101,7 +101,16 @@ header{background:linear-gradient(180deg,var(--panel),var(--bg))}
 .ap button{border:0;border-radius:10px;padding:7px 14px;font:inherit;font-weight:600;cursor:pointer}
 .ap .yes{background:var(--accent);color:var(--accent-ink)}.ap .no{background:var(--chip);color:var(--ink)}
 .ap .done{font-size:12.5px;color:var(--mute)}
-.qa{display:flex;gap:6px;overflow-x:auto;padding:8px 12px 0;background:var(--panel);border-top:1px solid var(--line)}
+#qs{background:var(--panel);border-top:1px solid var(--line)}
+.qsec{display:flex;gap:4px;overflow-x:auto;padding:7px 12px 0;scrollbar-width:none}.qsec::-webkit-scrollbar{display:none}
+.qsec button{border:0;background:none;color:var(--mute);font:inherit;font-size:12px;font-weight:600;letter-spacing:.2px;padding:3px 9px;border-radius:12px;cursor:pointer;white-space:nowrap;transition:background-color .2s,color .2s}
+.qsec button:hover{color:var(--ink)}.qsec button[aria-selected=true]{background:var(--accent2);color:var(--ink)}
+.qsec button.hot{color:var(--accent)}
+.qa{display:flex;gap:6px;overflow-x:auto;padding:6px 12px 2px;background:var(--panel);min-height:30px;scrollbar-width:none}.qa::-webkit-scrollbar{display:none}
+.qa .sug{flex:none;animation:cardIn .35s var(--ease) both}.qa .sug.go{border-color:var(--accent);color:var(--ink);font-weight:600}
+.cmp label{display:block;font-size:12px;color:var(--mute);margin:8px 0 3px}.cmp select,.cmp input,.cmp textarea{width:100%;box-sizing:border-box;font:inherit;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:7px 9px}
+.cmp textarea{min-height:64px;resize:vertical}.cmp .draft{font-size:12.5px;color:var(--mute);background:var(--bg);border:1px dashed var(--line);border-radius:10px;padding:7px 9px;margin-top:8px;word-break:break-word}
+.cmp .note{font-size:12px;color:var(--warn);margin-top:4px}
 .qa .sug{white-space:nowrap;padding:4px 11px;font-size:12.5px}
 form{border-top:0;padding-top:8px}
 textarea#q{flex:1;resize:none;max-height:140px;min-height:38px;line-height:1.4}
@@ -122,7 +131,7 @@ body,header,nav,.card,.bub,.btn,.sug,input,textarea,.pop,.qa,form{transition:bac
 header{backdrop-filter:blur(14px) saturate(1.3);-webkit-backdrop-filter:blur(14px) saturate(1.3);position:relative;z-index:3}
 h1{background:linear-gradient(90deg,var(--ink),color-mix(in srgb,var(--accent) 70%,var(--ink)));-webkit-background-clip:text;background-clip:text;color:transparent;letter-spacing:.3px}
 .logo{background:none;box-shadow:none;width:28px;height:28px}.logo svg{width:100%;height:100%;overflow:visible}
-.logo svg path.b{fill:url(#lg);stroke:#08392f;stroke-width:2;stroke-linejoin:round}
+.osw{transform-origin:36px 36px;animation:oswirl 12s linear infinite}@keyframes oswirl{to{transform:rotate(360deg)}}
 .logo{animation:logo 4.5s ease-in-out infinite}@keyframes logo{0%,100%{filter:drop-shadow(0 0 2px #38d6b066)}50%{filter:drop-shadow(0 0 7px #38d6b0cc)}}
 .av{background:linear-gradient(135deg,#0e3f36,#0a2a25);padding:3px}.av svg{width:100%;height:100%}
 nav{position:relative;gap:0;padding:0 6px;scrollbar-width:none}nav::-webkit-scrollbar{display:none}
@@ -162,8 +171,8 @@ section.show{animation:secIn .32s var(--ease) both}
 #splash{position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:radial-gradient(700px 420px at 50% 30%,color-mix(in srgb,var(--accent) 22%,transparent),transparent 70%),var(--bg);transition:opacity .55s var(--ease),transform .55s var(--ease),visibility .55s}
 #splash.gone{opacity:0;transform:scale(1.04);visibility:hidden;pointer-events:none}
 #splash .box{text-align:center;display:flex;flex-direction:column;align-items:center;gap:14px}
-#splash svg{width:78px;height:98px;overflow:visible;animation:sbolt 2.2s ease-in-out infinite}
-@keyframes sbolt{0%,100%{transform:translateY(0) scale(1);filter:drop-shadow(0 0 8px #38d6b088)}50%{transform:translateY(-4px) scale(1.05);filter:drop-shadow(0 0 20px #38d6b0)}}
+#splash svg{width:96px;height:96px;overflow:visible;animation:sbolt 2.2s ease-in-out infinite}
+@keyframes sbolt{0%,100%{transform:translateY(2px) scale(1);filter:drop-shadow(0 0 10px #38d6b088)}50%{transform:translateY(-7px) scale(1.06);filter:drop-shadow(0 0 26px #38d6b0)}}
 #splash .ttl{font-size:22px;font-weight:750;letter-spacing:.6px;background:linear-gradient(90deg,var(--ink),var(--accent));-webkit-background-clip:text;background-clip:text;color:transparent}
 #splash .stp{height:18px;font-size:12.5px;color:var(--mute);transition:opacity .25s}
 #splash .bar{width:170px;height:3px;border-radius:2px;background:var(--line);overflow:hidden}
@@ -176,9 +185,16 @@ section.show{animation:secIn .32s var(--ease) both}
 </style>
 </head>
 <body>
-<div id="splash" role="status" aria-live="polite"><div class="box"><svg viewBox="0 0 72 92" aria-hidden="true"><defs><linearGradient id="sg" x1=".2" y1="0" x2=".65" y2="1"><stop offset="0" stop-color="#f2fffc"/><stop offset=".35" stop-color="#9ff8e6"/><stop offset=".7" stop-color="#34d6b4"/><stop offset="1" stop-color="#0d8f78"/></linearGradient></defs><g class="arcs"><path d="M8 30 L16 34 L11 42 L21 46"/><path d="M64 62 L55 66 L60 75 L49 79"/><path d="M58 18 L50 23 L55 30"/></g><path d="M41 5 L12 52 L31 52 L17 88 L60 38 L39 38 L54 5 Z" fill="none" stroke="#08392f" stroke-width="3.4" stroke-linejoin="round"/><path d="M41 5 L12 52 L31 52 L17 88 L60 38 L39 38 L54 5 Z" fill="url(#sg)"/></svg><div class="ttl">Ragnarok</div><div class="stp" id="stp">Unlocking your encrypted memory</div><div class="bar"><i></i></div></div></div>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<radialGradient id="og-base" cx="34%" cy="28%" r="82%"><stop offset="0" stop-color="#d9fff7"/><stop offset=".22" stop-color="#6ff0d6"/><stop offset=".55" stop-color="#19b3a0"/><stop offset=".82" stop-color="#0a5f6c"/><stop offset="1" stop-color="#062a3b"/></radialGradient>
+<radialGradient id="og-vio" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#9a8bff" stop-opacity=".75"/><stop offset="1" stop-color="#6a5cff" stop-opacity="0"/></radialGradient>
+<radialGradient id="og-wh" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#e6fffb" stop-opacity=".9"/><stop offset="1" stop-color="#7ff5df" stop-opacity="0"/></radialGradient>
+<radialGradient id="og-fres" cx="50%" cy="50%" r="50%"><stop offset=".62" stop-color="#9ffbe9" stop-opacity="0"/><stop offset=".9" stop-color="#9ffbe9" stop-opacity=".38"/><stop offset="1" stop-color="#e9fffb" stop-opacity=".85"/></radialGradient>
+<linearGradient id="og-spec" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".95"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+<clipPath id="og-clip"><circle cx="36" cy="36" r="30"/></clipPath></defs></svg>
+<div id="splash" role="status" aria-live="polite"><div class="box"><svg viewBox="0 0 72 72" aria-hidden="true"><circle cx="36" cy="36" r="30" fill="url(#og-base)"/><g clip-path="url(#og-clip)"><g class="osw"><ellipse cx="24" cy="30" rx="20" ry="12" fill="url(#og-wh)"/><ellipse cx="50" cy="44" rx="19" ry="13" fill="url(#og-vio)"/></g></g><circle cx="36" cy="36" r="30" fill="url(#og-fres)"/><ellipse cx="26" cy="22" rx="12" ry="6" transform="rotate(-32 26 22)" fill="url(#og-spec)" opacity=".9"/></svg><div class="ttl">Ragnarok</div><div class="stp" id="stp">Unlocking your encrypted memory</div><div class="bar"><i></i></div></div></div>
 <header>
-  <span class="logo"><svg viewBox="0 0 72 92" aria-hidden="true"><defs><linearGradient id="lg" x1=".2" y1="0" x2=".65" y2="1"><stop offset="0" stop-color="#f2fffc"/><stop offset=".35" stop-color="#9ff8e6"/><stop offset=".7" stop-color="#34d6b4"/><stop offset="1" stop-color="#0d8f78"/></linearGradient></defs><path class="b" d="M41 5 L12 52 L31 52 L17 88 L60 38 L39 38 L54 5 Z"/></svg></span>
+  <span class="logo"><svg viewBox="0 0 72 72" aria-hidden="true"><circle cx="36" cy="36" r="30" fill="url(#og-base)"/><g clip-path="url(#og-clip)"><g class="osw"><ellipse cx="24" cy="30" rx="20" ry="12" fill="url(#og-wh)"/><ellipse cx="50" cy="44" rx="19" ry="13" fill="url(#og-vio)"/></g></g><circle cx="36" cy="36" r="30" fill="url(#og-fres)"/><ellipse cx="26" cy="22" rx="12" ry="6" transform="rotate(-32 26 22)" fill="url(#og-spec)" opacity=".9"/></svg></span>
   <h1>Ragnarok</h1><span id="demopill" class="pill" style="display:none;background:var(--warn2);color:var(--warn);font-weight:700" title="Synthetic data, every send is a local fake. Nothing touches your real accounts.">DEMO</span>
   <span class="grow small"><span id="dot" class="dot" title="status" style="display:inline-block;margin-right:6px"></span><span id="state">connecting</span><span id="live"></span></span>
   <button id="moreb" class="ib" title="More: clear chat, copy chat, speak replies, shortcuts" aria-label="More"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg></button><button id="pinb" class="ib" title="Pin to a screen edge, split screen, desktops" aria-label="Window options"><svg viewBox="0 0 24 24"><path d="M12 17v5M9 3h6l-1 6 3 4H7l3-4z"/></svg></button><button id="themeb" class="ib" title="Switch light / dark" aria-label="Switch theme"><svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
@@ -192,6 +208,7 @@ section.show{animation:secIn .32s var(--ease) both}
   <button role="tab" aria-selected="false" data-t="appr">Approvals <span id="badge" class="bdg"></span></button>
   <button role="tab" aria-selected="false" data-t="msg">Memory</button>
   <button role="tab" aria-selected="false" data-t="act">Activity</button>
+  <button role="tab" aria-selected="false" data-t="scr">Scrolls</button>
   <button role="tab" aria-selected="false" data-t="src">Sources</button>
 </nav>
 <main>
@@ -211,7 +228,7 @@ section.show{animation:secIn .32s var(--ease) both}
       <div id="scrstat" class="small" style="margin-top:8px"></div>
       <div class="small" style="margin-top:6px">Tip: type a question first (for example "what is the total?") and it answers that instead.</div>
     </div>
-    <div class="qa" id="qa" style="display:none"></div>
+    <div id="qs"><div class="qsec" id="qsec" role="tablist" aria-label="Quick actions"></div><div class="qa" id="qa"></div></div>
     <form id="f"><button type="button" class="ib" id="attb" title="Ask about a picture (or paste / drop one)" aria-label="Attach picture"><svg viewBox="0 0 24 24"><path d="M21 12l-8.5 8.5a5 5 0 0 1-7-7L14 5a3.5 3.5 0 0 1 5 5l-8.5 8.5a2 2 0 0 1-3-3L15 8"/></svg></button><button type="button" class="ib" id="shotb" title="Look at my screen: whole screen, a part, or a window" aria-label="Explain my screen"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg></button><button type="button" class="ib" id="micb" title="Speak: click to start, click again to stop (runs on this computer, any language)" aria-label="Voice input"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button><input type="file" id="file" accept="image/png,image/jpeg,image/webp" style="display:none"><textarea id="q" rows="1" autocomplete="off" placeholder="Ask or tell me anything" aria-label="Message" maxlength="4000"></textarea><button class="ib go" type="submit" id="sendb" title="Send" aria-label="Send"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></form>
   </section>
   <section id="dig">
@@ -231,6 +248,7 @@ section.show{animation:secIn .32s var(--ease) both}
     <h2>Everything read</h2><div id="msgs"><div class="skl"></div><div class="skl"></div><div class="skl"></div></div></div>
   </section>
   <section id="act"><div class="pad" id="feed"></div></section>
+  <section id="scr"><div class="pad" id="scrbox"></div></section>
   <section id="src"><div class="pad" id="srcbox"></div></section>
 </main>
 <div id="moremenu" class="pop" style="display:none;position:fixed;right:12px;top:52px;bottom:auto;left:auto;width:min(280px,calc(100% - 24px))" role="menu">
@@ -243,6 +261,14 @@ section.show{animation:secIn .32s var(--ease) both}
   </div><div class="small" id="mm_msg" style="margin-top:6px"></div></div>
 <div id="showpop" class="pop" style="display:none;position:fixed;left:50%;top:52px;bottom:auto;transform:translateX(-50%);width:min(420px,calc(100% - 20px));max-height:calc(100% - 70px);overflow:auto" role="dialog" aria-label="Showcase">
   <div class="pt">Showcase</div><div class="small">Each button runs a real feature on your real data, so it works even when a sentence is misunderstood. What it does appears in the chat. Anything that sends still waits for your click.</div><div id="showbox"></div><button class="btn" id="show_close" type="button" style="margin-top:8px">Close</button></div>
+<div id="cmppop" class="pop cmp" style="display:none;position:fixed;left:50%;top:48px;bottom:auto;transform:translateX(-50%);width:min(440px,calc(100% - 20px));max-height:calc(100% - 64px);overflow:auto;z-index:21" role="dialog" aria-label="Send a message">
+  <div class="pt">Send a message from Ragnarok</div><div class="small">Pick an app, say where it goes and what to say. Ragnarok drafts the request for you and runs it: no wording to get right. Every send still waits for your click.</div>
+  <label for="cm_app">App</label><select id="cm_app"></select>
+  <label for="cm_to" id="cm_tol">To</label><input id="cm_to" type="text" maxlength="200" autocomplete="off">
+  <div class="note" id="cm_note"></div>
+  <label for="cm_text">What should it say? (blank: the predefined message)</label><textarea id="cm_text" maxlength="2000" placeholder="For example: The demo moved to five, bring the charger."></textarea>
+  <div class="draft" id="cm_draft"></div>
+  <div class="pb" style="margin-top:10px"><button class="btn pri" id="cm_send" type="button">Draft and send</button><button class="btn" id="cm_pre" type="button">Send the predefined one</button><button class="btn" id="cm_close" type="button">Close</button></div></div>
 <div id="scrollview" class="pop" style="display:none;position:fixed;left:50%;top:48px;bottom:auto;transform:translateX(-50%);width:min(560px,calc(100% - 16px));max-height:calc(100% - 64px);overflow:auto;z-index:20" role="dialog" aria-label="Skill scroll">
   <div class="pt" id="sv_t"></div><div class="small" id="sv_s"></div><div id="sv_w" class="small err" style="margin:6px 0"></div>
   <pre id="sv_pre" style="white-space:pre-wrap;word-break:break-word;font:12px/1.45 ui-monospace,Menlo,monospace;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px;max-height:46vh;overflow:auto;margin:6px 0"></pre>
@@ -270,11 +296,11 @@ section.show{animation:secIn .32s var(--ease) both}
   var cur="chat";
   var tabs=document.querySelectorAll("nav button");
   function goto(t){cur=t;setTimeout(moveInd,0);tabs.forEach(function(o){o.setAttribute("aria-selected",o.dataset.t===t)});document.querySelectorAll("section").forEach(function(s){s.classList.toggle("show",s.id===t)});
-    if(t==="dig")loadDigest();if(t==="inb"){loadInbox();loadReminders()}if(t==="msg"){loadMsgs();loadFacts()}if(t==="appr")pullCards();if(t==="src")refresh()}
+    if(t==="dig")loadDigest();if(t==="inb"){loadInbox();loadReminders()}if(t==="msg"){loadMsgs();loadFacts()}if(t==="appr")pullCards();if(t==="src")refresh();if(t==="scr"){loadScrolls();loadDream()}}
   tabs.forEach(function(b){b.onclick=function(){goto(b.dataset.t)}});
 
   /* ---------------- polish: avatar, tab indicator, loading screen ---------------- */
-  function avatar(){var d=el("div","av");d.innerHTML='<svg viewBox="0 0 72 92" aria-hidden="true"><path d="M41 5 L12 52 L31 52 L17 88 L60 38 L39 38 L54 5 Z" fill="url(#lg)" stroke="#08392f" stroke-width="3" stroke-linejoin="round"/></svg>';return d}
+  function avatar(){var d=el("div","av");d.innerHTML='<svg viewBox="0 0 72 72" aria-hidden="true"><circle cx="36" cy="36" r="30" fill="url(#og-base)"/><g clip-path="url(#og-clip)"><g class="osw"><ellipse cx="24" cy="30" rx="20" ry="12" fill="url(#og-wh)"/><ellipse cx="50" cy="44" rx="19" ry="13" fill="url(#og-vio)"/></g></g><circle cx="36" cy="36" r="30" fill="url(#og-fres)"/><ellipse cx="26" cy="22" rx="12" ry="6" transform="rotate(-32 26 22)" fill="url(#og-spec)" opacity=".9"/></svg>';return d}
   function moveInd(){var sel=document.querySelector('nav button[aria-selected="true"]'),ind=$("tabind");if(!sel||!ind)return;ind.style.left=(sel.offsetLeft+8)+"px";ind.style.width=Math.max(10,sel.offsetWidth-16)+"px"}
   window.addEventListener("resize",moveInd);setTimeout(moveInd,60);setTimeout(moveInd,600);
   var STEPS=["Unlocking your encrypted memory","Waking the local models","Connecting your apps","Almost ready"],stepI=0,splashT0=Date.now(),splashDone=false;
@@ -297,7 +323,7 @@ section.show{animation:secIn .32s var(--ease) both}
     lines.forEach(function(ln){var mm=ln.match(/^\s*(?:[-*•]|\d+[.)])\s+(.*)$/);
       if(mm){if(!ul){ul=el("ul");c.appendChild(ul)}var li=el("li");inline(li,mm[1]);ul.appendChild(li)}
       else{ul=null;if(!ln.trim())return;var p=el("p");inline(p,ln);c.appendChild(p)}})}
-  function intro(){var h=$("hello");if(h){h.remove();$("sugs").remove()}$("qa").style.display="flex"}
+  function intro(){var h=$("hello");if(h){h.remove();$("sugs").remove()}}
   function addUser(text,thumb){intro();var m=el("div","m u"),bub=el("div","bub");if(thumb){var im=el("img","shot");im.src=thumb;bub.appendChild(im)}bub.appendChild(document.createTextNode(text));m.appendChild(bub);log.appendChild(m);down(true);return m}
   function addBot(text,cites){intro();var m=el("div","m b");m.appendChild(avatar());var bub=el("div","bub"),body=el("div","body");rich(body,text);bub.appendChild(body);
     if(cites&&cites.length){var c=el("div","cites");cites.forEach(function(x){c.appendChild(el("span","chip","["+x.n+"] "+(x.citation||x.kind||"memory")))});bub.appendChild(c)}
@@ -351,7 +377,7 @@ section.show{animation:secIn .32s var(--ease) both}
   ["dragleave","drop"].forEach(function(n){chatEl.addEventListener(n,function(e){if(n==="drop"||e.target===$("drop")){$("drop").classList.remove("on")}})});
   chatEl.addEventListener("drop",function(e){e.preventDefault();var f=(e.dataTransfer.files||[])[0];if(f&&f.type.indexOf("image/")===0)attach(f)});
   var QA=["Catch me up","What needs my attention?","Today's agenda","Summarize my emails","Explain my screen"];
-  QA.forEach(function(x){[ $("sugs"),$("qa") ].forEach(function(host){var b=el("button","sug",x);b.type="button";b.onclick=function(){if(x==="Explain my screen")explainScreen("screen");else send(x==="Today's agenda"?"What is on my calendar today":x)};host.appendChild(b)})});
+  QA.forEach(function(x){[ $("sugs") ].forEach(function(host){var b=el("button","sug",x);b.type="button";b.onclick=function(){if(x==="Explain my screen")explainScreen("screen");else send(x==="Today's agenda"?"What is on my calendar today":x)};host.appendChild(b)})});
   /* approvals shown right in the chat: a tick or a cross, no tab hopping */
   var inline={};
   function renderInline(items){var ids={};items.forEach(function(c){ids[c.id]=1;if(inline[c.id])return;var box=el("div","ap");box.appendChild(el("h4","",c.headline||c.skill));
@@ -400,10 +426,45 @@ section.show{animation:secIn .32s var(--ease) both}
   /* ---------------- showcase: one button per feature ---------------- */
   var showItems=null;
   function runShowcase(it){$("showpop").style.display="none";go("/showcase/"+it.id,{},"Showcase: "+it.label,"Running: "+it.label)}
-  function buildShowcase(box){box.textContent="";(showItems||[]).reduce(function(acc,it){var g=acc.find(function(x){return x.name===it.group});if(!g){g={name:it.group,items:[]};acc.push(g)}g.items.push(it);return acc},[]).forEach(function(g){box.appendChild(el("h2","",g.name));var row=el("div","pb");row.style.marginTop="2px";g.items.forEach(function(it){var b=el("button","btn",it.label);b.title=it.help;b.onclick=function(){runShowcase(it)};row.appendChild(b)});box.appendChild(row)});
+  function buildShowcase(box){box.textContent="";var cb=el("button","btn pri","Send a message to any app…");cb.style.marginBottom="6px";cb.onclick=function(){openComposer("mail")};box.appendChild(cb);(showItems||[]).reduce(function(acc,it){var g=acc.find(function(x){return x.name===it.group});if(!g){g={name:it.group,items:[]};acc.push(g)}g.items.push(it);return acc},[]).forEach(function(g){box.appendChild(el("h2","",g.name));var row=el("div","pb");row.style.marginTop="2px";g.items.forEach(function(it){var b=el("button","btn",it.label);b.title=it.help;b.onclick=function(){runShowcase(it)};row.appendChild(b)});box.appendChild(row)});
     if(window.__demo){box.appendChild(el("h2","","Demo data"));var r2=el("div","pb");var b=el("button","btn","Send me a message now");b.onclick=function(){api("/demo/incoming",{}).then(function(r){if(r.ok){$("showpop").style.display="none";goto("chat");addBot("Demo message arrived on "+r.source+" from "+(r.from||r.title)+": "+r.text)}})};r2.appendChild(b);box.appendChild(r2)}}
   function openShowcase(){$("moremenu").style.display="none";var go2=function(){buildShowcase($("showbox"));$("showpop").style.display="block"};if(showItems)go2();else api("/showcase").then(function(d){showItems=d.items||[];go2()})}
   $("mm_show").onclick=openShowcase;$("show_close").onclick=function(){$("showpop").style.display="none"};
+  /* ---------------- quick-action bubbles in the chat, and the composer ---------------- */
+  var showApps=[],showTo="tushar.singh.software@gmail.com",scrollItems=[],chipSec="Send";
+  var ASK=["Catch me up","What needs my attention?","Today's agenda","Summarize my emails","Explain my screen"];
+  var SCROLL_EX={"meeting-notes":"summarize these meeting notes: Ravi will ship the login fix by Friday. Asha needs a design review before Monday. We dropped the old dashboard.","explain-simply":"explain this like I'm five: what is encryption","email-triage":"triage my inbox","action-items":"list the action items: Priya will book the venue by Tuesday. I need to send the budget to Meera.","decision-helper":"help me decide between a lodge and a city loft for the offsite","reply-drafter":"draft a reply to Dev's last email saying I will send the contract tomorrow","triage-and-reply":"triage my inbox and draft the first reply"};
+  function chip(label,fn,cls,title){var b=el("button","sug"+(cls?" "+cls:""),label);b.type="button";if(title)b.title=title;b.onclick=fn;return b}
+  function askChip(x){return chip(x,function(){if(x==="Explain my screen")explainScreen("screen");else send(x==="Today's agenda"?"What is on my calendar today":x)})}
+  function tryScroll(n){var ex=SCROLL_EX[n];if(ex){goto("chat");send(ex)}else{goto("chat");q.value="use the "+n+" scroll on ";q.focus()}}
+  function chipSections(){var secs=[{name:"Send",send:1},{name:"Everything at once"},{name:"Read"},{name:"Do"},{name:"Alerts"},{name:"Scrolls",scrolls:1},{name:"Ask",ask:1}];
+    (showItems||[]).forEach(function(it){var g=it.group.replace(/ \(.*\)/,"");var sec=secs.find(function(x){return x.name===g});if(sec){(sec.items=sec.items||[]).push(it)}});return secs}
+  function showChips(name){chipSec=name;var qa=$("qa");[].forEach.call($("qsec").children,function(b){b.setAttribute("aria-selected",b.dataset.s===name)});qa.textContent="";
+    var sec=chipSections().find(function(x){return x.name===name});if(!sec)return;
+    if(sec.send){qa.appendChild(chip("Compose a message…",function(){openComposer("mail")},"go","Type what to say and where it goes"));
+      showApps.filter(function(a){return a.id!=="all"}).forEach(function(a){qa.appendChild(chip(a.label+"…",function(){openComposer(a.id)},"",a.ready?("Send something to "+a.label):a.note))});qa.appendChild(chip("Every app…",function(){openComposer("all")},"","A document, an email with its link and every connected chat"))}
+    else if(sec.scrolls){var ok=scrollItems.filter(function(x){return x.status==="approved"});if(!ok.length)qa.appendChild(el("span","small","No approved scrolls yet. Open the Scrolls tab."));ok.forEach(function(x){qa.appendChild(chip(x.name,function(){tryScroll(x.name)},"",x.description))})}
+    else if(sec.ask){ASK.forEach(function(x){qa.appendChild(askChip(x))})}
+    else (sec.items||[]).forEach(function(it){qa.appendChild(chip(it.label,function(){runShowcase(it)},it.group.indexOf("Everything")===0?"go":"",it.help))})}
+  function buildChips(){var host=$("qsec");if(!host)return;host.textContent="";chipSections().forEach(function(sec){var b=el("button","",sec.name);b.type="button";b.dataset.s=sec.name;b.setAttribute("role","tab");if(sec.name==="Send"||sec.name==="Everything at once")b.className="hot";b.onclick=function(){showChips(sec.name)};host.appendChild(b)});showChips(chipSec)}
+  function loadShowcase(){return api("/showcase").then(function(d){showItems=d.items||[];showApps=d.apps||[];if(d.default_to)showTo=d.default_to;buildChips()}).catch(function(){})}
+  function sentence(app,to,text){var t=text?'"'+text+'"':"the predefined message";
+    if(app==="mail")return "email "+(to||showTo)+": "+t;
+    if(app==="calendar")return "put "+(text?'"'+text+'"':"a demo check-in")+" on my calendar "+(to||"tomorrow at 10am");
+    if(app==="drive")return "write a Google Doc with "+t+(to?" and email the link to "+to:"");
+    if(app==="all")return "send "+t+" to every app: a Google Doc, an email with its link to "+(to||showTo)+", and every connected chat";
+    return "tell "+(to||"my latest "+app+" chat")+" on "+app+": "+t}
+  function cmApp(){var v=$("cm_app").value;return showApps.find(function(a){return a.id===v})||{id:v}}
+  function cmDraft(){var a=cmApp();$("cm_draft").textContent="Ragnarok, "+sentence(a.id,$("cm_to").value.trim(),$("cm_text").value.trim())}
+  function cmFill(){var a=cmApp(),chat=a.id==="telegram"||a.id==="discord"||a.id==="slack";$("cm_tol").textContent=a.id==="mail"||a.id==="all"?"Send to (email address)":a.id==="calendar"?"When":a.id==="drive"?"Email the link to (optional)":"Conversation (blank: your latest one)";
+    $("cm_to").value=chat?"":(a.id==="drive"?"":(a.target||""));$("cm_to").placeholder=a.hint||"";$("cm_note").textContent=a.note||"";cmDraft()}
+  function openComposer(app){$("moremenu").style.display="none";$("showpop").style.display="none";var sel=$("cm_app");sel.textContent="";showApps.forEach(function(a){var o=el("option","",a.label+(a.ready?"":" (nothing read yet)"));o.value=a.id;sel.appendChild(o)});
+    sel.value=app||"mail";$("cm_text").value="";cmFill();$("cmppop").style.display="block";$("cm_text").focus()}
+  function cmSend(pre){if(busy){$("cm_note").textContent="Wait for the current reply to finish, then press again.";return}var a=cmApp(),to=$("cm_to").value.trim(),text=pre?"":$("cm_text").value.trim();$("cmppop").style.display="none";
+    go("/showcase/send",{app:a.id,to:to,text:text},"Ragnarok, "+sentence(a.id,to,text),"Sending")}
+  $("cm_app").onchange=cmFill;$("cm_to").oninput=cmDraft;$("cm_text").oninput=cmDraft;$("cm_send").onclick=function(){cmSend(false)};$("cm_pre").onclick=function(){cmSend(true)};$("cm_close").onclick=function(){$("cmppop").style.display="none"};
+  loadShowcase();setInterval(loadShowcase,30000);
+
   /* ---------------- dreaming and skill scrolls ---------------- */
   var scrollNew="";
   function pre(box,text,diff){box.textContent="";var lines=String(text).split("\n");lines.forEach(function(l){var s=el("div","",l||" ");if(diff){if(l[0]==="+"&&l.slice(0,3)!=="+++")s.style.cssText="background:#1f6f4a33;color:var(--ink)";else if(l[0]==="-"&&l.slice(0,3)!=="---")s.style.cssText="background:#a42d2d33;color:var(--ink)"}box.appendChild(s)})}
@@ -418,9 +479,10 @@ section.show{animation:secIn .32s var(--ease) both}
   function loadScrolls(){api("/scrolls").then(function(d){var c=$("scrollcard");if(!c)return;c.textContent="";var items=d.items||[];
       c.appendChild(el("div","small","One local model, many specialists. Only each scroll's short header is kept in memory ("+((d.stats||{}).header_tokens||0)+" tokens for all of them); the full text loads only for the scroll that fits what you ask. Say: use the explain-simply scroll on photosynthesis."));
       (d.drafts||[]).forEach(function(dr){var r=el("div","row"),g=el("div","grow");g.appendChild(el("div","",(dr.new?"New: ":"Improved: ")+dr.name));g.appendChild(el("div","small",dr.reason));r.appendChild(g);var b=el("button","btn pri","Review");b.onclick=function(){viewDraft(dr)};r.appendChild(b);c.appendChild(r)});
+      scrollItems=items;if(chipSec==="Scrolls")showChips("Scrolls");var tr=$("scrolltry");if(tr){tr.textContent="";items.filter(function(x){return x.status==="approved"}).forEach(function(x){tr.appendChild(chip(x.name,function(){tryScroll(x.name)},"go",x.description))})}
       items.forEach(function(s){var r=el("div","row"),g=el("div","grow");var t=el("div","");t.appendChild(document.createTextNode(s.name+" "));t.appendChild(el("span","tag "+(s.status==="approved"?"src":"warn"),s.status==="approved"?(s.source==="builtin"?"built in":"approved"):s.status));g.appendChild(t);g.appendChild(el("div","small",s.description));
         var tt=s.tests?(s.tests.passed+"/"+s.tests.total+" self-tests pass"):(s.examples?s.examples+" self-test(s), not run yet":"no self-tests");g.appendChild(el("div","small",tt+" - header "+s.header_tokens+" tokens, full "+s.full_tokens+(s.chain.length?" - then "+s.chain.join(", "):"")));r.appendChild(g);
-        var rd=el("button","btn",s.status==="pending"?"Read and approve":"Read");rd.onclick=function(){viewScroll(s.name)};r.appendChild(rd);
+        var rd=el("button","btn",s.status==="pending"?"Read and approve":"Read");rd.onclick=function(){viewScroll(s.name)};if(s.status==="approved"){var tb=el("button","btn pri","Try it");tb.onclick=function(){tryScroll(s.name)};r.appendChild(tb)}r.appendChild(rd);
         if(s.examples){var ts=el("button","btn","Test");ts.onclick=function(){ts.disabled=true;ts.textContent="Testing...";api("/scrolls/"+s.name+"/test",{}).then(function(){loadScrolls()})};r.appendChild(ts)}
         c.appendChild(r)});
       var er=Object.keys(d.errors||{});if(er.length)c.appendChild(el("div","small err","Not valid, ignored: "+er.map(function(k){return k+" ("+d.errors[k]+")"}).join("; ")));
@@ -438,7 +500,7 @@ section.show{animation:secIn .32s var(--ease) both}
       var rp=d.report&&d.report.phases;if(rp){var l=[];if(rp.replay&&rp.replay.summary)l.push("Day: "+rp.replay.summary);if(rp.rehearse&&rp.rehearse.rehearsed)l.push("Re-read "+rp.rehearse.rehearsed+" thing(s) that went wrong; "+rp.rehearse.would_work_now+" would work now.");
         if(rp.scrolls&&rp.scrolls.tested)l.push("Scroll tests: "+rp.scrolls.tested.map(function(t){return t.name+" "+t.passed+"/"+t.total}).join(", "));if(rp.scrolls&&rp.scrolls.drafts&&rp.scrolls.drafts.length)l.push(rp.scrolls.drafts.length+" skill draft(s) waiting for approval.");
         if(l.length){var rb=el("div","small");rb.style.marginTop="6px";rb.textContent="Last dream: "+l.join(" ");c.appendChild(rb)}}}).catch(function(){})}
-  setInterval(function(){if(cur==="src"&&$("dreamcard")){var rn=document.querySelector("#dreamcard .btn.pri");if(rn&&/Stop/.test(rn.textContent))loadDream()}},2500);
+  setInterval(function(){if(cur==="scr"&&$("dreamcard")){var rn=document.querySelector("#dreamcard .btn.pri");if(rn&&/Stop/.test(rn.textContent))loadDream()}},2500);
   /* ---------------- window shell: pin to an edge (the raven waits there), split screen, desktops ---------------- */
   var emEdge="right",emAll=false;
   function emClose(){$("edgemenu").style.display="none"}
@@ -470,8 +532,7 @@ section.show{animation:secIn .32s var(--ease) both}
       au.onclick=function(){var on=au.textContent.indexOf("on")>0;api("/demo/auto?enabled="+(!on),{}).then(function(r){au.textContent="Auto messages: "+(r.auto?"on":"off")})};
       dr.appendChild(inb);dr.appendChild(au);dc.appendChild(dr);box.appendChild(dc)}
     box.appendChild(el("h2","","Showcase"));var sc=el("div","card");sc.appendChild(el("div","small","One button per feature. If a command is ever misread, these still work. Results appear in the chat."));var sb=el("button","btn pri","Open the feature buttons");sb.style.marginTop="8px";sb.onclick=function(){goto("chat");openShowcase()};sc.appendChild(sb);box.appendChild(sc);
-    box.appendChild(el("h2","","Dreaming (idle time)"));var dc=el("div","card");dc.id="dreamcard";box.appendChild(dc);loadDream();
-    box.appendChild(el("h2","","Skill scrolls"));var scard=el("div","card");scard.id="scrollcard";box.appendChild(scard);loadScrolls();
+    box.appendChild(el("h2","","Skill scrolls and dreaming"));var pc=el("div","card");pc.appendChild(el("div","small","They have their own tab now, so they are easy to find."));var pb=el("button","btn pri","Open the Scrolls tab");pb.style.marginTop="8px";pb.onclick=function(){goto("scr")};pc.appendChild(pb);box.appendChild(pc);
     box.appendChild(el("h2","","Connected apps (checked continuously)"));
     var names=Object.keys(rt.sources||{});
     if(!names.length&&!window.__demo)box.appendChild(el("p","small","No sources connected yet. Run: ragnarok connect <name>"));
@@ -603,6 +664,9 @@ section.show{animation:secIn .32s var(--ease) both}
         var row=el("div","row");row.style.borderBottom="0";if(/scroll (proposed|ready)|Improved scroll/.test(m.title)){var rv=el("button","btn pri","Review");rv.onclick=function(){api("/scrolls").then(function(d){var nm=(m.title.split(": ")[1]||"").trim();var dr=(d.drafts||[]).find(function(x){return x.name===nm});if(dr)viewDraft(dr);else{goto("src")}})};row.appendChild(rv)}if(m.link){var l=el("a","small","Open");l.href=m.link;l.target="_blank";l.rel="noopener noreferrer";row.appendChild(l)}var x=el("button","btn","Dismiss");x.onclick=function(){api("/inbox/dismiss?item_id="+encodeURIComponent(m.id),{}).then(loadInbox)};row.appendChild(x);c.appendChild(row);b.appendChild(c)})}).catch(function(){})}
   $("idis").onclick=function(){api("/inbox/dismiss",{}).then(loadInbox)};
 
+  (function(){var box=$("scrbox");box.appendChild(el("h2","","Try a scroll"));box.lastChild.style.marginTop="4px";var tr=el("div","pb");tr.id="scrolltry";box.appendChild(tr);box.appendChild(el("div","small","One click sends a ready-made request to the right specialist, so the wording never has to be right."));
+    box.appendChild(el("h2","","Skill scrolls"));var sc=el("div","card");sc.id="scrollcard";box.appendChild(sc);
+    box.appendChild(el("h2","","Dreaming (idle time)"));var dc=el("div","card");dc.id="dreamcard";box.appendChild(dc);loadScrolls();loadDream()})();
   /* ---------------- live refresh ---------------- */
   refresh();pullCards();loadInbox();if(tabq&&document.querySelector('nav button[data-t="'+tabq+'"]'))goto(tabq);
   setInterval(refresh,3000);setInterval(pullCards,1000);setInterval(loadInbox,4000);

@@ -64,6 +64,12 @@ class MascotSize(BaseModel):
     h: int = Field(ge=20, le=300)
 
 
+class ShowcaseSendIn(BaseModel):
+    app: str = Field(max_length=20)
+    to: str = Field(default="", max_length=200)
+    text: str = Field(default="", max_length=2000)
+
+
 class DreamIn(BaseModel):
     enabled: bool | None = None
     idle_min: int | None = Field(default=None, ge=1, le=240)
@@ -459,7 +465,14 @@ def create_app(guard: TokenGuard | None = None, port: int = DEFAULT_PORT, servic
 
     @app.get("/showcase")
     async def showcase_list() -> dict[str, Any]:
-        return {"items": svc.showcase.items() if svc.showcase else []}
+        return {"items": svc.showcase.items() if svc.showcase else [], "apps": svc.showcase.apps() if svc.showcase else [], "default_to": __import__("ragnarok.harness.showcase", fromlist=["DEFAULT_TO"]).DEFAULT_TO}
+
+    @app.post("/showcase/send")
+    async def showcase_send(body: ShowcaseSendIn) -> dict[str, Any]:
+        """The composer: what to say and where to, typed in the window. The plan is built directly and every send still waits for a click."""
+        if svc.chat is None or svc.showcase is None:
+            return {"ok": False, "error": "E_NO_SHOWCASE"}
+        return await svc.chat.submit_showcase("send", svc.showcase, {"app": body.app, "to": body.to, "text": body.text})
 
     @app.post("/showcase/{name}")
     async def showcase_run(name: str) -> dict[str, Any]:

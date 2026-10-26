@@ -1,0 +1,72 @@
+{
+ "suite": "multimodal",
+ "requirement": "FR1.4 voice input, FR2.6 screen understanding (local only)",
+ "metrics": {
+  "ocr_word_recall": {
+   "k": 47,
+   "n": 47,
+   "rate": 1.0,
+   "ci95": [
+    0.924,
+    1.0
+   ]
+  },
+  "ocr_latency": {
+   "n": 4,
+   "p50_ms": 144.8,
+   "p95_ms": 316.9,
+   "max_ms": 316.9
+  },
+  "vqa_read_engine_correct": {
+   "k": 8,
+   "n": 8,
+   "rate": 1.0,
+   "ci95": [
+    0.676,
+    1.0
+   ]
+  },
+  "vqa_read_engine_latency": {
+   "n": 8,
+   "p50_ms": 472.8,
+   "p95_ms": 1172.6,
+   "max_ms": 1172.6
+  },
+  "vqa_look_engine_correct": {
+   "k": 8,
+   "n": 8,
+   "rate": 1.0,
+   "ci95": [
+    0.676,
+    1.0
+   ]
+  },
+  "vqa_look_engine_latency": {
+   "n": 8,
+   "p50_ms": 874.1,
+   "p95_ms": 5172.7,
+   "max_ms": 5172.7
+  },
+  "stt_language_identified": {
+   "k": 3,
+   "n": 4,
+   "rate": 0.75,
+   "ci95": [
+    0.301,
+    0.954
+   ]
+  },
+  "stt_word_overlap_mean": 0.643,
+  "stt_latency": {
+   "n": 4,
+   "p50_ms": 228.9,
+   "p95_ms": 2218.9,
+   "max_ms": 2218.9
+  }
+ },
+ "failures": [],
+ "n": 67,
+ "notes": "Rendered Helvetica text, not photographs; synthetic macOS voices, not human speech (accented-synthetic accuracy with the base model is limited). 'read' engine = OCR then text model; 'look' = vision model on the picture.",
+ "seconds": 28.9,
+ "finished_at": 1792983023371
+}

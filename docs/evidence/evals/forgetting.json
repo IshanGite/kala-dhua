@@ -1,0 +1,92 @@
+{
+ "suite": "forgetting",
+ "requirement": "FR1.3 forgetting and bounded growth",
+ "n": 1800,
+ "metrics": {
+  "facts_written": 1800,
+  "state_at_day_90": {
+   "active": 712,
+   "archived": 188
+  },
+  "state_at_day_180": {
+   "active": 1002,
+   "archived": 231
+  },
+  "stored_fraction_of_written_day_180": 0.685,
+  "growth_per_day_days_150_to_180": 3.57,
+  "write_rate_per_day": 10,
+  "frequently_used_facts_older_than_90d_still_active": {
+   "k": 180,
+   "n": 180,
+   "rate": 1.0,
+   "ci95": [
+    0.979,
+    1.0
+   ]
+  },
+  "rarely_used_facts_older_than_90d_still_active": {
+   "k": 127,
+   "n": 720,
+   "rate": 0.1764,
+   "ci95": [
+    0.15,
+    0.206
+   ]
+  },
+  "pinned_facts_kept": {
+   "k": 5,
+   "n": 5,
+   "rate": 1.0,
+   "ci95": [
+    0.566,
+    1.0
+   ]
+  },
+  "plain_read_of_50_active_facts_ms": {
+   "n": 30,
+   "p50_ms": 0.0,
+   "p95_ms": 0.0,
+   "max_ms": 0.0
+  }
+ },
+ "series_stored_facts_every_5_days": [
+  10,
+  60,
+  110,
+  160,
+  210,
+  260,
+  310,
+  360,
+  410,
+  460,
+  510,
+  560,
+  610,
+  660,
+  710,
+  760,
+  810,
+  860,
+  899,
+  949,
+  958,
+  964,
+  1014,
+  1014,
+  1022,
+  1025,
+  1075,
+  1080,
+  1082,
+  1132,
+  1136,
+  1138,
+  1137,
+  1187,
+  1188,
+  1193
+ ],
+ "notes": "Simulated clock, 10 facts per day for 180 days (20% important); each day a random 15% of the 'first two facts of each earlier day' are used again. Retention sweep weekly, 30-day grace before a purge. Measures the policy, not model quality. 'Stored' counts active plus archived; the difference to facts written was purged.",
+ "finished_at": 1792983377121
+}

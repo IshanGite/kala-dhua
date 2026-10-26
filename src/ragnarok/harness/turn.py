@@ -489,7 +489,7 @@ class Agent:
         sends, posts or writes outside is never re-planned by the machine, and anything the user must fix (a denied card, a missing permission) is not retried."""
         if outcome.state == "succeeded" or not outcome.errors:
             return outcome
-        if any(code in self.USER_FIXABLE for code in outcome.errors.values()):
+        if any(code in self.USER_FIXABLE for code in outcome.errors.values()) or len(request.split()) <= 4:  # a fragment gives a second planner nothing new to work with
             return outcome
         by_id = {n.id: n for n in plan.nodes}
         for nid in outcome.errors:
@@ -785,6 +785,8 @@ class Agent:
             if plan is None:
                 decision.tier, plan_source = "L3", "L3"
         if plan is None and self.fast_refuse and self._is_action_request(request) and not self._multistep(request):  # one unresolved action: say so now, do not burn 30 s of planner on it
+            return TurnResult(decision.tier, decision, None, self.NO_ACTION, (time.perf_counter() - t0) * 1000)
+        if plan is None and self.fast_refuse and len(request.split()) <= 4:  # a fragment ("remind me to", a stray line of code) gives the planner nothing to plan: say so now instead of spending 30 s on it
             return TurnResult(decision.tier, decision, None, self.NO_ACTION, (time.perf_counter() - t0) * 1000)
         if plan is None:
             manifests = [m for n in decision.shortlist if (m := self._manifest(n)) is not None] or self._all_manifests()[:5]

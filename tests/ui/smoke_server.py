@@ -17,6 +17,14 @@ from ragnarok.platform.secrets import MemoryStore, token_name  # noqa: E402
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8794
 
 
+async def fake_mail(p):
+    return "gm1"
+
+
+async def fake_drive(p):
+    return "https://docs.example/d/1"
+
+
 async def fake_cal(p, due):
     return "https://calendar.example/e"
 
@@ -38,7 +46,7 @@ async def seed(w):
 
 vault = MemoryStore()
 vault.set(token_name("google", "write"), json.dumps({"client_id": "a", "client_secret": "b", "refresh_token": "c"}))
-w = build_world(vault=vault, gateway=FakeGateway(responder), sandbox=False, use_laya=False, embed_rungs=False, senders={"calendar": fake_cal}, max_cpu=101)
+w = build_world(vault=vault, gateway=FakeGateway(responder), sandbox=False, use_laya=False, embed_rungs=False, senders={"calendar": fake_cal, "mail": fake_mail, "drive": fake_drive}, max_cpu=101)
 asyncio.run(seed(w))
 server, _ = start_in_thread(make_api(w, PORT), PORT)
 print(json.dumps({"port": PORT, "token": w.guard.token}), flush=True)

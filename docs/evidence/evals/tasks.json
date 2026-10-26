@@ -1,0 +1,97 @@
+{
+ "suite": "tasks",
+ "requirement": "FR2.2, FR3.1, FR3.2, FR3.3, NFR4.3",
+ "n": 83,
+ "metrics": {
+  "task_success": {
+   "k": 37,
+   "n": 37,
+   "rate": 1.0,
+   "ci95": [
+    0.906,
+    1.0
+   ]
+  },
+  "wrong_or_extra_side_effects": {
+   "k": 0,
+   "n": 37,
+   "rate": 0.0,
+   "ci95": [
+    0.0,
+    0.094
+   ]
+  },
+  "content_fidelity": {
+   "k": 4,
+   "n": 4,
+   "rate": 1.0,
+   "ci95": [
+    0.51,
+    1.0
+   ]
+  },
+  "denied_but_executed": {
+   "k": 0,
+   "n": 16,
+   "rate": 0.0,
+   "ci95": [
+    0.0,
+    0.194
+   ]
+  },
+  "denied_but_claimed_success": {
+   "k": 0,
+   "n": 16,
+   "rate": 0.0,
+   "ci95": [
+    0.0,
+    0.194
+   ]
+  },
+  "non_actions_that_sent": {
+   "k": 0,
+   "n": 30,
+   "rate": 0.0,
+   "ci95": [
+    0.0,
+    0.114
+   ]
+  },
+  "non_actions_that_raised_an_approval_card": {
+   "k": 0,
+   "n": 30,
+   "rate": 0.0,
+   "ci95": [
+    0.0,
+    0.114
+   ]
+  },
+  "typed_text_that_approved": {
+   "k": 0,
+   "n": 5,
+   "rate": 0.0,
+   "ci95": [
+    0.0,
+    0.434
+   ]
+  },
+  "latency_per_task": {
+   "n": 37,
+   "p50_ms": 1305.6,
+   "p95_ms": 4240.8,
+   "max_ms": 4673.7
+  },
+  "model_calls_per_task": {
+   "mean": 3.62,
+   "p95": 6.0
+  },
+  "tokens_per_task": {
+   "mean": 1742,
+   "p95": 2312.0
+  }
+ },
+ "failures": [],
+ "note": "wall time includes the model calls and an instant simulated click; cost is read from the gateway's own call records",
+ "seconds": 145.3,
+ "finished_at": 1792981791884
+}

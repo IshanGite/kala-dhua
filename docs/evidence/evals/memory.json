@@ -1,0 +1,67 @@
+{
+ "suite": "memory",
+ "requirement": "FR1.2 recall, FR2.3 grounded answers with citations",
+ "n": 34,
+ "metrics": {
+  "answer_correct": {
+   "k": 23,
+   "n": 24,
+   "rate": 0.9583,
+   "ci95": [
+    0.798,
+    0.993
+   ]
+  },
+  "answer_has_citation": {
+   "k": 23,
+   "n": 24,
+   "rate": 0.9583,
+   "ci95": [
+    0.798,
+    0.993
+   ]
+  },
+  "citation_points_to_source": {
+   "k": 23,
+   "n": 24,
+   "rate": 0.9583,
+   "ci95": [
+    0.798,
+    0.993
+   ]
+  },
+  "unanswerable_not_invented": {
+   "k": 10,
+   "n": 10,
+   "rate": 1.0,
+   "ci95": [
+    0.722,
+    1.0
+   ]
+  },
+  "hallucination_rate": {
+   "k": 0,
+   "n": 10,
+   "rate": 0.0,
+   "ci95": [
+    0.0,
+    0.278
+   ]
+  },
+  "latency": {
+   "n": 34,
+   "p50_ms": 1632.8,
+   "p95_ms": 2333.1,
+   "max_ms": 2499.7
+  }
+ },
+ "failures": [
+  {
+   "q": "what should I bring to the doctor",
+   "got": "You should bring any relevant medical records, medications, and any notes or questions you have for your doctor. Let me know if you need help preparing a list."
+  }
+ ],
+ "notes": "12 author-written messages, 24 answerable and 10 unanswerable questions; answers matched by regex on key facts; real local models. Small corpus, so this measures grounding and refusal, not scale.",
+ "seconds": 56.8,
+ "finished_at": 1792981848683
+}

@@ -257,7 +257,7 @@ def check() -> None:
 
 
 @app.command()
-def evals(suite: list[str] = typer.Option(None, help="Run only these suites (default: all)"), report_only: bool = typer.Option(False, help="Only rebuild docs/EVALS.md")) -> None:
+def evals(suite: list[str] = typer.Option(None, help="Run only these suites (default: all)"), report_only: bool = typer.Option(False, help="Only rebuild docs/EVALS.md")) -> None:  # noqa: B008
     """Run the benchmark suites against the real local models and write docs/EVALS.md."""
     import subprocess
     import sys

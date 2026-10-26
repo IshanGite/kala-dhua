@@ -49,7 +49,7 @@ async def run() -> dict:
     sec_of: dict[str, int] = {}
     for si, s in enumerate(d["sections"]):
         for it in s["items"]:
-            for key, tp in text_topic.items():
+            for key in text_topic:
                 if key[:30].lower() in (it["snippet"] or "").lower():
                     sec_of[key] = si
     pairs = list(itertools.combinations(text_topic.items(), 2))

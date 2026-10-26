@@ -207,14 +207,14 @@ class ChatService:
 
         return await self._start(job, run(), 0.4)
 
-    async def submit_showcase(self, name: str, showcase: Any) -> dict[str, Any]:
+    async def submit_showcase(self, name: str, showcase: Any, args: dict[str, str] | None = None) -> dict[str, Any]:
         job = Job(new_id()[:10], f"Showcase: {name}")
         self.jobs[job.id] = job
 
         async def run() -> None:
             PROGRESS.set(lambda tid: setattr(job, "task_id", tid))
             try:
-                job.reply = summarize(await showcase.run(name))
+                job.reply = summarize(await showcase.run(name, args))
                 self._log_reply(job.reply.get("text", ""))
                 job.state = "done"
             except asyncio.CancelledError:

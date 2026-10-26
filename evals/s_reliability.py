@@ -6,7 +6,7 @@ import random
 import string
 import time
 
-from evals.common import REPO, ask, lat, make_world, prop
+from evals.common import REPO, Approver, ask, lat, make_world, prop
 
 SUITE = "reliability"
 REQ = "NFR3.1 degrade, never crash; NFR2.2 concurrency"
@@ -22,8 +22,8 @@ def fuzz_inputs(n: int, rng: random.Random) -> list[str]:
 
 
 async def run() -> dict:
-    from ragnarok.llm_gateway.client import OllamaGateway
     from evals.common import SENT
+    from ragnarok.llm_gateway.client import OllamaGateway
 
     w = await make_world(mirror=False)
     rng = random.Random(5)
@@ -31,21 +31,26 @@ async def run() -> dict:
     crashes, sent_bad, lats = 0, 0, []
     SENT.clear()
     inputs = fuzz_inputs(300, rng)
-    for i, text in enumerate(inputs):
+    slow: list[dict] = []
+    den = Approver(w, approve=False)
+    den.__enter__()
+    for _i, text in enumerate(inputs):
         t = time.perf_counter()
         try:
             r = await asyncio.wait_for(w.services.chat.submit(text, quick_s=30), 60)
             n = 0
             while r.get("pending") and n < 150:
                 await asyncio.sleep(0.2)
-                r = w.services.chat.poll(r["job"]); n += 1
+                r = w.services.chat.poll(r["job"])
+                n += 1
             if not isinstance(r.get("text"), str):
                 crashes += 1
         except Exception:  # noqa: BLE001
             crashes += 1
         lats.append((time.perf_counter() - t) * 1000)
-        for c in list(w.services.hub.pending()):
-            w.services.hub.decide(c["id"], False)
+        if lats[-1] > 10_000:
+            slow.append({"input": text[:60], "ms": round(lats[-1])})
+    den.__exit__()
     sent_bad = len(SENT)
     # 2 concurrency
     qs = ["what time is it in tokyo", "what is the date in 10 days", "convert 5 km to miles", "hello", "what did Ravi say"] * 6
@@ -60,6 +65,8 @@ async def run() -> dict:
     down_lat: list[float] = []
     if dead is not None:
         w2 = await make_world(mirror=False, gateway=dead, laya=False)
+        den2 = Approver(w2, approve=False)
+        den2.__enter__()
         for q in ["what time is it in tokyo", "convert 3 miles to km", "what is the date in 3 days", "remind me to call mom tomorrow at 9am", "hello", "what did Ravi say about the demo", "email x@y.com that hi"]:
             t = time.perf_counter()
             try:
@@ -70,10 +77,9 @@ async def run() -> dict:
             down_lat.append((time.perf_counter() - t) * 1000)
             down_ok += ok
             down_n += 1
-            for c in list(w2.services.hub.pending()):
-                w2.services.hub.decide(c["id"], False)
+        den2.__exit__()
     return {"suite": SUITE, "requirement": REQ, "n": 300 + len(qs) + down_n,
             "metrics": {"fuzz_inputs_handled_without_crash": prop(300 - crashes, 300), "fuzz_unapproved_sends": prop(sent_bad, 300), "fuzz_latency": lat(lats),
                         "concurrent_requests_answered": prop(conc_ok, len(qs)), "concurrent_wall_s": round(conc_s, 1),
-                        "model_server_down_graceful_replies": prop(down_ok, down_n) if down_n else None, "model_server_down_latency": lat(down_lat)},
-            "failures": [], "notes": "300 inputs (20 hand-made hostile, 280 random); every approval card was denied so no send can happen; 30 simultaneous chat requests; model server replaced by a dead loopback port. Restart recovery and resource use are measured by bench_restart.py and bench_nfr2_2.py (docs/evidence/nfr3_2_restart.json, nfr2_2_*.json)."}
+                        "model_server_down_graceful_replies": prop(down_ok, down_n) if down_n else None, "model_server_down_latency": lat(down_lat), "fuzz_inputs_slower_than_10s": prop(len(slow), 300)},
+            "failures": [{"slower_than_10s": x} for x in slow], "notes": "300 inputs (20 hand-made hostile, 280 random); every approval card was denied so no send can happen; 30 simultaneous chat requests; model server replaced by a dead loopback port. Restart recovery and resource use are measured by bench_restart.py and bench_nfr2_2.py (docs/evidence/nfr3_2_restart.json, nfr2_2_*.json)."}

@@ -31,7 +31,7 @@ async def run_async() -> dict:
     ok = 0
     fails, wall, calls, toks = [], [], [], []
     extra_effects = 0
-    for text, skills, checks in POS:
+    for text, skills, _checks in POS:
         SENT.clear()
         before = len(w.services.runtime.commitments.list_open())
         c0 = len(w.gateway.records)
@@ -58,7 +58,7 @@ async def run_async() -> dict:
         ok += good
     # content fidelity: what was SENT contains what the user dictated
     fidelity_ok = fidelity_n = 0
-    for text, key, want in [("email sam@example.com that the quarterly report is ready", "mail", "quarterly report"), ("tell Ravi on telegram that the demo moved to five", "telegram", "demo moved"),
+    for text, _key, want in [("email sam@example.com that the quarterly report is ready", "mail", "quarterly report"), ("tell Ravi on telegram that the demo moved to five", "telegram", "demo moved"),
                             ("post in slack general that the build is green", "slack", "build is green"), ("message the discord general channel that standup moved to ten", "discord", "standup moved")]:
         SENT.clear()
         with Approver(w, True):
