@@ -245,6 +245,26 @@ header .grow{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}header .b
 #ginfo{position:absolute;right:10px;top:10px;display:none;width:min(250px,60%);max-height:70%;overflow:auto;background:rgba(8,13,29,.88);color:#eaf2ff;border:1px solid #2a3a63;border-radius:12px;padding:10px 12px;backdrop-filter:blur(5px);box-shadow:0 0 28px rgba(92,200,255,.12)}
 #ginfo .gih{font:600 15px Palatino,Georgia,serif;margin-bottom:4px;color:#ffe9a8}#ginfo .gd{margin:6px 0;color:#b9c6e6}#ginfo .gc{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}#ginfo .small{color:#97a6c9}
 #ghelp{position:absolute;left:10px;bottom:8px;color:#7f8db0}
+
+/* ---------- small windows: everything stays, it just packs tighter ---------- */
+@media (max-width:620px){
+  header{flex-wrap:wrap;gap:6px 6px;padding:8px 10px}
+  h1{font-size:13px;letter-spacing:.14em}
+  header .grow{order:9;flex:1 0 100%;font-size:11.5px}
+  .ib{width:32px;height:32px;padding:0}.ib svg{width:17px;height:17px}
+  #syncb{padding:4px 9px;font-size:12px}.sw{transform:scale(.9)}
+  nav{padding:0 4px}nav button{padding:8px 9px;font-size:13px}.rn{margin-right:3px;font-size:11px}
+  .gbar{flex-wrap:nowrap;overflow-x:auto;gap:6px;padding:6px 8px;scrollbar-width:none}.gbar::-webkit-scrollbar{display:none}
+  .gbar .btn,.gbar .seg button{padding:5px 9px;font-size:12px;white-space:nowrap;flex:none}.gbar .seg{flex:none}.gbar input{flex:0 0 130px;min-width:130px;padding:5px 8px;font-size:12px}.gbar .small{white-space:nowrap;flex:none;font-size:11px}
+  #gleg{top:6px;left:6px;right:6px;bottom:auto;flex-direction:row;overflow-x:auto;max-height:none;scrollbar-width:none}#gleg::-webkit-scrollbar{display:none}.gl{flex:none;font-size:10px;padding:2px 7px}
+  #gflow{left:6px;right:6px;bottom:20px}.gfh{flex-wrap:nowrap;overflow-x:auto;width:auto;padding:4px 7px;scrollbar-width:none}.gfh::-webkit-scrollbar{display:none}.gfh .gn,.gfh .ga,.gfh .gm{flex:none;font-size:10px}.gfh .gn{padding:0 5px}
+  #ghelp{font-size:9.5px;bottom:4px;right:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #ginfo{top:34px;width:min(250px,72%)}
+  #gruns{left:6px;right:6px;top:34px;bottom:6px;width:auto}
+  #gbench{padding:10px}.bgrid{grid-template-columns:1fr}
+  .qsec{padding:6px 8px 0}.qa{padding:5px 8px 2px}
+  .pad{padding:10px 10px}
+}
 </style>
 </head>
 <body>
@@ -751,7 +771,7 @@ header .grow{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}header .b
       var s=g.createRadialGradient(80,78,4,96,96,48);s.addColorStop(0,shade(col,.85));s.addColorStop(.35,col);s.addColorStop(1,shade(col,-.62));g.fillStyle=s;g.beginPath();g.arc(96,96,48,0,7);g.fill();
       var r=g.createRadialGradient(96,96,30,96,96,48);r.addColorStop(0,"rgba(255,255,255,0)");r.addColorStop(1,"rgba(255,255,255,.4)");g.fillStyle=r;g.beginPath();g.arc(96,96,48,0,7);g.fill();
       g.fillStyle="rgba(255,255,255,.85)";g.beginPath();g.ellipse(80,76,13,7,-.6,0,7);g.fill();return sprites[type]=c}
-    function resize(){var r=wrap.getBoundingClientRect();DPR=Math.max(2,Math.min(3,window.devicePixelRatio||2));W=Math.max(10,r.width);H=Math.max(10,r.height);cv.width=Math.round(W*DPR);cv.height=Math.round(H*DPR);cv.style.width=W+"px";cv.style.height=H+"px"}
+    function resize(){var r=wrap.getBoundingClientRect();DPR=Math.max(2,Math.min(3,window.devicePixelRatio||2));W=Math.max(10,r.width);H=Math.max(10,r.height);cv.width=Math.round(W*DPR);cv.height=Math.round(H*DPR);cv.style.width=W+"px";cv.style.height=H+"px";if(mode==="flow"&&N.length&&(W/Math.max(H,1)<.95)!==tall)flowRelayout()}
     for(var i=0;i<170;i++)stars.push([Math.random()*2-1,Math.random()*2-1,Math.random()*.9+.1]);
     function load(){if(loading||mode==="flow")return;loading=true;$("gstat").textContent="Reading the realms...";api("/graph?demo="+(demoOn?1:0)).then(function(d){G=d;build();loading=false}).catch(function(){loading=false;$("gstat").textContent="Could not read the graph."})}
     var STAGE=["intake","scan","understand","route","plan","policy","approve","execute","remember","reply"];function stageIdx(id){return STAGE.indexOf(id.slice(6))}
@@ -842,9 +862,12 @@ header .grow{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}header .b
       ["apps","CONNECTED APPS","Gmail, Slack, Telegram...","#5cc8ff",[-540,170,70],"Each app has its own live poller feeding memory.","Reads continuously; writes only through approvals."],
       ["dreamer","DREAMER","idle-time, plugged in","#9a8bff",[130,250,-100],"When idle and charging: replays the day, tidies memory, rehearses failures, drafts better scrolls.","No executor at all: it can only draft."]],
       FLOWE=[["user","scan",1],["scan","understand",1],["understand","router",1],["router","library",0],["router","laya",0],["router","planner",1],["router","policy",1],["planner","policy",1],["policy","approval",1],["approval","executor",1],["policy","executor",0],["executor","memory",1],["memory","writer",1],["writer","reply",1],["understand","scrolls",0],["scrolls","reply",0],["user","vision",0],["vision","reply",0],["apps","memory",0],["dreamer","memory",0],["memory","reply",0]];
-    function flowBuild(){N=FLOW.map(function(f){return {d:{id:f[0],label:f[1],type:"agent",size:1,detail:f[5],degree:2,sub:f[2],tech:f[6]},id:f[0],type:"agent",label:f[1],fixed:true,x:f[4][0],y:f[4][1],z:f[4][2],vx:0,vy:0,vz:0,r:16,px:0,py:0,pz:0,ps:1,nb:[],col:f[3],sub:f[2]}});
+    var tall=false;function flowZoom(){tall=W>0&&W/Math.max(H,1)<.95;return tall?Math.max(.3,Math.min(.9,W/820,H/1380)):Math.max(.4,Math.min(.92,W/1330))}
+    function flowPos(f){return tall?[(f[4][1]-42)*1.8,f[4][0],f[4][2]]:f[4]}
+    function flowRelayout(){if(mode!=="flow")return;var z=flowZoom();N.forEach(function(n,i){var p=flowPos(FLOW[i]);n.x=p[0];n.y=p[1];n.z=p[2]});cam.zoom=z;cam.cx=cam.cy=cam.cz=cam.tcx=cam.tcy=cam.tcz=0}
+    function flowBuild(){resize();flowZoom();N=FLOW.map(function(f){return {d:{id:f[0],label:f[1],type:"agent",size:1,detail:f[5],degree:2,sub:f[2],tech:f[6]},id:f[0],type:"agent",label:f[1],fixed:true,x:flowPos(f)[0],y:flowPos(f)[1],z:flowPos(f)[2],vx:0,vy:0,vz:0,r:16,px:0,py:0,pz:0,ps:1,nb:[],col:f[3],sub:f[2]}});
       ix={};N.forEach(function(n){ix[n.id]=n});E=FLOWE.map(function(e){var a=ix[e[0]],b=ix[e[1]];a.nb.push(b);b.nb.push(a);return {a:a,b:b,k:e[2]?"main":"side",t:Math.random()}});
-      pulses=E.map(function(e){return {e:e,t:Math.random(),v:e.k==="main"?.28:.12}});G={counts:{agent:N.length},nodes:[],edges:[]};alpha=0;sel=null;info();$("gleg").textContent="";$("gstat").textContent=N.length+" agents · "+E.length+" hand-offs · local only";cam.zoom=.92;cam.pitch=.22;cam.yaw=.3}
+      pulses=E.map(function(e){return {e:e,t:Math.random(),v:e.k==="main"?.28:.12}});G={counts:{agent:N.length},nodes:[],edges:[]};alpha=0;sel=null;info();$("gleg").textContent="";$("gstat").textContent=N.length+" agents · "+E.length+" hand-offs · local only";cam.zoom=flowZoom();cam.pitch=tall?.12:.22;cam.yaw=.3}
     function flowPath(r){var sk=r.skills||[],fam=r.family||"",acts=sk.length>0&&!/^(recall|catchup|agenda|attention|chat|question)$/.test(fam),p=["user","scan","understand"];
       if(r.backend==="scroll"||fam==="scroll"){p.push("scrolls","reply")}else if(fam==="vision"){p=["user","vision","reply"]}else{
         p.push("router");if(/laya/i.test(r.backend||""))p.push("laya");if(r.tier==="L0")p.push("library");if(r.tier==="L3")p.push("planner");
