@@ -33,6 +33,7 @@ from ragnarok.harness.answer import (
     source_recall,
 )
 from ragnarok.harness.calc import try_calc
+from ragnarok.harness.connections import answer_connection, refuse_unsupported_send
 from ragnarok.harness.decompose import decompose, is_compound
 from ragnarok.harness.executor import ExecContext, Executor, TaskOutcome
 from ragnarok.harness.plan import Plan, PlanNode, validate_plan
@@ -575,6 +576,23 @@ class Agent:
             return done("chat", await self.answerer._general(request, history if len(request.split()) > 3 else None), "ordinary conversation, not from your data")
         return None
 
+    connections: Any = None  # the daemon sets it: a callable giving the real connector state
+
+    def _connection_turn(self, request: str, t0: float) -> TurnResult | None:
+        """Is X connected / send on X: answered or refused from the real state by code, before any model can make something up."""
+        text = refuse_unsupported_send(request)
+        if text is None:
+            try:
+                state = self.connections() if self.connections else None
+            except Exception:  # noqa: BLE001
+                state = None
+            text = answer_connection(request, state)
+        if text is None:
+            return None
+        dec = RouteDecision(tier="L1", intent_family="connections", skills=[], plan_needed=False, risk_floor=0, memory_types=[], confidence=1.0, latency_ms=0.0, backend="rule",
+                            trace=["Checked the real connector state by code; no model was asked, so it cannot invent a connection"])
+        return TurnResult("L1", dec, None, None, (time.perf_counter() - t0) * 1000, answer=Answered(text, grounded=True, notes=["connections"]))
+
     async def rehearse(self, text: str) -> tuple[bool, str]:
         """A DRY RUN used while dreaming: read the sentence the way the live path would and build the plan, without executing anything or contacting anything. True when it would now be understood."""
         saved = getattr(self, "_clarify", None)
@@ -673,6 +691,8 @@ class Agent:
             txt = n.strftime("It is %H:%M on %A %d %B %Y") + f" ({n.tzname()})."
             dec = RouteDecision(tier="L1", intent_family="clock", skills=[], plan_needed=False, risk_floor=0, memory_types=[], confidence=1.0, latency_ms=0.0, backend="rule")
             return TurnResult("L1", dec, None, None, (time.perf_counter() - t0) * 1000, answer=Answered(txt), timings=tm)
+        if self.answerer is not None and trust == "user_direct" and (cn := self._connection_turn(request, t0)) is not None:
+            return cn
         if strong is None and self.answerer is not None and CAPABILITY_ASK.search(request) and not self._is_action_request(request.replace("can you", "")):
             dec = RouteDecision(tier="L1", intent_family="capabilities", skills=[], plan_needed=False, risk_floor=0, memory_types=[], confidence=1.0, latency_ms=0.0, backend="rule")
             return TurnResult("L1", dec, None, None, (time.perf_counter() - t0) * 1000, answer=Answered(CAPABILITIES))

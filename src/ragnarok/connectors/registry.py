@@ -52,3 +52,8 @@ def connected(vault: SecretStore) -> list[str]:
         if n not in skip and vault.get(token_name(_key(n), "read")):
             out.append(n)
     return out
+
+
+def write_connected(vault: SecretStore) -> list[str]:
+    """Connectors that also hold a write token (so the agent may send, post or create with them, after a click)."""
+    return [n for n in NAMES if n != "files" and vault.get(token_name(_key(n), "write"))]

@@ -180,6 +180,12 @@ def build_world(*, use_laya: bool = True, sandbox: bool = True, embed_rungs: boo
     scroll_lib = ScrollLibrary(Path(__file__).resolve().parents[1] / "scrolls" / "builtin", root / "scrolls", gw)
     scroll_runner = ScrollRunner(scroll_lib, gw, reader, index, COMPARTMENT, answerer, mem)
     agent.scrolls = scroll_runner
+    def _connections() -> dict[str, Any]:
+        from ragnarok.connectors.registry import write_connected
+
+        return {"read": [n for n in runners if n not in ("files", "notifications")] + (["files"] if "files" in runners else []), "write": write_connected(vault), "health": runtime.status().get("sources", {})}
+
+    agent.connections = _connections
     services = Services(runtime, answerer, notif, chat, reader, hub, proactive, mem, reindex, skills_admin, digest, vision)
     services.scrolls = scroll_runner
     from ragnarok.daemon.dream import Dreamer
