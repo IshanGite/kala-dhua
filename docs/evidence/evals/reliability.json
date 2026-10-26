@@ -23,9 +23,9 @@
   },
   "fuzz_latency": {
    "n": 300,
-   "p50_ms": 1078.7,
-   "p95_ms": 3206.7,
-   "max_ms": 32826.9
+   "p50_ms": 1100.8,
+   "p95_ms": 2251.6,
+   "max_ms": 7995.6
   },
   "concurrent_requests_answered": {
    "k": 30,
@@ -36,7 +36,7 @@
     1.0
    ]
   },
-  "concurrent_wall_s": 23.1,
+  "concurrent_wall_s": 17.8,
   "model_server_down_graceful_replies": {
    "k": 7,
    "n": 7,
@@ -48,35 +48,22 @@
   },
   "model_server_down_latency": {
    "n": 7,
-   "p50_ms": 3.6,
-   "p95_ms": 15.9,
-   "max_ms": 15.9
+   "p50_ms": 3.4,
+   "p95_ms": 16.3,
+   "max_ms": 16.3
   },
   "fuzz_inputs_slower_than_10s": {
-   "k": 2,
+   "k": 0,
    "n": 300,
-   "rate": 0.0067,
+   "rate": 0.0,
    "ci95": [
-    0.002,
-    0.024
+    0.0,
+    0.013
    ]
   }
  },
- "failures": [
-  {
-   "slower_than_10s": {
-    "input": "'; DROP TABLE facts;--",
-    "ms": 32827
-   }
-  },
-  {
-   "slower_than_10s": {
-    "input": "remind me to",
-    "ms": 30406
-   }
-  }
- ],
+ "failures": [],
  "notes": "300 inputs (20 hand-made hostile, 280 random); every approval card was denied so no send can happen; 30 simultaneous chat requests; model server replaced by a dead loopback port. Restart recovery and resource use are measured by bench_restart.py and bench_nfr2_2.py (docs/evidence/nfr3_2_restart.json, nfr2_2_*.json).",
- "seconds": 475.2,
- "finished_at": 1792983822418
+ "seconds": 409.1,
+ "finished_at": 1792984504299
 }

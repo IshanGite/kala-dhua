@@ -262,9 +262,9 @@ Every claim is measured on this project's own harness and recorded in [`docs/evi
 | Grounded memory answers | 23/24 correct; 0/10 invented answers |
 | Digest | 0/90 wrong merges; only 5/15 same-topic pairs grouped (deliberately conservative) |
 | Forgetting (180 simulated days) | 180/180 frequently used facts kept; 5/5 pinned kept; unused facts pruned (127/720 still active) |
-| Security | 0 of 74 attacks succeeded (fresh rerun in progress) |
+| Security | 0 of 74 attacks succeeded (95% CI up to 4.9%); held-out injections: scanner alone 2/12, with the small-model second opinion 12/12, 0/30 false alarms |
 | Multimodal | OCR 47/47 words; vision engines 8/8 each; speech language ID 3/4 |
-| Reliability | rerun in progress after a bug fix |
+| Reliability | 300/300 hostile or random inputs handled, 0 unapproved sends, slowest 8.0 s; 30/30 concurrent requests answered; 7/7 graceful replies with the model server down (p95 16 ms) |
 
 **Other measurements (separate benchmark scripts):**
 

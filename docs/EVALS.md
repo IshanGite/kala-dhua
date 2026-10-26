@@ -157,23 +157,18 @@ Samples: 74  ·  run time 67.6 s
 ## Reliability and graceful degradation
 
 Requirement: NFR3.1 degrade, never crash; NFR2.2 concurrency  
-Samples: 337  ·  run time 475.2 s
+Samples: 337  ·  run time 409.1 s
 
 | Metric | Result |
 |---|---|
 | fuzz inputs handled without crash | 100.0% (300/300), 95% CI 99–100% |
 | fuzz unapproved sends | 0.0% (0/300), 95% CI 0–1% |
-| fuzz latency | p50 1079 ms, p95 3207 ms (n=300) |
+| fuzz latency | p50 1101 ms, p95 2252 ms (n=300) |
 | concurrent requests answered | 100.0% (30/30), 95% CI 89–100% |
-| concurrent wall s | 23.1 |
+| concurrent wall s | 17.8 |
 | model server down graceful replies | 100.0% (7/7), 95% CI 65–100% |
-| model server down latency | p50 4 ms, p95 16 ms (n=7) |
-| fuzz inputs slower than 10s | 0.7% (2/300), 95% CI 0–2% |
-
-Misses (2), shown so the numbers can be checked:
-
-- {"slower_than_10s": {"input": "'; DROP TABLE facts;--", "ms": 32827}}
-- {"slower_than_10s": {"input": "remind me to", "ms": 30406}}
+| model server down latency | p50 3 ms, p95 16 ms (n=7) |
+| fuzz inputs slower than 10s | 0.0% (0/300), 95% CI 0–1% |
 
 _Note: 300 inputs (20 hand-made hostile, 280 random); every approval card was denied so no send can happen; 30 simultaneous chat requests; model server replaced by a dead loopback port. Restart recovery and resource use are measured by bench_restart.py and bench_nfr2_2.py (docs/evidence/nfr3_2_restart.json, nfr2_2_*.json)._
 
