@@ -183,6 +183,8 @@ class Deleter:
                 q = ",".join("?" * len(ids["items"]))
                 c.execute(f"DELETE FROM provenance WHERE (child_type='item' AND child_id IN ({q})) OR (parent_type='item' AND parent_id IN ({q}))", [*ids["items"], *ids["items"]])
                 c.execute(f"DELETE FROM items WHERE id IN ({q})", ids["items"])
+            if ids["items"]:
+                self._m.prune_people(c)  # names of people who no longer appear in any remaining message go too
             if ids["facts"]:
                 self._m._purge_facts(ids["facts"])  # noqa: SLF001
             if ids["events"]:

@@ -17,6 +17,7 @@ from ragnarok.config.paths import data_dir, db_path, ensure_dirs
 from ragnarok.connectors.notifications import Notifications, default_source
 from ragnarok.connectors.registry import build, connected
 from ragnarok.connectors.runner import ConnectorRunner
+from ragnarok.core.logging import log
 from ragnarok.daemon.actions import Actions
 from ragnarok.daemon.api import Services
 from ragnarok.daemon.approvals import ApprovalHub
@@ -96,6 +97,10 @@ def build_world(*, use_laya: bool = True, sandbox: bool = True, embed_rungs: boo
     root = ensure_dirs()
     keys = KeyHierarchy.load_or_create(vault)
     mem = MemoryService(db_path(root), keys)
+    try:
+        mem.backfill_people()  # older messages were stored before people were noted
+    except Exception:  # noqa: BLE001 - relational memory is a convenience; never block start-up
+        log("people_backfill_failed")
     reader = MemoryReader(mem.db_path, keys)
     index = VectorIndex()
     _load_index(mem, reader, index)

@@ -835,6 +835,10 @@ class Agent:
             self.routes.add_event(decision.route_id, "tier_used", tier=decision.tier, latency_ms=latency, ok=outcome.state == "succeeded", trace_id=tid[:12])
         self.ledger.record_decision("route", task_id=tid, tier=decision.tier, backend=decision.backend, choice={"skills": decision.skills, "plan_needed": decision.plan_needed},
                                     rationale="; ".join(decision.notes) or None, outcome={"state": outcome.state}, latency_ms=latency)
+        try:  # meta-memory: how often this kind of decision and each skill worked (numbers only)
+            self.mem.note_meta(decision.intent_family, decision.backend, outcome.state == "succeeded", [(n.skill, outcome.node_states.get(n.id) == "succeeded") for n in plan.nodes])
+        except Exception:  # noqa: BLE001
+            pass
         self.mem.write_event(EventIn(compartment=self.ctx.compartment, kind="task_result", actor="agent", content=f"{request[:200]} -> {outcome.state}", trust="agent", task_id=tid))
         return TurnResult(decision.tier, decision, outcome, None, latency, learned, decision.notes, task_id=tid, timings=tm)
 

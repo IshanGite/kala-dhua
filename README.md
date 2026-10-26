@@ -111,15 +111,15 @@ All eleven live in a single encrypted SQLCipher file. The table says how each on
 | # | Type | How it works in practice | State |
 |---|---|---|---|
 | 1 | Working | Running tasks and their steps are saved to disk in `tasks` and `task_nodes`, so a crash resumes them (measured restore: 3.3 s). | Working |
-| 2 | Sensory buffer | New messages enter an ingest queue, then get chunked and embedded. | Queue works; the planned 7-day purge of processed raw items is not implemented yet |
+| 2 | Sensory buffer | New messages enter an ingest queue, then get chunked and embedded. | Working. The planned 7-day purge applies to a raw buffer this build does not keep: items are chunked and marked processed in the same transaction (see ADR 005) |
 | 3 | Episodic | `events` is an append-only, hash-chained log of every message, reply and task result. | Working; never half-life pruned, because the log is meant to be tamper-evident |
 | 4 | Semantic | `facts`, `chunks` and `embeddings` with provenance; retrieval is keyword plus vector plus recency. | Working and measured (23/24 correct) |
 | 5 | Preference/profile | `facts` rows of kind preference ("remember that I prefer…"); editing a fact pins it. | Working |
-| 6 | Relational (people) | "What did Ravi say" works by looking up the message author. | Partial: the `people`, `identities` and `merge_log` tables exist but nothing writes to them yet, so there is no identity merging across apps |
+| 6 | Relational (people) | Each message author is noted as a person with the app handles they use. The same full name on another app joins the same person; a bare first name never does (two Ravis stay apart). A delete also removes the names of people who no longer appear in any remaining message. | Working (the `merge_log` is not used: joins are by exact full name only, no fuzzy matching) |
 | 7 | Prospective | `commitments` and reminders: due dates, firing on time, snooze. | Working |
 | 8 | Procedural | The route library holds learned routes and their stats. | Working |
-| 9 | Meta-memory | Router calibration and route stats. | Partial: the `router_stats` and `skill_stats` tables are never written |
-| 10 | Project/context | Compartments partition every row (the app uses `work`). | Partial: there is no `projects` table or project-close archiving yet |
+| 9 | Meta-memory | Per-skill calls and failures and per-decision success counts, numbers only, kept for 30 days, shown on the skill nodes in the Graph tab. | Working |
+| 10 | Project/context | Compartments partition every row (the app uses `work`). | Working through compartments; there is no separate `projects` table (not needed so far, see ADR 005) |
 | 11 | Autobiographical timeline | `consolidate()` turns events older than 14 days into saga summaries. | Working; the default is extractive, not model-written |
 
 ---

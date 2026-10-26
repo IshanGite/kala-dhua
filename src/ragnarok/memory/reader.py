@@ -103,6 +103,21 @@ class MemoryReader:
             sql += " AND valid_to IS NULL AND state='active'"
         return [dict(r) for r in self._r.execute(sql + " ORDER BY learned_at DESC", args)]
 
+    def people_list(self, limit: int = 60) -> list[dict[str, Any]]:
+        """People noted from message authors, with the app handles they use, most recent first."""
+        out = []
+        for r in self._r.execute("SELECT id, display_name, last_seen FROM people WHERE merged_into IS NULL ORDER BY last_seen DESC LIMIT ?", (limit,)):
+            ids = [{"platform": x[0], "handle": x[1]} for x in self._r.execute("SELECT platform, handle FROM identities WHERE person_id=?", (r[0],))]
+            out.append({"id": r[0], "name": r[1], "last_seen": r[2], "identities": ids})
+        return out
+
+    def skill_stats(self) -> dict[str, dict[str, int]]:
+        """Meta-memory: calls and failures per skill over the kept 30 days. Numbers only."""
+        return {r[0]: {"calls": r[1], "failures": r[2]} for r in self._r.execute("SELECT skill_id, sum(calls), sum(failures) FROM skill_stats GROUP BY skill_id")}
+
+    def router_stats(self) -> list[dict[str, Any]]:
+        return [{"decision": r[0], "backend": r[1], "n": r[2], "correct": r[3]} for r in self._r.execute("SELECT decision, backend, sum(n), sum(correct) FROM router_stats GROUP BY decision, backend ORDER BY sum(n) DESC")]
+
     def facts_by_state(self, comp_id: str, state: str) -> list[dict[str, Any]]:
         return [dict(r) for r in self._r.execute("SELECT * FROM facts WHERE compartment_id=? AND state=?", (comp_id, state))]
 

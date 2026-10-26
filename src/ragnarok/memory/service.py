@@ -10,9 +10,11 @@ Guarantees implemented here:
 
 from __future__ import annotations
 
+import json
 import re
 import threading
 from collections import deque
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -188,7 +190,85 @@ class MemoryService:
                     )
                     self._w.execute("INSERT INTO provenance(child_type,child_id,parent_type,parent_id,relation,quote) VALUES ('chunk',?,'item',?,'part_of',NULL)", (cid, item_id))
                 self._w.execute("UPDATE items SET status='processed' WHERE id=?", (item_id,))
+                self._note_person(item.source, item.flags.get("author") or item.flags.get("from") or "", item.occurred_at or now)
             return ItemResult(item_id=item_id, action=action, chunk_ids=chunk_ids)  # type: ignore[arg-type]
+
+    # ------------------------------------------------------------------ meta-memory: numbers about how well things worked (no content, rolling 30 days)
+    def note_meta(self, decision: str, backend: str, ok: bool, skills: list[tuple[str, bool]]) -> None:
+        now = self._now()
+        day, bucket = datetime.fromtimestamp(now / 1000, tz=UTC).strftime("%Y-%m-%d"), now // 86_400_000
+        with self._lock, transaction(self._w):
+            self._w.execute("INSERT INTO router_stats(decision,backend,bucket,n,correct) VALUES (?,?,?,1,?) ON CONFLICT(decision,backend,bucket) DO UPDATE SET n=n+1, correct=correct+excluded.correct",
+                            (decision[:40] or "unknown", backend[:40] or "unknown", bucket, 1 if ok else 0))
+            for sk, good in skills:
+                self._w.execute("INSERT INTO skill_stats(skill_id,day,calls,failures) VALUES (?,?,1,?) ON CONFLICT(skill_id,day) DO UPDATE SET calls=calls+1, failures=failures+excluded.failures", (sk[:60], day, 0 if good else 1))
+            self._w.execute("DELETE FROM router_stats WHERE bucket<?", (bucket - 30,))
+            self._w.execute("DELETE FROM skill_stats WHERE day<?", (datetime.fromtimestamp((now - 30 * 86_400_000) / 1000, tz=UTC).strftime("%Y-%m-%d"),))
+
+    # ------------------------------------------------------------------ relational memory: people and their handles
+    @staticmethod
+    def split_author(raw: Any) -> tuple[str, str]:
+        """'Name <mail@x.com>' -> ('Name', 'mail@x.com'); a bare name is its own handle. Empty when there is nobody to note."""
+        text = " ".join(str(raw or "").split())
+        if not text or len(text) > 120:
+            return "", ""
+        if "<" in text and text.endswith(">"):
+            name, _, addr = text.partition("<")
+            name, addr = name.strip(" \"'"), addr[:-1].strip().lower()
+            return (name or addr.split("@")[0]), addr
+        return text, text.lower()
+
+    def _note_person(self, platform: str, author_raw: Any, ts: int) -> None:
+        """Who wrote this. One person per handle; the same FULL name (two or more words) on another app joins the same person, a single first name never does (two different Ravis stay apart)."""
+        name, handle = self.split_author(author_raw)
+        if not name or platform in ("notifications", "gcal", "gdrive", "files"):
+            return
+        row = self._w.execute("SELECT person_id FROM identities WHERE platform=? AND handle=?", (platform, handle)).fetchone()
+        if row:
+            self._w.execute("UPDATE people SET last_seen=? WHERE id=? AND (last_seen IS NULL OR last_seen<?)", (ts, row[0], ts))
+            return
+        norm = " ".join(name.lower().split())
+        pid = None
+        if len(norm.split()) >= 2:
+            hit = self._w.execute("SELECT id FROM people WHERE merged_into IS NULL AND lower(display_name)=?", (norm,)).fetchone()
+            pid = hit[0] if hit else None
+        if pid is None:
+            pid = new_id()
+            self._w.execute("INSERT INTO people(id,display_name,created_at,last_seen) VALUES (?,?,?,?)", (pid, name, self._now(), ts))
+        self._w.execute("INSERT OR IGNORE INTO identities(person_id,platform,handle) VALUES (?,?,?)", (pid, platform, handle))
+        self._w.execute("UPDATE people SET last_seen=? WHERE id=? AND (last_seen IS NULL OR last_seen<?)", (ts, pid, ts))
+
+    def prune_people(self, c: Any) -> int:
+        """After a delete: forget every handle no remaining message was written by, and every person left with no handle. A deleted conversation must not leave names behind."""
+        live = set()
+        for src, fl in c.execute("SELECT source, flags_json FROM items"):
+            try:
+                d = json.loads(fl or "{}")
+            except ValueError:
+                continue
+            _n, h = self.split_author(d.get("author") or d.get("from") or "")
+            if h:
+                live.add((src, h))
+        gone = [(r[0], r[1]) for r in c.execute("SELECT platform, handle FROM identities") if (r[0], r[1]) not in live]
+        for plat, h in gone:
+            c.execute("DELETE FROM identities WHERE platform=? AND handle=?", (plat, h))
+        n = c.execute("DELETE FROM people WHERE id NOT IN (SELECT person_id FROM identities)").rowcount
+        return int(n or 0)
+
+    def backfill_people(self) -> int:
+        """Older items were stored before people were noted: read their authors once."""
+        with self._lock:
+            seen = 0
+            with transaction(self._w):
+                for src, fl, ts in list(self._w.execute("SELECT source, flags_json, coalesce(occurred_at, ingested_at) FROM items")):
+                    try:
+                        d = json.loads(fl or "{}")
+                    except ValueError:
+                        continue
+                    before = self._w.execute("SELECT count(*) FROM identities").fetchone()[0]
+                    self._note_person(src, d.get("author") or d.get("from") or "", ts or 0)
+                    seen += self._w.execute("SELECT count(*) FROM identities").fetchone()[0] - before
+            return seen
 
     def put_embedding(self, owner_type: str, owner_id: str, compartment: str, model_id: str, vec: np.ndarray) -> None:
         with self._lock:

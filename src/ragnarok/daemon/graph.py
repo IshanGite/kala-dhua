@@ -108,10 +108,17 @@ def build_graph(svc: Any, *, demo: bool = False, hours: float = 24 * 30) -> dict
         node(f"src:{s}", SRC_LABEL.get(s, s), "app", 1.4 + math.log10(n + 1) * 0.5, f"{n} item(s) read from {SRC_LABEL.get(s, s)} in the last {int(hours / 24)} days")
         edge("root", f"src:{s}", "reads")
         edge(f"src:{s}", "realm:sensory", "feeds")
+    known: dict[str, set[str]] = {}
+    if reader is not None:
+        try:  # people noted by relational memory: one person, every app handle they use
+            for pr in reader.people_list(60):
+                known[pr["name"]] = {i["platform"] for i in pr["identities"]}
+        except Exception:  # noqa: BLE001
+            known = {}
     for p, n in people.most_common(24):
-        node(f"person:{p.lower()}", p, "person", 1.0 + math.log10(n + 1) * 0.6, f"{n} message(s) from {p}")
+        node(f"person:{p.lower()}", p, "person", 1.0 + math.log10(n + 1) * 0.6, f"{n} message(s) from {p}" + (f", on {len(known[p])} app(s)" if len(known.get(p, ())) > 1 else ""))
         edge("realm:relational", f"person:{p.lower()}", "knows")
-        for s in person_srcs[p]:
+        for s in person_srcs[p] | known.get(p, set()):
             edge(f"person:{p.lower()}", f"src:{s}", "wrote")
     try:
         sections = svc.digest.build(hours)["sections"][:14] if svc.digest is not None else []
@@ -136,8 +143,11 @@ def build_graph(svc: Any, *, demo: bool = False, hours: float = 24 * 30) -> dict
         except Exception:  # noqa: BLE001
             pass
     try:
+        stats = reader.skill_stats() if reader is not None else {}
         for s in (svc.skills.list() if svc.skills is not None else [])[:40]:
-            node(f"skill:{s['name']}", s["name"], "skill", 1.0 + (0.3 if s.get("enabled") else 0), f"{s['description'][:100]} (tier {s.get('tier')})", off=not s.get("enabled"))
+            st = stats.get(s["name"])
+            node(f"skill:{s['name']}", s["name"], "skill", 1.0 + (0.3 if s.get("enabled") else 0) + (min(.6, math.log10(st["calls"] + 1) * .3) if st else 0),
+                 f"{s['description'][:90]} (tier {s.get('tier')})" + (f" - {st['calls']} call(s), {st['failures']} failed in 30 days" if st else ""), off=not s.get("enabled"))
             edge("realm:procedural", f"skill:{s['name']}", "can")
     except Exception:  # noqa: BLE001
         pass
